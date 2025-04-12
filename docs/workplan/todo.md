@@ -12,21 +12,15 @@ Here is the revised plan for the first 10 high-level tasks, incorporating your f
 
 ---
 
-**1. Define and Implement Core Models**
-  - Create Task, AgentActivity, LlmCall, and Event models.
-- _Acceptance: Models exist with basic attributes and associations._
-  - Add state machine to Task (pending, active, waiting_on_human, completed, failed).
-    - _Acceptance: Task state transitions enforced and tested._
-  - Ensure AgentActivity supports parent/child relationships.
-- _Acceptance: AgentActivity can represent event flow ancestry._
-
+(Preliminary: Review regent gem docs and functionality and summarize its API - we are using our own fork upto date with main incase we need to make any changes but open_router should
+be able to be used as open ai compatible)
 
 **2. Set Up Core Infrastructure: Regent/SolidQueue/Event Bus/OpenRouter Integration**
-  - Integrate and configure Regent as the event bus within Rails.
+  - Integrate and configure Regent as the event bus within Rails. (REVIEW: agent_implementation.md)
     - _Acceptance: Regent is initialized, can publish/subscribe events from Rails._
-  - Wrap Regent for idiomatic Rails use; bridge events to Solid Queue jobs.
+  - Wrap Regent for idiomatic Rails use; bridge events to Solid Queue jobs.[Setup solid queue if necessary and set up mission_control-jobs dashboard in admin namespace without any customization for now]
     - _Acceptance: Event publish triggers jobs, and jobs emit events._
-  - Set up OpenRouter integration (API keys, basic call/test).
+  - Set up OpenRouter integration (basic call/test and model defaults/overides)
     - _Acceptance: System can make authenticated OpenRouter calls from jobs/services.
 
 
@@ -126,3 +120,11 @@ flowchart TD
 ### FINISHED
 
 - scaffolded rails app installed nec gems, etc
+
+**1. Define and Implement Core Models**
+  - Create Task, AgentActivity, LlmCall, and Event models.
+  - _Acceptance: Models exist with basic attributes and associations._
+  - Add state machine to Task (pending, active, waiting_on_human, completed, failed).
+  - _Acceptance: Task state transitions enforced and tested._
+  - Ensure AgentActivity supports parent/child relationships.
+  - _Acceptance: AgentActivity can represent event flow ancestry._

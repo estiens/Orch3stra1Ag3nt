@@ -103,6 +103,9 @@ GEM
     coderay (1.1.3)
     concurrent-ruby (1.3.5)
     connection_pool (2.5.0)
+    crack (1.0.0)
+      bigdecimal
+      rexml
     crass (1.0.6)
     csv (3.3.3)
     date (3.4.1)
@@ -157,6 +160,7 @@ GEM
       tzinfo
     ethon (0.16.0)
       ffi (>= 1.15.0)
+    event_stream_parser (1.0.0)
     factory_bot (6.5.1)
       activesupport (>= 6.1.0)
     factory_bot_rails (6.4.4)
@@ -182,6 +186,7 @@ GEM
       raabro (~> 1.4)
     globalid (1.2.1)
       activesupport (>= 6.1)
+    hashdiff (1.1.2)
     http-cookie (1.0.8)
       domain_name (~> 0.5)
     httparty (0.23.1)
@@ -374,6 +379,7 @@ GEM
     regexp_parser (2.10.0)
     reline (0.6.1)
       io-console (~> 0.5)
+    rexml (3.4.1)
     rspec-core (3.13.3)
       rspec-support (~> 3.13.0)
     rspec-expectations (3.13.3)
@@ -419,6 +425,10 @@ GEM
       rubocop (>= 1.72)
       rubocop-performance (>= 1.24)
       rubocop-rails (>= 2.30)
+    ruby-openai (8.1.0)
+      event_stream_parser (>= 0.3.0, < 2.0.0)
+      faraday (>= 1)
+      faraday-multipart (>= 1)
     ruby-progressbar (1.13.0)
     rubyntlm (0.6.5)
       base64
@@ -489,6 +499,10 @@ GEM
       activemodel (>= 6.0.0)
       bindex (>= 0.4.0)
       railties (>= 6.0.0)
+    webmock (3.25.1)
+      addressable (>= 2.8.0)
+      crack (>= 0.3.2)
+      hashdiff (>= 0.4.0, < 2.0.0)
     webrick (1.9.1)
     webrobots (0.1.2)
     websocket-driver (0.7.7)
@@ -535,6 +549,7 @@ DEPENDENCIES
   regent!
   rspec-rails
   rubocop-rails-omakase
+  ruby-openai (~> 8.1)
   shoulda-matchers (~> 6.0)
   solid_cable
   solid_cache
@@ -547,6 +562,7 @@ DEPENDENCIES
   tzinfo-data
   vcr
   web-console
+  webmock (~> 3.25)
 
 BUNDLED WITH
    2.6.2

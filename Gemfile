@@ -69,6 +69,10 @@ group :development do
   gem "web-console"
 end
 
+group :test do
+  gem "webmock", "~> 3.25"
+end
+
 gem "dotenv-rails"
 
 # LLM calls
@@ -92,3 +96,5 @@ gem "typhoeus"
 
 gem "chartkick"
 gem "mission_control-jobs"
+
+gem "ruby-openai", "~> 8.1"
