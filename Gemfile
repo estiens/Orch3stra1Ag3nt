@@ -83,5 +83,4 @@ gem "typhoeus"
 # dashboard
 
 gem "chartkick"
-gem "pg_hero"
 gem "mission_control-jobs"
