@@ -1,4 +1,12 @@
+
+gem "ancestry"
+
 source "https://rubygems.org"
+group :test do
+  gem "shoulda-matchers", "~> 6.0"
+end
+
+gem "aasm"
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "~> 8.0.2"
@@ -69,7 +77,7 @@ gem "open_router"
 
 # agents
 
-gem "regent"
+gem "regent", github: "estiens/regent"
 gem "dry-schema"
 gem "dry-validation"
 

@@ -1,6 +1,18 @@
+GIT
+  remote: https://github.com/estiens/regent.git
+  revision: d5a59ceb3c06e6d4a4383d9873a64718b2d0ce9c
+  specs:
+    regent (0.3.4)
+      faraday (~> 2.12)
+      pastel (~> 0.8.0)
+      tty-spinner (~> 0.9.3)
+      zeitwerk (~> 2.7)
+
 GEM
   remote: https://rubygems.org/
   specs:
+    aasm (5.5.0)
+      concurrent-ruby (~> 1.0)
     actioncable (8.0.2)
       actionpack (= 8.0.2)
       activesupport (= 8.0.2)
@@ -74,6 +86,8 @@ GEM
       uri (>= 0.13.1)
     addressable (2.8.7)
       public_suffix (>= 2.0.2, < 7.0)
+    ancestry (4.3.3)
+      activerecord (>= 5.2.6)
     ast (2.4.3)
     base64 (0.2.0)
     bcrypt_pbkdf (1.1.1)
@@ -357,11 +371,6 @@ GEM
     rake (13.2.1)
     rdoc (6.13.1)
       psych (>= 4.0.0)
-    regent (0.3.4)
-      faraday (~> 2.12)
-      pastel (~> 0.8.0)
-      tty-spinner (~> 0.9.3)
-      zeitwerk (~> 2.7)
     regexp_parser (2.10.0)
     reline (0.6.1)
       io-console (~> 0.5)
@@ -414,6 +423,8 @@ GEM
     rubyntlm (0.6.5)
       base64
     securerandom (0.4.1)
+    shoulda-matchers (6.4.0)
+      activesupport (>= 5.2.0)
     solid_cable (3.0.7)
       actioncable (>= 7.2)
       activejob (>= 7.2)
@@ -498,6 +509,8 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
+  aasm
+  ancestry
   bootsnap
   brakeman
   chartkick
@@ -519,9 +532,10 @@ DEPENDENCIES
   pry-rails
   puma (>= 5.0)
   rails (~> 8.0.2)
-  regent
+  regent!
   rspec-rails
   rubocop-rails-omakase
+  shoulda-matchers (~> 6.0)
   solid_cable
   solid_cache
   solid_queue
