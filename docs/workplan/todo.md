@@ -15,22 +15,33 @@ Here is the revised plan for the first 10 high-level tasks, incorporating your f
 (Preliminary: Review regent gem docs and functionality and summarize its API - we are using our own fork upto date with main incase we need to make any changes but open_router should
 be able to be used as open ai compatible)
 
-**2. Set Up Core Infrastructure: Regent/SolidQueue/Event Bus/OpenRouter Integration**
-  - Integrate and configure Regent as the event bus within Rails. (REVIEW: agent_implementation.md)
-    - _Acceptance: Regent is initialized, can publish/subscribe events from Rails._
-  - Wrap Regent for idiomatic Rails use; bridge events to Solid Queue jobs.[Setup solid queue if necessary and set up mission_control-jobs dashboard in admin namespace without any customization for now]
-    - _Acceptance: Event publish triggers jobs, and jobs emit events._
-  - Set up OpenRouter integration (basic call/test and model defaults/overides)
-    - _Acceptance: System can make authenticated OpenRouter calls from jobs/services.
 
 
-**3. Set Up Agent Job Execution Layer**
+**3. Set Up Agent Job Execution Layer** [IN PROGRESS]
   - Implement base Agent job class (app/jobs/agents/).
     - _Acceptance: Jobs can be enqueued/executed as agents._
   - Add support for job arguments (agent type, context, task ID).
     - _Acceptance: Jobs receive and use arguments correctly._
   - Integrate Ractors for agent job isolation.
-    - _Acceptance: Multiple jobs run in parallel without interference._
+    - _Acceptance: Multiple jobs run in parallel without interference._(Question Do we need this with async job handling and our existing queues? perhaps think through queue manageemnt)
+
+3. **Documentation**:
+   - The implementation guide (`agent_implementation.md`) is a good addition. Make sure it evolves alongside the codebase to maintain relevance.
+   - Further comments in the code (e.g., in complex methods) would improve readability and maintainability.
+
+4. **Error Handling**:
+   - Review error-handling strategies, particularly in the `invoke` method within the LLM class. Ensure that there are fallbacks or retries for temporary network issues.
+   - Implement custom error classes for better granularity in catching and handling specific exceptions.
+
+5. **Review of Queue Handling**:
+   - It's crucial to monitor the queuing system behavior under load, especially if you're planning to scale. Consider setting up alerts for dropped jobs or slow processing times.
+
+6. **Performance Considerations**:
+   - As more agents are implemented, performance could become an issue. Start profiling the job processing times and identify bottlenecks early.
+
+7. **API Rate Limiting**:
+   - Monitor API usage and consider implementing rate limiting on the application side if OpenRouter imposes usage limits.
+
 
 ---
 
