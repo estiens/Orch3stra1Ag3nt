@@ -1,6 +1,14 @@
 # require "serpapi"
 
-class SerpApiSearchTool < Regent::Tool
+class SerpApiSearchTool < BaseTool
+  def initialize
+    super("serp_api_search", "Search the web using SerpAPI")
+  end
+  
+  def call(args)
+    # Placeholder implementation
+    { error: "SerpAPI search not implemented yet" }
+  end
 end
 #   # Implement the call method that will be invoked when the tool is used
 #   def call(query, num_results: 5, include_snippets: true)

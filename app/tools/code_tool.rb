@@ -1,5 +1,9 @@
 # CodeTool: Provides code analysis capabilities
-class CodeTool < Regent::Tool
+class CodeTool < BaseTool
+  def initialize
+    super("code_analyzer", "Analyzes code snippets and provides insights")
+  end
+  
   def call(code_snippet)
     # In a real implementation, this would use a code analysis service or LLM
     Rails.logger.info("CodeTool analyzing code (length: #{code_snippet.length})")

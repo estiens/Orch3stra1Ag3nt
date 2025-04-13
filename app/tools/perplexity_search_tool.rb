@@ -1,8 +1,14 @@
 require "httparty"
 require "json"
 
-class PerplexitySearchTool < Regent::Tool
-  def call(query:, focus: "web")
+class PerplexitySearchTool < BaseTool
+  def initialize
+    super("perplexity_search", "Search the web using Perplexity AI")
+  end
+  
+  def call(args)
+    query = args.is_a?(Hash) ? args[:query] : args
+    focus = args.is_a?(Hash) ? args[:focus] || "web" : "web"
     begin
       # Validate the API key
       api_key = ENV["PERPLEXITY_API_KEY"]

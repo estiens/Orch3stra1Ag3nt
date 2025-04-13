@@ -1,8 +1,15 @@
 require "mechanize"
 require "nokogiri"
 
-class WebScraperTool < Regent::Tool
-  def call(url:, selector: nil, extract_type: "text")
+class WebScraperTool < BaseTool
+  def initialize
+    super("web_scraper", "Scrape content from web pages")
+  end
+  
+  def call(args)
+    url = args[:url]
+    selector = args[:selector]
+    extract_type = args[:extract_type] || "text"
     begin
       # Validate URL
       unless url =~ /\A(http|https):\/\/[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(\/.*)?(\?.*)?(\#.*)?\z/ix

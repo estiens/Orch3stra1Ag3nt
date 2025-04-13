@@ -1,5 +1,9 @@
 # ResearchTool: Provides research capabilities to agents
-class ResearchTool < Regent::Tool
+class ResearchTool < BaseTool
+  def initialize
+    super("research", "Performs research on a given topic")
+  end
+  
   # Implement the call method that will be invoked when the tool is used
   def call(query)
     # In a real implementation, this would connect to a search API

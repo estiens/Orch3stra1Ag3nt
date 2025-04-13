@@ -1,6 +1,19 @@
-class VectorEmbeddingTool < Regent::Tool
-  def call(action:, content: nil, collection: "default", task_id: nil, project_id: nil,
-           limit: 5, content_type: "text", metadata: {}, source_url: nil, source_title: nil)
+class VectorEmbeddingTool < BaseTool
+  def initialize
+    super("vector_embedding", "Store and retrieve vector embeddings")
+  end
+  
+  def call(args)
+    action = args[:action]
+    content = args[:content]
+    collection = args[:collection] || "default"
+    task_id = args[:task_id]
+    project_id = args[:project_id]
+    limit = args[:limit] || 5
+    content_type = args[:content_type] || "text"
+    metadata = args[:metadata] || {}
+    source_url = args[:source_url]
+    source_title = args[:source_title]
     begin
       # Validate OpenAI API key
       unless ENV["OPENAI_API_KEY"].present?
