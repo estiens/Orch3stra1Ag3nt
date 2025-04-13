@@ -1,6 +1,6 @@
 # Langchain Framework Initialization for Rails
 
-require "langchain"
+require "langchainrb"
 
 # Ensure OpenRouter API key is present (fail fast if missing)
 unless ENV["OPEN_ROUTER_API_KEY"].present?
@@ -17,7 +17,7 @@ LANGCHAIN_MODEL_DEFAULTS = {
 }.freeze
 
 # Configure Langchain with OpenRouter
-Langchain.configure do |config|
+Langchainrb.configure do |config|
   config.llm = {
     provider: :openrouter,
     api_key: ENV["OPEN_ROUTER_API_KEY"],

@@ -80,7 +80,7 @@ gem "open_router"
 
 # agents
 
-gem "langchain"
+gem "langchainrb"
 gem "dry-schema"
 gem "dry-validation"
 

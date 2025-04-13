@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Langchain
+module Langchainrb
   module LLM
     # Base class for LLM providers
     class Base
@@ -32,7 +32,7 @@ module Langchain
     end
     
     # LLM interface for Open Router APIs: https://openrouter.ai/docs
-    class OpenRouter < Base
+    class OpenRouter < Langchainrb::LLM::Base
       DEFAULTS = {
         temperature: 0.0,
         chat_model: "deepseek/deepseek-chat-v3-0324",
@@ -129,5 +129,5 @@ module Langchain
 end
 
 # Make our OpenRouter provider available to the application
-Langchain::LLM.const_set(:PROVIDER_CLASSES, {}) unless Langchain::LLM.const_defined?(:PROVIDER_CLASSES)
-Langchain::LLM::PROVIDER_CLASSES[:openrouter] = Langchain::LLM::OpenRouter
+Langchainrb::LLM.const_set(:PROVIDER_CLASSES, {}) unless Langchainrb::LLM.const_defined?(:PROVIDER_CLASSES)
+Langchainrb::LLM::PROVIDER_CLASSES[:openrouter] = Langchainrb::LLM::OpenRouter

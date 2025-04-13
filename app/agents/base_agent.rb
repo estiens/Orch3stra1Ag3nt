@@ -107,7 +107,7 @@ class BaseAgent
 
   # Common model definitions - can be referenced as :fast, :thinking, etc.
   def fast_model
-    Langchain::LLM::OpenRouter.new(
+    Langchainrb::LLM::OpenRouter.new(
       api_key: ENV["OPEN_ROUTER_API_KEY"],
       default_options: {
         model: LANGCHAIN_MODEL_DEFAULTS[:fast],
@@ -117,7 +117,7 @@ class BaseAgent
   end
 
   def thinking_model
-    Langchain::LLM::OpenRouter.new(
+    Langchainrb::LLM::OpenRouter.new(
       api_key: ENV["OPEN_ROUTER_API_KEY"],
       default_options: {
         model: LANGCHAIN_MODEL_DEFAULTS[:thinking],
@@ -127,7 +127,7 @@ class BaseAgent
   end
 
   def multimodal_model
-    Langchain::LLM::OpenRouter.new(
+    Langchainrb::LLM::OpenRouter.new(
       api_key: ENV["OPEN_ROUTER_API_KEY"],
       default_options: {
         model: LANGCHAIN_MODEL_DEFAULTS[:multimodal],
@@ -137,7 +137,7 @@ class BaseAgent
   end
 
   def edge_model
-    Langchain::LLM::OpenRouter.new(
+    Langchainrb::LLM::OpenRouter.new(
       api_key: ENV["OPEN_ROUTER_API_KEY"],
       default_options: {
         model: "anthropic/claude-3-haiku-20240307",
@@ -152,7 +152,7 @@ class BaseAgent
   end
 
   def default_model
-    Langchain::LLM::OpenRouter.new(
+    Langchainrb::LLM::OpenRouter.new(
       api_key: ENV["OPEN_ROUTER_API_KEY"],
       default_options: {
         model: self.class.default_model,
@@ -207,7 +207,7 @@ class BaseAgent
   private
   
   def initialize_llm(model_param)
-    if model_param.is_a?(Langchain::LLM::Base)
+    if model_param.is_a?(Langchainrb::LLM::Base)
       # Use the LLM instance as is
       model_param
     elsif model_param.is_a?(Symbol) && respond_to?("#{model_param}_model")
@@ -215,7 +215,7 @@ class BaseAgent
       send("#{model_param}_model")
     elsif model_param.is_a?(String)
       # Create a new LLM instance with the given model name
-      Langchain::LLM::OpenRouter.new(
+      Langchainrb::LLM::OpenRouter.new(
         api_key: ENV["OPEN_ROUTER_API_KEY"],
         default_options: {
           model: model_param,
