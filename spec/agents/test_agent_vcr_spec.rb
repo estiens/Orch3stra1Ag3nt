@@ -3,15 +3,21 @@ require "rails_helper"
 RSpec.describe "TestAgent with VCR", type: :agent, vcr: true do
   # Create a simple test agent class with tools for testing
   class WeatherTestAgent < BaseAgent
-    tool :get_weather, "Get the weather for a location"
-    tool :get_forecast, "Get a future forecast for a location"
-
-    def get_weather(location)
+    tool :get_weather, "Get the weather for a location" do |location|
       "It is currently 72°F and sunny in #{location}."
     end
-
-    def get_forecast(location, days_ahead = 3)
+    
+    tool :get_forecast, "Get a future forecast for a location" do |location, days_ahead = 3|
       "The forecast for #{location} in #{days_ahead} days is 75°F with scattered clouds."
+    end
+    
+    # Direct methods for testing
+    def get_weather(location)
+      execute_tool(:get_weather, location)
+    end
+    
+    def get_forecast(location, days_ahead = 3)
+      execute_tool(:get_forecast, location, days_ahead)
     end
   end
 

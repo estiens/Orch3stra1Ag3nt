@@ -23,6 +23,11 @@ module Agents
       response.chat_completion
     end
 
+    # Direct method for testing
+    def llm_echo(input)
+      execute_tool(:llm_echo, input)
+    end
+
     # Override execute_chain to handle the input
     def execute_chain(input)
       if input.start_with?("llm_echo:")

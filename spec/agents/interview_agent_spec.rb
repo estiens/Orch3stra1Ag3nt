@@ -196,24 +196,24 @@ RSpec.describe InterviewAgent, type: :agent, vcr: true do
       allow(agent).to receive(:run).and_return("Interview completed successfully")
 
       # Prepare session data to simulate tool execution
-      tool_execution_span1 = instance_double(Object,
-        type: "tool_execution",
-        arguments: { name: "ask_llm_question", arguments: [ "What are three ways AI can help improve healthcare?" ] },
-        output: "AI can help improve healthcare through: 1) Diagnostic assistance, 2) Personalized treatment plans, 3) Administrative automation"
+      tool_execution_span1 = MockSpan.new(
+        "tool_execution",
+        { name: "ask_llm_question", arguments: [ "What are three ways AI can help improve healthcare?" ] },
+        "AI can help improve healthcare through: 1) Diagnostic assistance, 2) Personalized treatment plans, 3) Administrative automation"
       )
 
-      tool_execution_span2 = instance_double(Object,
-        type: "tool_execution",
-        arguments: { name: "save_response", arguments: [ "What are three ways AI can help improve healthcare?", "Response about healthcare improvement" ] },
-        output: "Response saved to interview_20250412.txt"
+      tool_execution_span2 = MockSpan.new(
+        "tool_execution",
+        { name: "save_response", arguments: [ "What are three ways AI can help improve healthcare?", "Response about healthcare improvement" ] },
+        "Response saved to interview_20250412.txt"
       )
 
-      mock_session = instance_double(Object,
-        spans: [ tool_execution_span1, tool_execution_span2 ],
-        result: "Interview completed successfully"
+      mock_session = MockSession.new(
+        [ tool_execution_span1, tool_execution_span2 ],
+        "Interview completed successfully"
       )
 
-      allow(agent).to receive(:session).and_return(mock_session)
+      agent.session = mock_session
 
       # Mock the session_trace to return a hash with the expected structure
       # This avoids using the real session_trace method which calls extract_llm_calls and extract_tool_executions
@@ -270,30 +270,30 @@ RSpec.describe InterviewAgent, type: :agent, vcr: true do
       allow(agent).to receive(:run).and_return("Search and interview completed successfully")
 
       # Prepare session data to simulate tool execution
-      tool_execution_span1 = instance_double(Object,
-        type: "tool_execution",
-        arguments: { name: "search_web", arguments: [ "AI ethics" ] },
-        output: "This is a simulated web search result for: 'AI ethics'"
+      tool_execution_span1 = MockSpan.new(
+        "tool_execution",
+        { name: "search_web", arguments: [ "AI ethics" ] },
+        "This is a simulated web search result for: 'AI ethics'"
       )
 
-      tool_execution_span2 = instance_double(Object,
-        type: "tool_execution",
-        arguments: { name: "ask_llm_question", arguments: [ "What are the ethical implications of AI in healthcare?" ] },
-        output: "The ethical implications of AI in healthcare include privacy concerns, bias in algorithms, and questions of accountability."
+      tool_execution_span2 = MockSpan.new(
+        "tool_execution",
+        { name: "ask_llm_question", arguments: [ "What are the ethical implications of AI in healthcare?" ] },
+        "The ethical implications of AI in healthcare include privacy concerns, bias in algorithms, and questions of accountability."
       )
 
-      tool_execution_span3 = instance_double(Object,
-        type: "tool_execution",
-        arguments: { name: "save_response", arguments: [ "What are the ethical implications of AI in healthcare?", "The ethical implications..." ] },
-        output: "Response saved to interview_20250412.txt"
+      tool_execution_span3 = MockSpan.new(
+        "tool_execution",
+        { name: "save_response", arguments: [ "What are the ethical implications of AI in healthcare?", "The ethical implications..." ] },
+        "Response saved to interview_20250412.txt"
       )
 
-      mock_session = instance_double(Object,
-        spans: [ tool_execution_span1, tool_execution_span2, tool_execution_span3 ],
-        result: "Search and interview completed successfully"
+      mock_session = MockSession.new(
+        [ tool_execution_span1, tool_execution_span2, tool_execution_span3 ],
+        "Search and interview completed successfully"
       )
 
-      allow(agent).to receive(:session).and_return(mock_session)
+      agent.session = mock_session
 
       # Create a saved response event to satisfy the test
       agent_activity.events.create!(

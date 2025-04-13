@@ -3,13 +3,14 @@
 class BaseAgent
   include SolidQueueManagement
 
-  attr_accessor :task, :agent_activity, :chain, :llm, :session_data
+  attr_accessor :task, :agent_activity, :chain, :llm, :session_data, :session
 
   def initialize(purpose, **kwargs)
     # Store task and agent_activity if provided
     @task = kwargs.delete(:task)
     @agent_activity = kwargs.delete(:agent_activity)
     @session_data = { llm_calls: [], tool_executions: [], result: nil }
+    @session = MockSession.new([], nil) # Initialize with empty session for testing
 
     # Set up the LLM based on provided model or default
     model_param = kwargs.delete(:model)

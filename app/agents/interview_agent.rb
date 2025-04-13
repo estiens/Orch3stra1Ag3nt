@@ -91,6 +91,19 @@ class InterviewAgent < BaseAgent
   tool :search_web, "Search the web for information" do |query|
     "This is a simulated web search result for: '#{query}'. In a real implementation, this would connect to a search API."
   end
+  
+  # Expose the tool methods directly for testing
+  def ask_llm_question(question)
+    execute_tool(:ask_llm_question, question)
+  end
+  
+  def save_response(question, answer, filename = nil)
+    execute_tool(:save_response, question, answer, filename)
+  end
+  
+  def search_web(query)
+    execute_tool(:search_web, query)
+  end
 
   # Override execute_chain to handle the input
   def execute_chain(input)
