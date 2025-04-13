@@ -107,40 +107,44 @@ class BaseAgent
 
   # Common model definitions - can be referenced as :fast, :thinking, etc.
   def fast_model
-    Langchain::LLM::OpenRouter.new(
+    Langchain::LLMs::OpenAI.new(
       api_key: ENV["OPEN_ROUTER_API_KEY"],
-      default_options: {
-        chat_model: LANGCHAIN_MODEL_DEFAULTS[:fast],
+      base_url: "https://openrouter.ai/api/v1",
+      parameters: {
+        model: LANGCHAIN_MODEL_DEFAULTS[:fast] || "anthropic/claude-3-haiku-20240307",
         temperature: 0.2
       }
     )
   end
 
   def thinking_model
-    Langchain::LLM::OpenRouter.new(
+    Langchain::LLMs::OpenAI.new(
       api_key: ENV["OPEN_ROUTER_API_KEY"],
-      default_options: {
-        chat_model: LANGCHAIN_MODEL_DEFAULTS[:thinking],
+      base_url: "https://openrouter.ai/api/v1",
+      parameters: {
+        model: LANGCHAIN_MODEL_DEFAULTS[:thinking] || "anthropic/claude-3-sonnet-20240229",
         temperature: 0.3
       }
     )
   end
 
   def multimodal_model
-    Langchain::LLM::OpenRouter.new(
+    Langchain::LLMs::OpenAI.new(
       api_key: ENV["OPEN_ROUTER_API_KEY"],
-      default_options: {
-        chat_model: LANGCHAIN_MODEL_DEFAULTS[:multimodal],
+      base_url: "https://openrouter.ai/api/v1",
+      parameters: {
+        model: LANGCHAIN_MODEL_DEFAULTS[:multimodal] || "anthropic/claude-3-opus-20240229",
         temperature: 0.2
       }
     )
   end
 
   def edge_model
-    Langchain::LLM::OpenRouter.new(
+    Langchain::LLMs::OpenAI.new(
       api_key: ENV["OPEN_ROUTER_API_KEY"],
-      default_options: {
-        chat_model: "anthropic/claude-3-haiku-20240307",
+      base_url: "https://openrouter.ai/api/v1",
+      parameters: {
+        model: "anthropic/claude-3-haiku-20240307",
         temperature: 0.1
       }
     )
@@ -148,14 +152,15 @@ class BaseAgent
 
   # Default model if none specified
   def self.default_model
-    LANGCHAIN_MODEL_DEFAULTS[:thinking]
+    LANGCHAIN_MODEL_DEFAULTS[:thinking] || "anthropic/claude-3-sonnet-20240229"
   end
 
   def default_model
-    Langchain::LLM::OpenRouter.new(
+    Langchain::LLMs::OpenAI.new(
       api_key: ENV["OPEN_ROUTER_API_KEY"],
-      default_options: {
-        chat_model: self.class.default_model,
+      base_url: "https://openrouter.ai/api/v1",
+      parameters: {
+        model: self.class.default_model,
         temperature: 0.3
       }
     )
@@ -207,7 +212,7 @@ class BaseAgent
   private
   
   def initialize_llm(model_param)
-    if model_param.is_a?(Langchain::LLM::Base)
+    if model_param.is_a?(Langchain::LLMs::Base)
       # Use the LLM instance as is
       model_param
     elsif model_param.is_a?(Symbol) && respond_to?("#{model_param}_model")
@@ -215,10 +220,11 @@ class BaseAgent
       send("#{model_param}_model")
     elsif model_param.is_a?(String)
       # Create a new LLM instance with the given model name
-      Langchain::LLM::OpenRouter.new(
+      Langchain::LLMs::OpenAI.new(
         api_key: ENV["OPEN_ROUTER_API_KEY"],
-        default_options: {
-          chat_model: model_param,
+        base_url: "https://openrouter.ai/api/v1",
+        parameters: {
+          model: model_param,
           temperature: 0.3
         }
       )

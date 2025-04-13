@@ -29,7 +29,7 @@ RSpec.describe "TestAgent with VCR", type: :agent, vcr: true do
       result = agent.run("What's the weather like in San Francisco?")
 
       # Check that the agent used the tool
-      expect(agent.session.spans.map(&:type)).to include(Regent::Span::Type::TOOL_EXECUTION)
+      expect(agent.session.spans.map(&:type)).to include("tool_execution")
 
       # Expect the result to mention San Francisco weather
       expect(result).to include("San Francisco")
@@ -57,7 +57,7 @@ RSpec.describe "TestAgent with VCR", type: :agent, vcr: true do
       result = agent.run("What's the weather like in Tokyo today and what's the forecast for Tokyo in 3 days?")
 
       # Check that the agent made multiple tool calls
-      tool_executions = agent.session.spans.select { |span| span.type == Regent::Span::Type::TOOL_EXECUTION }
+      tool_executions = agent.session.spans.select { |span| span.type == "tool_execution" }
       expect(tool_executions.count).to be > 1
 
       # Expect the result to include both current weather and forecast

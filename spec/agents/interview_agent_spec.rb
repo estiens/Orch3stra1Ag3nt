@@ -24,12 +24,12 @@ RSpec.describe InterviewAgent, type: :agent, vcr: true do
         agent_activity: agent_activity
       )
 
-      # Stub the llm.invoke call to return a predictable result
-      allow_any_instance_of(Regent::LLM).to receive(:invoke).and_return(
+      # Stub the llm.complete call to return a predictable result
+      allow_any_instance_of(Langchain::LLMs::Base).to receive(:complete).and_return(
         OpenStruct.new(
           content: "This is a simulated response to the ethical question. AI systems should be deployed with careful consideration of fairness, transparency, and accountability.",
-          input_tokens: 20,
-          output_tokens: 30
+          prompt_tokens: 20,
+          completion_tokens: 30
         )
       )
 
@@ -55,7 +55,7 @@ RSpec.describe InterviewAgent, type: :agent, vcr: true do
       )
 
       # Simulate an error condition
-      allow_any_instance_of(Regent::LLM).to receive(:invoke).and_raise(StandardError.new("API connection error"))
+      allow_any_instance_of(Langchain::LLMs::Base).to receive(:complete).and_raise(StandardError.new("API connection error"))
 
       result = agent.ask_llm_question("This question should trigger an error")
 
@@ -196,19 +196,19 @@ RSpec.describe InterviewAgent, type: :agent, vcr: true do
       allow(agent).to receive(:run).and_return("Interview completed successfully")
 
       # Prepare session data to simulate tool execution
-      tool_execution_span1 = instance_double(Regent::Span,
-        type: Regent::Span::Type::TOOL_EXECUTION,
+      tool_execution_span1 = instance_double(Object,
+        type: "tool_execution",
         arguments: { name: "ask_llm_question", arguments: [ "What are three ways AI can help improve healthcare?" ] },
         output: "AI can help improve healthcare through: 1) Diagnostic assistance, 2) Personalized treatment plans, 3) Administrative automation"
       )
 
-      tool_execution_span2 = instance_double(Regent::Span,
-        type: Regent::Span::Type::TOOL_EXECUTION,
+      tool_execution_span2 = instance_double(Object,
+        type: "tool_execution",
         arguments: { name: "save_response", arguments: [ "What are three ways AI can help improve healthcare?", "Response about healthcare improvement" ] },
         output: "Response saved to interview_20250412.txt"
       )
 
-      mock_session = instance_double(Regent::Session,
+      mock_session = instance_double(Object,
         spans: [ tool_execution_span1, tool_execution_span2 ],
         result: "Interview completed successfully"
       )
@@ -246,7 +246,7 @@ RSpec.describe InterviewAgent, type: :agent, vcr: true do
       task.update(notes: "Interview conducted with 1 questions. 1 responses saved to files.")
 
       # Verify that both tools were used
-      tool_executions = agent.session.spans.select { |span| span.type == Regent::Span::Type::TOOL_EXECUTION }
+      tool_executions = agent.session.spans.select { |span| span.type == "tool_execution" }
       tool_names = tool_executions.map { |span| span.arguments[:name] }
 
       expect(tool_names).to include("ask_llm_question")
@@ -270,25 +270,25 @@ RSpec.describe InterviewAgent, type: :agent, vcr: true do
       allow(agent).to receive(:run).and_return("Search and interview completed successfully")
 
       # Prepare session data to simulate tool execution
-      tool_execution_span1 = instance_double(Regent::Span,
-        type: Regent::Span::Type::TOOL_EXECUTION,
+      tool_execution_span1 = instance_double(Object,
+        type: "tool_execution",
         arguments: { name: "search_web", arguments: [ "AI ethics" ] },
         output: "This is a simulated web search result for: 'AI ethics'"
       )
 
-      tool_execution_span2 = instance_double(Regent::Span,
-        type: Regent::Span::Type::TOOL_EXECUTION,
+      tool_execution_span2 = instance_double(Object,
+        type: "tool_execution",
         arguments: { name: "ask_llm_question", arguments: [ "What are the ethical implications of AI in healthcare?" ] },
         output: "The ethical implications of AI in healthcare include privacy concerns, bias in algorithms, and questions of accountability."
       )
 
-      tool_execution_span3 = instance_double(Regent::Span,
-        type: Regent::Span::Type::TOOL_EXECUTION,
+      tool_execution_span3 = instance_double(Object,
+        type: "tool_execution",
         arguments: { name: "save_response", arguments: [ "What are the ethical implications of AI in healthcare?", "The ethical implications..." ] },
         output: "Response saved to interview_20250412.txt"
       )
 
-      mock_session = instance_double(Regent::Session,
+      mock_session = instance_double(Object,
         spans: [ tool_execution_span1, tool_execution_span2, tool_execution_span3 ],
         result: "Search and interview completed successfully"
       )
@@ -304,7 +304,7 @@ RSpec.describe InterviewAgent, type: :agent, vcr: true do
       result = agent.run("Search for information about AI ethics, then ask the LLM about ethical implications of AI in healthcare, and save the response.")
 
       # Verify all three tools were used
-      tool_executions = agent.session.spans.select { |span| span.type == Regent::Span::Type::TOOL_EXECUTION }
+      tool_executions = agent.session.spans.select { |span| span.type == "tool_execution" }
       tool_names = tool_executions.map { |span| span.arguments[:name] }
 
       expect(tool_names).to include("search_web")
