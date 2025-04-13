@@ -13,6 +13,7 @@ jobs:
       postgres:
         image: postgres
         env:
+          POSTGRES_DB: postgres
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         ports:
@@ -36,7 +37,7 @@ jobs:
         env:
           RAILS_ENV: test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
-        run: bin/rails db:setup && bundle exec rspec --format documentation
+        run: bin/rails db:create && db:migrate && bundle exec rspec --format documentation
 
   scan_ruby:
     runs-on: ubuntu-latest
