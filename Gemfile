@@ -103,4 +103,4 @@ gem "google_search_results"
 
 # Vector search
 gem "pgvector", "~> 0.2.1"  # PostgreSQL vector operations
-gem "neighbor", "~> 0.3.0"  # Better pgvector integration with Rails
+gem "neighbor", "~> 0.5.2"  # Better pgvector integration with Rails
