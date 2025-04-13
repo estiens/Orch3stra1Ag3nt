@@ -16,16 +16,5 @@ LANGCHAIN_MODEL_DEFAULTS = {
   multimodal:  "meta-llama/llama-3.2-11b-vision-instruct"
 }.freeze
 
-# Configure Langchain with OpenRouter
-Langchainrb.configure do |config|
-  config.llm = {
-    provider: :openrouter,
-    api_key: ENV["OPEN_ROUTER_API_KEY"],
-    default_options: {
-      model: "deepseek/deepseek-chat-v3-0324",
-      temperature: 0.3
-    }
-  }
-end
-
+# Initialize OpenRouter LLM
 Rails.logger.info("Langchain initialized with OpenRouter LLM provider and custom model defaults.")

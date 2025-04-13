@@ -12,13 +12,13 @@ class ExampleLangchainAgent < BaseAgent
   
   def execute_chain(input)
     # Create a simple prompt template
-    prompt = Langchainrb::Prompt::PromptTemplate.new(
+    prompt = Langchain::Prompt::PromptTemplate.new(
       template: "You are a helpful assistant. Answer the following question: {question}",
       input_variables: ["question"]
     )
     
     # Create a simple LLM chain
-    chain = Langchainrb::Chains::LLMChain.new(
+    chain = Langchain::Chains::LLMChain.new(
       llm: @llm,
       prompt: prompt
     )
@@ -27,7 +27,7 @@ class ExampleLangchainAgent < BaseAgent
     result = chain.run(question: input)
     
     # Record the LLM call
-    model_name = @llm.defaults[:model] || @llm.defaults[:chat_model] || "unknown"
+    model_name = @llm.defaults[:chat_model] || "unknown"
     
     if result.respond_to?(:prompt_tokens)
       record_llm_call(
