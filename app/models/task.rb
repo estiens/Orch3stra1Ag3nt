@@ -2,6 +2,26 @@ class Task < ApplicationRecord
   validates :title, presence: true
 
   has_many :agent_activities, dependent: :destroy
+  has_many :events, dependent: :destroy
+
+  # Project association
+  belongs_to :project, optional: true
+
+  # Parent-child relationship
+  belongs_to :parent, class_name: "Task", optional: true
+  has_many :subtasks, class_name: "Task", foreign_key: "parent_id", dependent: :destroy
+
+  # Task types
+  TASK_TYPES = %w[general research code analysis review orchestration].freeze
+
+  # Store metadata as JSON
+  serialize :metadata, JSON
+
+  # Scopes
+  scope :root_tasks, -> { where(parent_id: nil) }
+  scope :by_type, ->(type) { where(task_type: type) }
+  scope :research_tasks, -> { where(task_type: "research") }
+  scope :recent, -> { order(created_at: :desc) }
 
   # State machine for Task
   # Requires 'aasm' gem. If not installed, add 'gem "aasm"' to your Gemfile and run bundle install.
@@ -29,5 +49,71 @@ class Task < ApplicationRecord
     event :fail do
       transitions from: [ :pending, :active, :waiting_on_human ], to: :failed
     end
+  end
+
+  # Callbacks
+  before_create :propagate_project_from_parent
+  after_create :ensure_metadata_exists
+
+  # Get the path of tasks from root to this task
+  def task_path
+    path = []
+    current = self
+
+    while current
+      path.unshift(current)
+      current = current.parent
+    end
+
+    path
+  end
+
+  # Check if this task has any pending human input requests
+  def waiting_for_human_input?
+    HumanInputRequest.where(task_id: id, status: "pending").exists?
+  end
+
+  # Default task type if not specified
+  def task_type
+    self[:task_type] || "general"
+  end
+
+  # Find the root task (topmost ancestor)
+  def root_task
+    parent_id.present? ? parent.root_task : self
+  end
+
+  # Search the project's knowledge base related to this task
+  def search_knowledge(query, limit = 5)
+    return [] unless project.present?
+
+    project.search_knowledge(query, limit)
+  end
+
+  # Store knowledge in the project's semantic memory
+  def store_knowledge(content, content_type: "text", collection: "default", metadata: {})
+    return nil unless project.present?
+
+    project.store_knowledge(
+      content,
+      content_type: content_type,
+      collection: collection,
+      metadata: metadata.merge(task_id: id, task_title: title)
+    )
+  end
+
+  private
+
+  # Ensure a subtask belongs to the same project as its parent
+  def propagate_project_from_parent
+    if parent_id.present? && project_id.nil?
+      self.project_id = parent.project_id
+    end
+  end
+
+  # Ensure metadata exists
+  def ensure_metadata_exists
+    self.metadata ||= {}
+    save if metadata_changed?
   end
 end

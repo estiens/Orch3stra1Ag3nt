@@ -186,6 +186,7 @@ GEM
       raabro (~> 1.4)
     globalid (1.2.1)
       activesupport (>= 6.1)
+    google_search_results (2.2.0)
     hashdiff (1.1.2)
     http-cookie (1.0.8)
       domain_name (~> 0.5)
@@ -313,6 +314,7 @@ GEM
     pastel (0.8.0)
       tty-color (~> 0.5)
     pg (1.5.9)
+    pgvector (0.2.2)
     pp (0.6.2)
       prettyprint
     prettyprint (0.2.0)
@@ -533,15 +535,17 @@ DEPENDENCIES
   dry-schema
   dry-validation
   factory_bot_rails
-  httparty
+  google_search_results
+  httparty (~> 0.21)
   importmap-rails
   jbuilder
   kamal
-  mechanize
+  mechanize (~> 2.9)
   mission_control-jobs
-  nokogiri
+  nokogiri (~> 1.15)
   open_router
   pg (~> 1.1)
+  pgvector (~> 0.2.1)
   propshaft
   pry-rails
   puma (>= 5.0)
