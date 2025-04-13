@@ -1,25 +1,65 @@
-# Configure Langchain OpenRouter provider
+# frozen_string_literal: true
+
 module Langchain
   module LLM
-    class OpenRouter
-      def initialize(api_key: nil, default_options: {})
-        @api_key = api_key || ENV["OPEN_ROUTER_API_KEY"]
-        @default_options = default_options || {}
-        
-        raise "OpenRouter API key is required" unless @api_key
+    # Base class for LLM providers
+    class Base
+      def initialize(*)
+        # Base initialization
       end
       
-      def chat(messages, **options)
-        options = @default_options.merge(options)
-        model = options[:model] || "deepseek/deepseek-chat-v3-0324"
-        temperature = options[:temperature] || 0.3
+      def chat(*)
+        raise NotImplementedError, "Subclasses must implement #chat"
+      end
+      
+      def complete(*)
+        raise NotImplementedError, "Subclasses must implement #complete"
+      end
+      
+      def embed(*)
+        raise NotImplementedError, "Subclasses must implement #embed"
+      end
+      
+      protected
+      
+      def depends_on(gem_name)
+        begin
+          require gem_name
+        rescue LoadError
+          raise "The #{gem_name} gem is required for this provider. Please add it to your Gemfile."
+        end
+      end
+    end
+    
+    # LLM interface for Open Router APIs: https://openrouter.ai/docs
+    class OpenRouter < Base
+      DEFAULTS = {
+        temperature: 0.0,
+        chat_model: "deepseek/deepseek-chat-v3-0324",
+        embedding_model: "openrouter/auto"
+      }.freeze
+
+      attr_reader :defaults, :client
+
+      def initialize(api_key: nil, default_options: {})
+        depends_on "open_router"
+
+        @api_key = api_key || ENV["OPEN_ROUTER_API_KEY"]
+        raise "OpenRouter API key is required" unless @api_key
         
-        client = ::OpenRouter::Client.new(access_token: @api_key)
+        @client = ::OpenRouter::Client.new(access_token: @api_key)
+        @defaults = DEFAULTS.merge(default_options)
+      end
+
+      def chat(messages, **options)
+        options = @defaults.merge(options)
+        model = options[:model] || @defaults[:chat_model]
+        temperature = options[:temperature] || @defaults[:temperature]
         
         formatted_messages = format_messages(messages)
         
         begin
-          response = client.complete(
+          response = @client.complete(
             formatted_messages,
             model: model,
             extras: {
@@ -29,14 +69,7 @@ module Langchain
             }
           )
           
-          content = response.dig("choices", 0, "message", "content")
-          
-          Langchain::LLM::ChatResponse.new(
-            content: content,
-            response: response,
-            prompt_tokens: response.dig("usage", "prompt_tokens").to_i,
-            completion_tokens: response.dig("usage", "completion_tokens").to_i
-          )
+          OpenRouterResponse.new(response)
         rescue => e
           Rails.logger.error("OpenRouter API error: #{e.message}")
           raise e
@@ -45,14 +78,15 @@ module Langchain
       
       def complete(prompt, **options)
         messages = [{ role: "user", content: prompt }]
-        response = chat(messages, **options)
-        
-        Langchain::LLM::CompletionResponse.new(
-          content: response.content,
-          response: response.response,
-          prompt_tokens: response.prompt_tokens,
-          completion_tokens: response.completion_tokens
-        )
+        chat(messages, **options)
+      end
+      
+      def embed(text:, model: nil)
+        raise NotImplementedError, "OpenRouter does not support embeddings yet"
+      end
+      
+      def models
+        @client.models
       end
       
       private
@@ -76,19 +110,20 @@ module Langchain
       end
     end
     
-    # Response classes to match Langchain's expected format
-    class ChatResponse
-      attr_reader :content, :response, :prompt_tokens, :completion_tokens
+    # Response wrapper for OpenRouter API responses
+    class OpenRouterResponse
+      attr_reader :response, :content, :prompt_tokens, :completion_tokens
       
-      def initialize(content:, response:, prompt_tokens: 0, completion_tokens: 0)
-        @content = content
+      def initialize(response)
         @response = response
-        @prompt_tokens = prompt_tokens
-        @completion_tokens = completion_tokens
+        @content = response.dig("choices", 0, "message", "content")
+        @prompt_tokens = response.dig("usage", "prompt_tokens").to_i
+        @completion_tokens = response.dig("usage", "completion_tokens").to_i
       end
-    end
-    
-    class CompletionResponse < ChatResponse
+      
+      def to_s
+        content
+      end
     end
   end
 end

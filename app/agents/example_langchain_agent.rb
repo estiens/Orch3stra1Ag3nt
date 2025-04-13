@@ -26,14 +26,24 @@ class ExampleLangchainAgent < BaseAgent
     # Run the chain
     result = chain.run(question: input)
     
-    # Record the LLM call
-    record_llm_call(
-      "openrouter",
-      @llm.instance_variable_get(:@default_options)[:model],
-      input,
-      result,
-      0 # We don't have token count here
-    )
+    # Record the LLM call - assuming result is an OpenRouterResponse
+    if result.respond_to?(:prompt_tokens)
+      record_llm_call(
+        "openrouter",
+        @llm.defaults[:chat_model],
+        input,
+        result.to_s,
+        result.prompt_tokens + result.completion_tokens
+      )
+    else
+      record_llm_call(
+        "openrouter",
+        @llm.defaults[:chat_model],
+        input,
+        result.to_s,
+        0
+      )
+    end
     
     # Return the result
     result

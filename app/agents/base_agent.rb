@@ -197,7 +197,7 @@ class BaseAgent
   private
   
   def initialize_llm(model_param)
-    if model_param.is_a?(Langchain::LLM::Base) || model_param.is_a?(Langchain::LLM::OpenRouter)
+    if model_param.is_a?(Langchain::LLM::Base)
       # Use the LLM instance as is
       model_param
     elsif model_param.is_a?(Symbol) && respond_to?("#{model_param}_model")
@@ -207,8 +207,10 @@ class BaseAgent
       # Create a new LLM instance with the given model name
       Langchain::LLM.from_provider(
         :openrouter, 
-        model: model_param,
-        temperature: 0.3
+        default_options: {
+          model: model_param,
+          temperature: 0.3
+        }
       )
     else
       # Fall back to default model
