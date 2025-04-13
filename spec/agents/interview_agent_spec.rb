@@ -27,7 +27,7 @@ RSpec.describe InterviewAgent, type: :agent, vcr: true do
       # Stub the llm.chat call to return a predictable result
       allow_any_instance_of(Langchain::LLM::OpenRouter).to receive(:chat).and_return(
         OpenStruct.new(
-          content: "This is a simulated response to the ethical question. AI systems should be deployed with careful consideration of fairness, transparency, and accountability.",
+          chat_completion: "This is a simulated response to the ethical question. AI systems should be deployed with careful consideration of fairness, transparency, and accountability.",
           prompt_tokens: 20,
           completion_tokens: 30
         )
@@ -215,14 +215,12 @@ RSpec.describe InterviewAgent, type: :agent, vcr: true do
 
       agent.session = mock_session
 
-      # Mock the session_trace to return a hash with the expected structure
-      # This avoids using the real session_trace method which calls extract_llm_calls and extract_tool_executions
-      mock_session_trace = {
+      # No need to mock session_trace, we'll use the actual session_data
+      agent.session_data = {
         llm_calls: [],
         tool_executions: [],
         result: "Interview completed successfully"
       }
-      allow(agent).to receive(:session_trace).and_return(mock_session_trace)
 
       # This will use our stub instead of actually running
       result = agent.run("Ask the following question to an LLM and save the response: 'What are three ways AI can help improve healthcare?'")

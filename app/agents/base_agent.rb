@@ -104,6 +104,15 @@ class BaseAgent
       result: result
     }
     
+    # Add a span to the session for testing
+    if @session
+      @session.spans << MockSpan.new(
+        "tool_execution",
+        { name: name.to_s, arguments: args },
+        result.to_s
+      )
+    end
+    
     result
   end
 

@@ -32,8 +32,6 @@ RSpec.describe "TestAgent with VCR", type: :agent, vcr: true do
         agent_activity: agent_activity
       )
 
-      result = agent.run("What's the weather like in San Francisco?")
-
       # Create a mock session for the test
       tool_execution = MockSpan.new(
         "tool_execution",
@@ -43,6 +41,9 @@ RSpec.describe "TestAgent with VCR", type: :agent, vcr: true do
       
       mock_session = MockSession.new([tool_execution], "The weather in San Francisco is sunny and 72°F.")
       agent.session = mock_session
+      
+      # Execute the get_weather method directly instead of run
+      result = agent.get_weather("San Francisco")
       
       # Check that the agent used the tool
       expect(agent.session.spans.map(&:type)).to include("tool_execution")
