@@ -15,14 +15,23 @@ class EventDispatchJob < ApplicationJob
 
     Rails.logger.info("Processing event #{event.event_type} [#{event_id}] via job")
 
-    # Use the EventBus singleton to dispatch the event
-    EventBus.instance.dispatch_event(event)
+    # Process the event, which will dispatch it via the event bus and mark it as processed
+    event.process
 
-    # Update the event to show it's been processed
-    event.update(processed_at: Time.current)
+    Rails.logger.info("Successfully processed event #{event.event_type} [#{event_id}]")
+  rescue ActiveRecord::RecordNotFound => e
+    Rails.logger.error("Error processing event #{event_id}: Couldn't find Event with 'id'=#{event_id}")
+    Rails.logger.error(e.backtrace.join("\n"))
+    # Don't re-raise - this will be caught by the discard_on handler
   rescue => e
     Rails.logger.error("Error processing event #{event_id}: #{e.message}")
     Rails.logger.error(e.backtrace.join("\n"))
+
+    # Record the attempt in the event
+    if defined?(event) && event.present?
+      event.record_processing_attempt!(e)
+    end
+
     raise # Re-raise to trigger retry
   end
 end

@@ -6,9 +6,9 @@ class Project < ApplicationRecord
   # Validations
   validates :name, presence: true
 
-  # Serialization
-  serialize :settings, JSON
-  serialize :metadata, JSON
+  # # Serialization
+  # serialize :settings, JSON
+  # serialize :metadata, JSON
 
   # Scopes
   scope :active, -> { where(status: "active") }
@@ -92,12 +92,13 @@ class Project < ApplicationRecord
   private
 
   def set_defaults
+    self.status ||= "pending"
     self.settings ||= {
-      max_concurrent_tasks: 5,
-      llm_budget_limit: 10.0,  # In dollars
-      task_timeout_hours: 24,
-      allow_web_search: true,
-      allow_code_execution: false
+      "max_concurrent_tasks" => 5,
+      "llm_budget_limit" => 10.0,  # In dollars
+      "task_timeout_hours" => 24,
+      "allow_web_search" => true,
+      "allow_code_execution" => false
     }
 
     self.metadata ||= {}

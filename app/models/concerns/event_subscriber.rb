@@ -23,6 +23,23 @@ module EventSubscriber
       # Register with EventBus
       EventBus.register_handler(event_name.to_s, self)
     end
+
+    # Class-level method to process an event directly
+    # This allows for both class-level and instance-level handling
+    def self.process(event)
+      # Get the callback for this event type
+      callback = self.subscriptions[event.event_type]
+
+      return unless callback
+
+      if callback.is_a?(Symbol)
+        # If the callback is a symbol, call the method on the class
+        self.send(callback, event)
+      elsif callback.is_a?(Proc)
+        # If the callback is a proc, execute it in the class context
+        self.class_exec(event, &callback)
+      end
+    end
   end
 
   # Instance method to process an event

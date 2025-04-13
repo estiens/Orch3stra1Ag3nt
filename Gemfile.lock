@@ -266,6 +266,8 @@ GEM
     multi_xml (0.7.1)
       bigdecimal (~> 3.1)
     multipart-post (2.4.1)
+    neighbor (0.3.2)
+      activerecord (>= 6.1)
     net-http (0.6.0)
       uri
     net-http-digest_auth (1.4.1)
@@ -542,6 +544,7 @@ DEPENDENCIES
   kamal
   mechanize (~> 2.9)
   mission_control-jobs
+  neighbor (~> 0.3.0)
   nokogiri (~> 1.15)
   open_router
   pg (~> 1.1)

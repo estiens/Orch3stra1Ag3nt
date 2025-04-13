@@ -2,40 +2,43 @@ class VectorEmbedding < ApplicationRecord
   belongs_to :task, optional: true
   belongs_to :project, optional: true
 
+  # Set up nearest neighbor search on the embedding vector
+  has_neighbors :embedding
+
   # Validations
   validates :content, presence: true
   validates :content_type, presence: true
   validates :collection, presence: true
 
   # Scopes
-  scope :by_collection, ->(collection) { where(collection: collection) }
+  scope :in_collection, ->(collection) { where(collection: collection) }
   scope :by_content_type, ->(type) { where(content_type: type) }
   scope :for_task, ->(task_id) { where(task_id: task_id) }
   scope :for_project, ->(project_id) { where(project_id: project_id) }
 
-  # Find similar embeddings with a vector similarity search
+  # Find similar embeddings with a vector similarity search using Neighbor
   # @param query_embedding [Array] The query embedding vector
   # @param limit [Integer] Maximum number of results to return
   # @param collection [String] Optional collection to search within
   # @param task_id [Integer] Optional task_id to filter by
   # @param project_id [Integer] Optional project_id to filter by
+  # @param distance [String] The distance metric to use ("euclidean", "cosine", "inner_product")
   # @return [Array<VectorEmbedding>] Matching embeddings sorted by similarity
-  def self.find_similar(query_embedding, limit: 5, collection: nil, task_id: nil, project_id: nil)
-    # Start with a base query
-    query = self
+  def self.find_similar(query_embedding, limit: 5, collection: nil, task_id: nil, project_id: nil, distance: "cosine")
+    # Start with a nearest neighbors query
+    query = nearest_neighbors(:embedding, query_embedding, distance: distance)
 
     # Add collection filter if specified
-    query = query.where(collection: collection) if collection.present?
+    query = query.in_collection(collection) if collection.present?
 
     # Add task filter if specified
-    query = query.where(task_id: task_id) if task_id.present?
+    query = query.for_task(task_id) if task_id.present?
 
     # Add project filter if specified
-    query = query.where(project_id: project_id) if project_id.present?
+    query = query.for_project(project_id) if project_id.present?
 
     # Get nearest neighbors
-    query.order(Arel.sql("embedding <-> '#{query_embedding}'::vector"))
-         .limit(limit)
+    query.limit(limit)
   end
 
   # Generate an embedding for the given text using OpenAI's embeddings API
@@ -99,12 +102,20 @@ class VectorEmbedding < ApplicationRecord
   # @param collection [String] Optional collection to search within
   # @param task_id [Integer] Optional task_id to filter by
   # @param project_id [Integer] Optional project_id to filter by
+  # @param distance [String] The distance metric to use ("euclidean", "cosine", "inner_product")
   # @return [Array<VectorEmbedding>] Matching embeddings sorted by similarity
-  def self.search(text:, limit: 5, collection: nil, task_id: nil, project_id: nil)
+  def self.search(text:, limit: 5, collection: nil, task_id: nil, project_id: nil, distance: "cosine")
     # Generate embedding for the query text
     query_embedding = generate_embedding(text)
 
     # Search for similar embeddings
-    find_similar(query_embedding, limit: limit, collection: collection, task_id: task_id, project_id: project_id)
+    find_similar(
+      query_embedding,
+      limit: limit,
+      collection: collection,
+      task_id: task_id,
+      project_id: project_id,
+      distance: distance
+    )
   end
 end

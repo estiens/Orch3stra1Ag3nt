@@ -1,34 +1,34 @@
-require 'httparty'
-require 'json'
+require "httparty"
+require "json"
 
 class PerplexitySearchTool < Regent::Tool
   def call(query:, focus: "web")
     begin
       # Validate the API key
-      api_key = ENV['PERPLEXITY_API_KEY']
+      api_key = ENV["PERPLEXITY_API_KEY"]
       unless api_key
         return { error: "PERPLEXITY_API_KEY environment variable is not set" }
       end
-      
+
       # Validate the query
       if query.to_s.strip.empty?
         return { error: "Search query cannot be empty" }
       end
-      
+
       # Validate and normalize focus
       valid_focuses = %w[web academic news writing]
       focus = focus.to_s.downcase
       unless valid_focuses.include?(focus)
         focus = "web"
       end
-      
+
       # Setup API endpoint and headers
       url = "https://api.perplexity.ai/chat/completions"
       headers = {
         "Authorization" => "Bearer #{api_key}",
         "Content-Type" => "application/json"
       }
-      
+
       # Prepare the request body
       body = {
         model: "sonar-medium-online",
@@ -48,7 +48,7 @@ class PerplexitySearchTool < Regent::Tool
           search_focus: focus
         }
       }
-      
+
       # Make the API request
       response = HTTParty.post(
         url,
@@ -56,20 +56,20 @@ class PerplexitySearchTool < Regent::Tool
         body: body.to_json,
         timeout: 30
       )
-      
+
       # Handle API response
       if response.success?
         data = JSON.parse(response.body)
-        
+
         # Format the response
         result = {
           query: query,
           response: data["choices"][0]["message"]["content"],
           focus: focus
         }
-        
+
         # Add citation information if available
-        if data["choices"][0]["message"]["context"] && 
+        if data["choices"][0]["message"]["context"] &&
            data["choices"][0]["message"]["context"]["citations"]
           citations = data["choices"][0]["message"]["context"]["citations"]
           result[:citations] = citations.map do |citation|
@@ -80,17 +80,22 @@ class PerplexitySearchTool < Regent::Tool
             }
           end
         end
-        
-        return result
+
+        result
       else
         # Handle error response
-        return {
+        error_message = begin
+                          response.parsed_response.dig("error", "message") || "Error details not available"
+                        rescue StandardError
+                          "Unknown error"
+                        end
+        {
           error: "Perplexity API error: #{response.code}",
-          message: response.parsed_response["error"]["message"] rescue "Unknown error"
+          message: error_message
         }
       end
     rescue => e
-      return { error: "Error executing Perplexity search: #{e.message}" }
+      { error: "Error executing Perplexity search: #{e.message}" }
     end
   end
-end 
+end

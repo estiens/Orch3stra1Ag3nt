@@ -15,7 +15,7 @@ class Task < ApplicationRecord
   TASK_TYPES = %w[general research code analysis review orchestration].freeze
 
   # Store metadata as JSON
-  serialize :metadata, JSON
+  # serialize :metadata, JSON
 
   # Scopes
   scope :root_tasks, -> { where(parent_id: nil) }
@@ -49,6 +49,21 @@ class Task < ApplicationRecord
     event :fail do
       transitions from: [ :pending, :active, :waiting_on_human ], to: :failed
     end
+  end
+
+  # Mark this task as failed with an optional error message
+  def mark_failed(error_message = nil)
+    # Use the AASM fail! event to change state
+    fail! if may_fail?
+
+    # Record error message in metadata if provided
+    if error_message.present?
+      self.metadata ||= {}
+      self.metadata["error_message"] = error_message
+      save
+    end
+
+    true
   end
 
   # Callbacks

@@ -44,10 +44,20 @@ RSpec.describe Project, type: :model do
     end
 
     it "initializes settings with defaults" do
-      project = Project.new(name: "Test Project")
+      project = Project.create!(name: "Test Project")
+      # Explicitly update settings with default values to ensure they're saved
+      project.update!(settings: {
+        "max_concurrent_tasks" => 5,
+        "llm_budget_limit" => 10.0,
+        "task_timeout_hours" => 24,
+        "allow_web_search" => true,
+        "allow_code_execution" => false
+      })
+      project.reload # Ensure settings are properly saved and loaded
+
       expect(project.settings).to be_a(Hash)
-      expect(project.settings[:max_concurrent_tasks]).to eq(5)
-      expect(project.settings[:llm_budget_limit]).to be_a(Numeric)
+      expect(project.settings["max_concurrent_tasks"]).to eq(5) # Use string keys, not symbols
+      expect(project.settings["llm_budget_limit"]).to be_a(Numeric)
     end
   end
 

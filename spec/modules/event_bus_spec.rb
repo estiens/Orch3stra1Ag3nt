@@ -5,7 +5,7 @@ RSpec.describe EventBus do
   class TestEventBusSubscriber
     include EventSubscriber
 
-    subscribe_to 'test_bus_event'
+    subscribe_to 'test_bus_event', :process
 
     def self.process(event)
       @processed_events ||= []
@@ -23,23 +23,23 @@ RSpec.describe EventBus do
 
   before(:each) do
     TestEventBusSubscriber.reset!
-    # Temporarily clear other subscribers to isolate our tests
-    @original_subscribers = EventBus.instance_variable_get(:@subscribers)
-    EventBus.instance_variable_set(:@subscribers, {})
+    # Temporarily clear other handlers to isolate our tests
+    @original_handlers = EventBus.instance.instance_variable_get(:@handlers)
+    EventBus.instance.instance_variable_set(:@handlers, Hash.new { |hash, key| hash[key] = [] })
     # Register our test subscriber
-    EventBus.register('test_bus_event', TestEventBusSubscriber)
+    EventBus.register_handler('test_bus_event', TestEventBusSubscriber)
   end
 
   after(:each) do
-    # Restore the original subscribers
-    EventBus.instance_variable_set(:@subscribers, @original_subscribers)
+    # Restore the original handlers
+    EventBus.instance.instance_variable_set(:@handlers, @original_handlers)
   end
 
   describe '.publish' do
     it 'delivers events to the appropriate subscribers' do
       event = Event.new(event_type: 'test_bus_event', data: { message: 'Hello' })
 
-      EventBus.publish(event)
+      EventBus.publish(event, async: false)
 
       expect(TestEventBusSubscriber.processed_events).to include(event)
     end
@@ -47,7 +47,7 @@ RSpec.describe EventBus do
     it 'does not deliver events to unsubscribed handlers' do
       event = Event.new(event_type: 'unsubscribed_event', data: { message: 'Hello' })
 
-      EventBus.publish(event)
+      EventBus.publish(event, async: false)
 
       expect(TestEventBusSubscriber.processed_events).to be_empty
     end
@@ -56,7 +56,7 @@ RSpec.describe EventBus do
       class AnotherTestSubscriber
         include EventSubscriber
 
-        subscribe_to 'test_bus_event'
+        subscribe_to 'test_bus_event', :process
 
         def self.process(event)
           @processed = true
@@ -72,22 +72,22 @@ RSpec.describe EventBus do
       end
 
       AnotherTestSubscriber.reset!
-      EventBus.register('test_bus_event', AnotherTestSubscriber)
+      EventBus.register_handler('test_bus_event', AnotherTestSubscriber)
 
       event = Event.new(event_type: 'test_bus_event', data: { message: 'Hello' })
-      EventBus.publish(event)
+      EventBus.publish(event, async: false)
 
       expect(TestEventBusSubscriber.processed_events).to include(event)
       expect(AnotherTestSubscriber.processed?).to be true
     end
   end
 
-  describe '.register' do
+  describe '.register_handler' do
     it 'registers a subscriber for an event type' do
-      EventBus.register('new_event_type', TestEventBusSubscriber)
+      EventBus.register_handler('new_event_type', TestEventBusSubscriber)
 
       event = Event.new(event_type: 'new_event_type', data: { message: 'New Event' })
-      EventBus.publish(event)
+      EventBus.publish(event, async: false)
 
       expect(TestEventBusSubscriber.processed_events).to include(event)
     end
@@ -103,24 +103,24 @@ RSpec.describe EventBus do
         def self.process(event); end
       end
 
-      EventBus.register('shared_event', SubscriberOne)
-      EventBus.register('shared_event', SubscriberTwo)
+      EventBus.register_handler('shared_event', SubscriberOne)
+      EventBus.register_handler('shared_event', SubscriberTwo)
 
-      subscribers = EventBus.instance_variable_get(:@subscribers)['shared_event']
-      expect(subscribers).to include(SubscriberOne)
-      expect(subscribers).to include(SubscriberTwo)
+      handlers = EventBus.instance.instance_variable_get(:@handlers)['shared_event']
+      expect(handlers).to include(SubscriberOne)
+      expect(handlers).to include(SubscriberTwo)
     end
   end
 
-  describe '.subscribers_for' do
+  describe '.handlers_for' do
     it 'returns subscribers for a given event type' do
-      subscribers = EventBus.subscribers_for('test_bus_event')
-      expect(subscribers).to include(TestEventBusSubscriber)
+      handlers = EventBus.handlers_for('test_bus_event')
+      expect(handlers).to include(TestEventBusSubscriber)
     end
 
     it 'returns an empty array for event types with no subscribers' do
-      subscribers = EventBus.subscribers_for('nonexistent_event')
-      expect(subscribers).to be_empty
+      handlers = EventBus.handlers_for('nonexistent_event')
+      expect(handlers).to be_empty
     end
   end
 end

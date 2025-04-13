@@ -12,7 +12,7 @@ class CreateVectorEmbeddings < ActiveRecord::Migration[8.0]
       t.string :source_url                                   # URL source if available
       t.string :source_title                                 # Title of the source
       t.jsonb :metadata, null: false, default: {}            # Additional metadata
-      t.vector :embedding, dimensions: 1536                  # OpenAI ada-002 model dimensionality
+      t.vector :embedding, limit: 1536, null: false          # OpenAI ada-002 model dimensionality
       t.timestamps
     end
 
@@ -20,8 +20,11 @@ class CreateVectorEmbeddings < ActiveRecord::Migration[8.0]
     add_index :vector_embeddings, :collection
     add_index :vector_embeddings, :content_type
 
-    # Add an index for vector similarity search
-    execute "CREATE INDEX vector_embeddings_embedding_idx ON vector_embeddings USING ivfflat (embedding vector_l2_ops) WITH (lists = 100)"
+    # Add an index for vector similarity search using HNSW
+    add_index :vector_embeddings, :embedding, using: :hnsw, opclass: :vector_l2_ops
+
+    # If you prefer IVFFlat, use this instead (faster to build, slower to query than HNSW)
+    # add_index :vector_embeddings, :embedding, using: :ivfflat, opclass: :vector_l2_ops, with: { lists: 100 }
   end
 
   def down

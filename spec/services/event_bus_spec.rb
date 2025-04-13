@@ -1,12 +1,20 @@
 require 'rails_helper'
 
 RSpec.describe EventBus do
-  describe '.subscribe' do
-    after do
-      # Clean up subscriptions after tests
-      EventBus.instance_variable_set(:@subscribers, {})
-    end
+  let(:agent_activity) { create(:agent_activity) }
 
+  before(:each) do
+    # Get a fresh instance for each test
+    @bus = EventBus.instance
+    @bus.clear_handlers!
+  end
+
+  after(:each) do
+    # Clean up handlers after each test
+    @bus.clear_handlers!
+  end
+
+  describe '.subscribe' do
     it 'registers a subscriber for an event type' do
       test_subscriber = Class.new do
         def self.process(event)
@@ -16,8 +24,8 @@ RSpec.describe EventBus do
 
       EventBus.subscribe('test_event', test_subscriber)
 
-      subscribers = EventBus.instance_variable_get(:@subscribers)
-      expect(subscribers['test_event']).to include(test_subscriber)
+      handlers = @bus.instance_variable_get(:@handlers)
+      expect(handlers['test_event']).to include(test_subscriber)
     end
 
     it 'allows multiple subscribers for the same event type' do
@@ -36,22 +44,20 @@ RSpec.describe EventBus do
       EventBus.subscribe('test_event', test_subscriber1)
       EventBus.subscribe('test_event', test_subscriber2)
 
-      subscribers = EventBus.instance_variable_get(:@subscribers)
-      expect(subscribers['test_event']).to include(test_subscriber1, test_subscriber2)
+      handlers = @bus.instance_variable_get(:@handlers)
+      expect(handlers['test_event']).to include(test_subscriber1, test_subscriber2)
     end
   end
 
   describe '.publish' do
-    let(:event) { Event.create!(event_type: 'test_event', data: { foo: 'bar' }) }
-
-    after do
-      # Clean up subscriptions after tests
-      EventBus.instance_variable_set(:@subscribers, {})
-    end
+    let(:event) { Event.create!(event_type: 'test_event', agent_activity: agent_activity, data: { foo: 'bar' }) }
 
     it 'notifies all subscribers for the event type' do
-      test_subscriber1 = double('Subscriber1')
-      test_subscriber2 = double('Subscriber2')
+      test_subscriber1 = double('Subscriber1_publish_1')
+      test_subscriber2 = double('Subscriber2_publish_1')
+
+      allow(test_subscriber1).to receive(:respond_to?).with(:process).and_return(true)
+      allow(test_subscriber2).to receive(:respond_to?).with(:process).and_return(true)
 
       expect(test_subscriber1).to receive(:process).with(event)
       expect(test_subscriber2).to receive(:process).with(event)
@@ -59,22 +65,26 @@ RSpec.describe EventBus do
       EventBus.subscribe('test_event', test_subscriber1)
       EventBus.subscribe('test_event', test_subscriber2)
 
-      EventBus.publish(event)
+      EventBus.publish(event, async: false)
     end
 
     it 'does not notify subscribers for other event types' do
-      test_subscriber = double('Subscriber')
+      test_subscriber = double('Subscriber_publish_2')
 
+      allow(test_subscriber).to receive(:respond_to?).with(:process).and_return(true)
       expect(test_subscriber).not_to receive(:process)
 
       EventBus.subscribe('other_event', test_subscriber)
 
-      EventBus.publish(event)
+      EventBus.publish(event, async: false)
     end
 
     it 'handles errors from subscribers without affecting other subscribers' do
-      error_subscriber = double('ErrorSubscriber')
-      working_subscriber = double('WorkingSubscriber')
+      error_subscriber = double('ErrorSubscriber_publish_3')
+      working_subscriber = double('WorkingSubscriber_publish_3')
+
+      allow(error_subscriber).to receive(:respond_to?).with(:process).and_return(true)
+      allow(working_subscriber).to receive(:respond_to?).with(:process).and_return(true)
 
       allow(error_subscriber).to receive(:process).and_raise(StandardError.new('Test error'))
       expect(working_subscriber).to receive(:process).with(event)
@@ -84,10 +94,10 @@ RSpec.describe EventBus do
       EventBus.subscribe('test_event', working_subscriber)
 
       expect {
-        EventBus.publish(event)
+        EventBus.publish(event, async: false)
       }.not_to raise_error
 
-      expect(Rails.logger).to have_received(:error).with(/Error processing event/)
+      expect(Rails.logger).to have_received(:error).with(/Error dispatching event/)
     end
   end
 end
