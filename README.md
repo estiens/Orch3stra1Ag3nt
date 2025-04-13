@@ -1,24 +1,17 @@
-# README
+# WIP
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+⚠️ WARNING: This repo is like a IKEA shelf missing 30% of its screws. 🚧
 
-Things you may want to cover:
+This is a Work In Progress™ that’s 10% vision, 90% "why won’t you compile, you absolute walnut?" Nothing works. Yet.
 
-* Ruby version
+Current stability rating: A raccoon balancing a Jenga tower.
 
-* System dependencies
+For users: Please don’t. Just… don’t. 🛑 Your computer will judge you
 
-* Configuration
+--
 
-* Database creation
+For contributors: Please do.
 
-* Database initialization
+--
 
-* How to run the test suite
-
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+Multi-agent AI framework built lightly beside Rails 8 using native postgres embedding, event pub/sub, adjustible concurrency, solid queue, and real-time reactive visibility
