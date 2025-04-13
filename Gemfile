@@ -102,5 +102,5 @@ gem "ruby-openai", "~> 8.1"
 gem "google_search_results"
 
 # Vector search
-gem "pgvector", "~> 0.2.1"  # PostgreSQL vector operations
+gem "pgvector", "~> 0.3.2"  # PostgreSQL vector operations
 gem "neighbor", "~> 0.3.0"  # Better pgvector integration with Rails
