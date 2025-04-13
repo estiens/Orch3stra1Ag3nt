@@ -140,5 +140,5 @@ module Langchain
   end
 end
 
-# Add OpenRouter to the list of available LLMs
-Langchain::LLM.register(:open_router, Langchain::LLM::OpenRouter)
+# Don't try to register the class - this method doesn't exist
+# Instead, we'll just define the class and use it directly
