@@ -11,46 +11,52 @@ class InterviewAgent < BaseAgent
   end
 
   # Tools that the interview agent can use
-  tool :ask_llm_question, "Ask a question to an LLM and get its response"
-  tool :save_response, "Save a response to a text file"
-  tool :search_web, "Search the web for information"
-
-  # Ask a question directly to the LLM
-  def ask_llm_question(question)
+  tool :ask_llm_question, "Ask a question to an LLM and get its response" do |question|
     # Create a direct LLM query (different from the agent itself)
-    # This shows how to call a different LLM model directly within a tool
-    llm = Regent::LLM.new("deepseek/deepseek-chat-v3-0324", temperature: 0.3)
+    # This shows how to call a different model directly within a tool
+    interview_llm = Langchain::LLM::OpenRouter.new(
+      api_key: ENV["OPEN_ROUTER_API_KEY"],
+      default_options: {
+        chat_model: "deepseek/deepseek-chat-v3-0324",
+        temperature: 0.3
+      }
+    )
 
     # Track the fact that we're making this call in our activity
     agent_activity.events.create!(
       event_type: "llm_direct_query",
-      data: { question: question, model: llm.model }
+      data: { question: question, model: "deepseek/deepseek-chat-v3-0324" }
     ) if agent_activity
 
     # Make the actual LLM call
     begin
-      result = llm.invoke("You are a helpful AI assistant being interviewed. Please answer the following question professionally, truthfully, and concisely: #{question}")
+      response = interview_llm.chat(
+        messages: [
+          { role: "system", content: "You are a helpful AI assistant being interviewed. Please answer the following question professionally, truthfully, and concisely." },
+          { role: "user", content: question }
+        ]
+      )
 
       # Record this call in our database if we have an activity
       if agent_activity
         agent_activity.llm_calls.create!(
           provider: "openrouter",
-          model: llm.model,
+          model: response.model || "deepseek/deepseek-chat-v3-0324",
           prompt: question,
-          response: result.content,
-          tokens_used: (result.input_tokens || 0) + (result.output_tokens || 0)
+          response: response.chat_completion,
+          tokens_used: (response.prompt_tokens || 0) + (response.completion_tokens || 0)
         )
       end
 
       # Return just the content
-      result.content
+      response.chat_completion
     rescue => e
       "Error getting response: #{e.message}"
     end
   end
 
   # Save a response to a file
-  def save_response(question, answer, filename = nil)
+  tool :save_response, "Save a response to a text file" do |question, answer, filename = nil|
     # Generate a filename if not provided
     filename ||= "interview_#{Time.now.strftime('%Y%m%d_%H%M%S')}.txt"
 
@@ -82,8 +88,31 @@ class InterviewAgent < BaseAgent
   end
 
   # Search the web for information (simulated)
-  def search_web(query)
+  tool :search_web, "Search the web for information" do |query|
     "This is a simulated web search result for: '#{query}'. In a real implementation, this would connect to a search API."
+  end
+
+  # Override execute_chain to handle the input
+  def execute_chain(input)
+    # Use the LLM to decide what to do with the input
+    response = @llm.chat(
+      messages: [
+        { role: "system", content: "You are an interview agent that can ask questions to an LLM, search the web for information, and save responses to files." },
+        { role: "user", content: input }
+      ]
+    )
+    
+    # Record the LLM call
+    record_llm_call(
+      "openrouter",
+      response.model || "unknown",
+      input,
+      response.chat_completion,
+      response.total_tokens || 0
+    )
+    
+    # Return the completion
+    response.chat_completion
   end
 
   # Custom after_run to provide a summary of the interview

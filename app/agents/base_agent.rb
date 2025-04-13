@@ -48,8 +48,9 @@ class BaseAgent
   end
   
   def execute_chain(input)
-    # Override in subclasses to implement specific chain execution
-    raise NotImplementedError, "Subclasses must implement execute_chain"
+    # Default implementation that can be overridden in subclasses
+    # Simply returns the input as the result
+    input
   end
 
   def self.queue_name
@@ -168,7 +169,7 @@ class BaseAgent
 
     # Update agent_activity if present
     if @agent_activity
-      @agent_activity.update(status: "running", started_at: Time.current)
+      @agent_activity.update(status: "running")
     end
   end
 
