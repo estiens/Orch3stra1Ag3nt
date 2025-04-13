@@ -73,8 +73,15 @@ class Agents::AgentJob < ApplicationJob
         result
       end
     rescue => e
-      # Log error
-      Rails.logger.error("Error in agent job: #{e.message}\n#{e.backtrace.join("\n")}")
+      # Use the error handler for standardized error processing
+      error_context = {
+        agent_class: agent_klass.name,
+        agent_activity_id: agent_activity.id,
+        task_id: task.id,
+        prompt: agent_prompt&.respond_to?(:truncate) ? agent_prompt.truncate(100) : agent_prompt.to_s[0...100]
+      }
+
+      ErrorHandler.handle_error(e, error_context)
 
       # Update agent activity with error
       agent_activity.update!(
@@ -83,17 +90,34 @@ class Agents::AgentJob < ApplicationJob
         completed_at: Time.current
       )
 
-      # Create error event
+      # Create error event with more detailed information
       agent_activity.events.create!(
         event_type: "agent_failed",
-        data: { error: e.message }
+        data: {
+          error: e.message,
+          error_class: e.class.name,
+          recoverable: ErrorHandler::TRANSIENT_ERRORS.any? { |err| e.is_a?(err) }
+        }
+      )
+
+      # Emit a system-wide error event for possible automatic recovery
+      Event.publish(
+        "agent_error",
+        {
+          agent_class: agent_klass.name,
+          task_id: task.id,
+          agent_activity_id: agent_activity.id,
+          error: e.message,
+          error_class: e.class.name
+        },
+        priority: Event::HIGH_PRIORITY
       )
 
       # Mark task as failed unless it's already in another terminal state
       task.fail! if task.may_fail?
 
-      # Re-raise for Solid Queue's retry mechanism
-      raise
+      # Re-raise for Solid Queue's retry mechanism with improved context
+      raise e, "#{e.message} (in #{agent_klass.name} job for task #{task.id})", e.backtrace
     end
   end
 

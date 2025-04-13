@@ -1,4 +1,3 @@
-
 gem "ancestry"
 
 source "https://rubygems.org"
@@ -87,9 +86,9 @@ gem "dry-validation"
 
 # web scraping
 
-gem "httparty"
-gem "nokogiri"
-gem "mechanize"
+gem "httparty", "~> 0.21"
+gem "nokogiri", "~> 1.15"
+gem "mechanize", "~> 2.9"
 gem "typhoeus"
 
 # dashboard
@@ -98,3 +97,10 @@ gem "chartkick"
 gem "mission_control-jobs"
 
 gem "ruby-openai", "~> 8.1"
+
+# Web scraping and searching
+gem "google_search_results"
+
+# Vector search
+gem "pgvector", "~> 0.2.1"  # PostgreSQL vector operations
+gem "neighbor", "~> 0.3.0"  # Better pgvector integration with Rails

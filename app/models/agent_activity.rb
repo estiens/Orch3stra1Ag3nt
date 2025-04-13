@@ -7,4 +7,12 @@ class AgentActivity < ApplicationRecord
 
   has_many :llm_calls, dependent: :destroy
   has_many :events, dependent: :destroy
+
+  # Mark this activity as failed with an error message
+  def mark_failed(error_message)
+    update(
+      status: "failed",
+      error_message: error_message
+    )
+  end
 end

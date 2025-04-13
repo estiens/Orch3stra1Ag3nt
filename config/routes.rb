@@ -9,10 +9,18 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
+  # Project management
+  resources :projects do
+    member do
+      post :kickoff
+    end
+  end
+
   # Defines the root path route ("/")
   namespace :admin do
     mount MissionControl::Jobs::Engine, at: "/jobs"
   end
 
-  # root "posts#index"
+  # Root route goes to projects index
+  root "projects#index"
 end
