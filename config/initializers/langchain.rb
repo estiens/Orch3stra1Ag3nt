@@ -128,7 +128,6 @@ module Langchain
   end
 end
 
-# Register the OpenRouter provider with Langchain
-Langchain::LLM.register(:openrouter) do |api_key: nil, **options|
-  Langchain::LLM::OpenRouter.new(api_key: api_key, default_options: options)
-end
+# Make our OpenRouter provider available to the application
+Langchain::LLM.const_set(:PROVIDER_CLASSES, {}) unless Langchain::LLM.const_defined?(:PROVIDER_CLASSES)
+Langchain::LLM::PROVIDER_CLASSES[:openrouter] = Langchain::LLM::OpenRouter
