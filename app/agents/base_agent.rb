@@ -109,32 +109,40 @@ class BaseAgent
   def fast_model
     Langchain::LLM.new(
       provider: :openrouter,
-      model: LANGCHAIN_MODEL_DEFAULTS[:fast],
-      temperature: 0.2
+      default_options: {
+        model: LANGCHAIN_MODEL_DEFAULTS[:fast],
+        temperature: 0.2
+      }
     )
   end
 
   def thinking_model
     Langchain::LLM.new(
       provider: :openrouter,
-      model: LANGCHAIN_MODEL_DEFAULTS[:thinking],
-      temperature: 0.3
+      default_options: {
+        model: LANGCHAIN_MODEL_DEFAULTS[:thinking],
+        temperature: 0.3
+      }
     )
   end
 
   def multimodal_model
     Langchain::LLM.new(
       provider: :openrouter,
-      model: LANGCHAIN_MODEL_DEFAULTS[:multimodal],
-      temperature: 0.2
+      default_options: {
+        model: LANGCHAIN_MODEL_DEFAULTS[:multimodal],
+        temperature: 0.2
+      }
     )
   end
 
   def edge_model
     Langchain::LLM.new(
       provider: :openrouter,
-      model: "anthropic/claude-3-haiku-20240307",
-      temperature: 0.1
+      default_options: {
+        model: "anthropic/claude-3-haiku-20240307",
+        temperature: 0.1
+      }
     )
   end
 
@@ -146,8 +154,10 @@ class BaseAgent
   def default_model
     Langchain::LLM.new(
       provider: :openrouter,
-      model: self.class.default_model,
-      temperature: 0.3
+      default_options: {
+        model: self.class.default_model,
+        temperature: 0.3
+      }
     )
   end
 
@@ -205,7 +215,13 @@ class BaseAgent
       send("#{model_param}_model")
     elsif model_param.is_a?(String)
       # Create a new LLM instance with the given model name
-      Langchain::LLM.new(provider: :openrouter, model: model_param)
+      Langchain::LLM.new(
+        provider: :openrouter, 
+        default_options: {
+          model: model_param,
+          temperature: 0.3
+        }
+      )
     else
       # Fall back to default model
       default_model
