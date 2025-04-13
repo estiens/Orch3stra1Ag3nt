@@ -15,39 +15,6 @@ Here is the revised plan for the first 10 high-level tasks, incorporating your f
 (Preliminary: Review regent gem docs and functionality and summarize its API - we are using our own fork upto date with main incase we need to make any changes but open_router should
 be able to be used as open ai compatible)
 
-
-
-**3. Set Up Agent Job Execution Layer** [IN PROGRESS]
-
-IT WILL BE VERY IMPORTANT TO GET THIS RIGHT - THINK THROUGH DEEPLY HOW REGENT WORKS AND WHERE WE CAN HOOK INTO IT - I HAVE PUT THE COMPLETE SOURCE CODE OF THE GEM AT docs/regent_code.txt for review
-
-  - Implement base Agent job class (app/jobs/agents/).
-    - _Acceptance: Jobs can be enqueued/executed as agents._
-  - Add support for job arguments (agent type, context, task ID).
-    - _Acceptance: Jobs receive and use arguments correctly._
-  - Integrate Ractors for agent job isolation.
-    - _Acceptance: Multiple jobs run in parallel without interference._(Question Do we need this with async job handling and our existing queues? perhaps think through queue manageemnt)
-
-3. **Documentation**:
-   - The implementation guide (`agent_implementation.md`) is a good addition. Make sure it evolves alongside the codebase to maintain relevance.
-   - Further comments in the code (e.g., in complex methods) would improve readability and maintainability.
-
-4. **Error Handling**:
-   - Review error-handling strategies, particularly in the `invoke` method within the LLM class. Ensure that there are fallbacks or retries for temporary network issues.
-   - Implement custom error classes for better granularity in catching and handling specific exceptions.
-
-5. **Review of Queue Handling**:
-   - It's crucial to monitor the queuing system behavior under load, especially if you're planning to scale. Consider setting up alerts for dropped jobs or slow processing times.
-
-6. **Performance Considerations**:
-   - As more agents are implemented, performance could become an issue. Start profiling the job processing times and identify bottlenecks early.
-
-7. **API Rate Limiting**:
-   - Monitor API usage and consider implementing rate limiting on the application side if OpenRouter imposes usage limits.
-
-
----
-
 **4. Build OrchestratorAgent and CoordinatorAgent**
   - Implement short-lived OrchestratorAgent (spawned by event or recurring job).
     - _Acceptance: OrchestratorAgent can spawn, act, and terminate._
@@ -56,6 +23,130 @@ IT WILL BE VERY IMPORTANT TO GET THIS RIGHT - THINK THROUGH DEEPLY HOW REGENT WO
   - Configure orchestration queue with highest priority.
     - _Acceptance: OrchestratorAgent jobs run promptly when scheduled._
 
+We will use this to build code_writing, code_research, code_review, and code_testing agents. to build out the rest of this app
+
+As you flesh out the OrchestrationAgent and middle-managers for tasks think through how event pub/sub will work, how we will create custom tools for Regent, etc etc etc
+
+Overview Of Work so far
+
+1. **Solid Foundation with Rails**
+   - Good choice leveraging Rails for a mature foundation with database integration, job queuing, and application structure
+
+2. **Agent Hierarchy**
+   - Clean inheritance pattern with `BaseAgent` providing shared functionality
+   - Specialized agents with clear responsibilities (Orchestrator, Coordinator, Interview)
+   - Integration with Regent for LLM interactions
+
+3. **Job System Implementation**
+   - Well-structured queue management with SolidQueue
+   - Per-agent queue configuration with concurrency limits
+   - Good error handling and job status tracking
+
+4. **Task Management**
+   - State machine implementation using AASM
+   - Hierarchical task structure with subtask capabilities
+   - Activity tracking per task
+
+5. **Logging and Monitoring**
+   - Comprehensive LLM call logging
+   - Agent activity tracking with detailed event recording
+   - Session trace capture for debugging
+
+## Gaps and Areas for Improvement
+
+1. **Event-Driven Architecture**
+   - **Critical Gap**: The core pub/sub event system for agent communication isn't fully implemented
+   - Events are currently used mostly for logging rather than driving inter-agent workflow
+   - Need to implement true event subscriptions and handlers
+
+2. **Schema Validation**
+   - No integration with dry-schema/dry-types as specified
+   - Missing structured validation for agent inputs/outputs
+   - Tool interfaces lack formal schema definitions
+
+3. **Tool Architecture**
+   - Tools are embedded in agent classes rather than as independent components
+   - No clear separation between tool definition and implementation
+   - Missing the tool registry system mentioned in the spec
+
+4. **Human-in-the-Loop**
+   - Task has `waiting_on_human` state but missing the soft/hard clarification interfaces
+   - No dashboard implementation for human interaction
+   - Missing timeout handling for human responses
+
+5. **State Management**
+   - Currently relies entirely on database for state
+   - Missing Redis integration for ephemeral state
+   - No clear strategy for managing large context windows between agent invocations
+
+6. **Dashboard & Monitoring**
+   - No implementation of the real-time dashboard using Turbo Streams
+   - Missing cost tracking and visualization
+   - No interface for human intervention
+
+7. **Vector Database**
+   - No integration with vector databases for semantic search
+   - Missing document storage capabilities
+
+## Implementation Concerns
+
+1. **Ractor Usage**
+   - `maybe_with_ractor` is experimental and has significant limitations
+   - Many Ruby objects cannot be shared between Ractors
+   - Consider alternative isolation patterns or thorough testing before relying on this
+
+2. **Concurrency Management**
+   - Semaphore-based concurrency is good but needs careful timeout handling
+   - No circuit breaker implementation for cascading failure prevention
+   - `with_concurrency_control` could deadlock under certain conditions
+
+3. **AgentActivity Overloading**
+   - This model handles too many responsibilities (activity tracking, parent-child relationships, result storage)
+   - Consider splitting into more focused models as the system grows
+
+4. **Error Handling**
+   - Basic error catching exists but missing structured error recovery strategies
+   - No retry strategies with exponential backoff
+   - Missing global error monitoring and alerting
+
+## Recommendations
+
+1. **Implement True Event System**
+   - Create a dedicated `EventBus` class for pub/sub functionality
+   - Add event subscription capabilities to agents
+   - Enable event-driven workflows between agents
+
+2. **Add Schema Validation**
+   - Integrate dry-schema for input/output validation
+   - Define clear interfaces for tool inputs/outputs
+   - Implement response validation with feedback loops
+
+3. **Restructure Tool System**
+   - Extract tools into standalone classes
+   - Create a tool registry system
+   - Enable dynamic tool discovery and usage
+
+4. **Enhance Human Interaction**
+   - Implement both blocking and non-blocking clarification interfaces
+   - Create a user-friendly dashboard for interactions
+   - Add timeout handling and escalation policies
+
+5. **Improve State Management**
+   - Integrate Redis for ephemeral state
+   - Implement strategies for large context persistence
+   - Add state versioning for backwards compatibility
+
+6. **Build Dashboard & Monitoring**
+   - Create Turbo Stream-based real-time dashboard
+   - Implement cost tracking and visualization
+   - Add system health monitoring
+
+7. **Consider Scaling Strategy**
+   - Define clear boundaries for horizontal scaling
+   - Implement proper resource limits
+   - Add cost control mechanisms
+
+Overall, the implementation provides a solid foundation but needs significant development to match the complete vision outlined in the technical specification. The core agent and job architecture is well-structured, but the event-driven nature of the system requires more attention to fulfill the original design goals.
 ---
 
 **5. Implement Queue Management and Safeguards**
