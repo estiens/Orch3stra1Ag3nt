@@ -11,34 +11,25 @@ class ExampleLangchainAgent < BaseAgent
   end
   
   def execute_chain(input)
-    # Create Langchain tools that wrap our custom tools
-    langchain_tools = [
-      Langchain::Tool.new(
-        name: "search_web",
-        description: "Search the web for information",
-        function: ->(query) { execute_tool(:search_web, query) }
-      ),
-      Langchain::Tool.new(
-        name: "calculate",
-        description: "Perform a calculation",
-        function: ->(expression) { execute_tool(:calculate, expression) }
-      )
-    ]
-    
-    # Create an agent with tools
-    agent = Langchain::Agent::ReActAgent.new(
-      llm: @llm,
-      tools: langchain_tools
+    # Create a simple prompt template
+    prompt = Langchain::Prompt::PromptTemplate.new(
+      template: "You are a helpful assistant. Answer the following question: {question}",
+      input_variables: ["question"]
     )
     
-    # Run the agent
-    result = agent.run(input)
+    # Create a simple LLM chain
+    chain = Langchain::Chains::LLMChain.new(
+      llm: @llm,
+      prompt: prompt
+    )
     
-    # Record the LLM calls from the agent's execution
-    # Note: In a real implementation, we would need to extract the LLM calls from Langchain
+    # Run the chain
+    result = chain.run(question: input)
+    
+    # Record the LLM call
     record_llm_call(
       "openrouter",
-      @llm.default_options[:model],
+      @llm.instance_variable_get(:@default_options)[:model],
       input,
       result,
       0 # We don't have token count here
