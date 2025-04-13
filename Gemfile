@@ -80,7 +80,7 @@ gem "open_router"
 
 # agents
 
-gem "regent", github: "estiens/regent"
+gem "langchain"
 gem "dry-schema"
 gem "dry-validation"
 
