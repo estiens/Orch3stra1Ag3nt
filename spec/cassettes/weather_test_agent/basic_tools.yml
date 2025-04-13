@@ -1,0 +1,145 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"messages":[{"role":"system","content":"## Instructions\nConsider
+        the following context: You are a helpful weather assistant\n\n\nYou are an
+        AI agent reasoning step-by-step to solve complex problems.\nYour reasoning
+        process happens in a loop of Thought, Action, Observation.\nThought - a description
+        of your thoughts about the question.\nAction - pick a an action from available
+        tools if required. If there are no tools that can help return an Answer saying
+        you are not able to help.\nObservation - is the result of running a tool.\nPAUSE
+        - a stop sequence that will always be present after an Action.\n\n## Available
+        tools:\nget_weather - Get the weather for a location\nget_forecast - Get a
+        future forecast for a location\n\n## Example session\nQuestion: What is the
+        weather in London today?\nThought: I need to get current weather in London\nAction:
+        {\"tool\": \"weather_tool\", \"args\": [\"London\"]}\nPAUSE\n\nYou will have
+        a response form a user with Observation:\nObservation: It is 32 degress and
+        Sunny\n\n... (this Thought/Action/Observation can repeat N times)\n\nThought:
+        I know the final answer\nAnswer: It is 32 degress and Sunny in London\n"},{"role":"user","content":"What''s
+        the weather like in San Francisco?"}],"model":"deepseek/deepseek-chat-v3-0324","temperature":0.5,"stop":["PAUSE"]}'
+    headers:
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Content-Type:
+      - application/json
+      X-Title:
+      - OpenRouter Ruby Client
+      Http-Referer:
+      - https://github.com/OlympiaAI/open_router
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Sun, 13 Apr 2025 00:43:09 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 92f6ed755e39a1e8-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n\n         \n\n         \n{\"id\":\"gen-1744504989-TrgtatmxHkTOg223zuVi\",\"provider\":\"DeepInfra\",\"model\":\"deepseek/deepseek-chat-v3-0324\",\"object\":\"chat.completion\",\"created\":1744504989,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Thought:
+        I need to get the current weather in San Francisco.\\nAction: {\\\"tool\\\":
+        \\\"get_weather\\\", \\\"args\\\": [\\\"San Francisco\\\"]}\\n\",\"refusal\":null,\"reasoning\":null}}],\"usage\":{\"prompt_tokens\":253,\"completion_tokens\":33,\"total_tokens\":286}}"
+  recorded_at: Sun, 13 Apr 2025 00:43:11 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"messages":[{"role":"system","content":"## Instructions\nConsider
+        the following context: You are a helpful weather assistant\n\n\nYou are an
+        AI agent reasoning step-by-step to solve complex problems.\nYour reasoning
+        process happens in a loop of Thought, Action, Observation.\nThought - a description
+        of your thoughts about the question.\nAction - pick a an action from available
+        tools if required. If there are no tools that can help return an Answer saying
+        you are not able to help.\nObservation - is the result of running a tool.\nPAUSE
+        - a stop sequence that will always be present after an Action.\n\n## Available
+        tools:\nget_weather - Get the weather for a location\nget_forecast - Get a
+        future forecast for a location\n\n## Example session\nQuestion: What is the
+        weather in London today?\nThought: I need to get current weather in London\nAction:
+        {\"tool\": \"weather_tool\", \"args\": [\"London\"]}\nPAUSE\n\nYou will have
+        a response form a user with Observation:\nObservation: It is 32 degress and
+        Sunny\n\n... (this Thought/Action/Observation can repeat N times)\n\nThought:
+        I know the final answer\nAnswer: It is 32 degress and Sunny in London\n"},{"role":"user","content":"What''s
+        the weather like in San Francisco?"},{"role":"assistant","content":"Thought:
+        I need to get the current weather in San Francisco.\nAction: {\"tool\": \"get_weather\",
+        \"args\": [\"San Francisco\"]}\n"},{"role":"user","content":"Observation:
+        It is currently 72°F and sunny in San Francisco."}],"model":"deepseek/deepseek-chat-v3-0324","temperature":0.5,"stop":["PAUSE"]}'
+    headers:
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Content-Type:
+      - application/json
+      X-Title:
+      - OpenRouter Ruby Client
+      Http-Referer:
+      - https://github.com/OlympiaAI/open_router
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Sun, 13 Apr 2025 00:43:11 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 92f6ed833b0b4c94-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: !binary |-
+        CiAgICAgICAgIAoKICAgICAgICAgCgogICAgICAgICAKCiAgICAgICAgIAoKICAgICAgICAgCgogICAgICAgICAKCiAgICAgICAgIAoKICAgICAgICAgCgogICAgICAgICAKCiAgICAgICAgIAp7ImlkIjoiZ2VuLTE3NDQ1MDQ5OTEtSDFXME9jd3JsdHRpM0JzWk9mMDEiLCJwcm92aWRlciI6IkRlZXBTZWVrIiwibW9kZWwiOiJkZWVwc2Vlay9kZWVwc2Vlay1jaGF0LXYzLTAzMjQiLCJvYmplY3QiOiJjaGF0LmNvbXBsZXRpb24iLCJjcmVhdGVkIjoxNzQ0NTA0OTkxLCJjaG9pY2VzIjpbeyJsb2dwcm9icyI6bnVsbCwiZmluaXNoX3JlYXNvbiI6InN0b3AiLCJuYXRpdmVfZmluaXNoX3JlYXNvbiI6InN0b3AiLCJpbmRleCI6MCwibWVzc2FnZSI6eyJyb2xlIjoiYXNzaXN0YW50IiwiY29udGVudCI6IlRob3VnaHQ6IEkgaGF2ZSB0aGUgY3VycmVudCB3ZWF0aGVyIGluZm9ybWF0aW9uIGZvciBTYW4gRnJhbmNpc2NvLlxuQW5zd2VyOiBJdCBpcyBjdXJyZW50bHkgNzLCsEYgYW5kIHN1bm55IGluIFNhbiBGcmFuY2lzY28uIiwicmVmdXNhbCI6bnVsbCwicmVhc29uaW5nIjpudWxsfX1dLCJzeXN0ZW1fZmluZ2VycHJpbnQiOiJmcF8zZDUxNDFhNjlhX3Byb2QwMjI1IiwidXNhZ2UiOnsicHJvbXB0X3Rva2VucyI6MzAxLCJjb21wbGV0aW9uX3Rva2VucyI6MjcsInRvdGFsX3Rva2VucyI6MzI4LCJwcm9tcHRfdG9rZW5zX2RldGFpbHMiOnsiY2FjaGVkX3Rva2VucyI6MjU2fX19
+  recorded_at: Sun, 13 Apr 2025 00:43:15 GMT
+recorded_with: VCR 6.3.1

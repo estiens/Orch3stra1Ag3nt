@@ -18,6 +18,9 @@ be able to be used as open ai compatible)
 
 
 **3. Set Up Agent Job Execution Layer** [IN PROGRESS]
+
+IT WILL BE VERY IMPORTANT TO GET THIS RIGHT - THINK THROUGH DEEPLY HOW REGENT WORKS AND WHERE WE CAN HOOK INTO IT - I HAVE PUT THE COMPLETE SOURCE CODE OF THE GEM AT docs/regent_code.txt for review
+
   - Implement base Agent job class (app/jobs/agents/).
     - _Acceptance: Jobs can be enqueued/executed as agents._
   - Add support for job arguments (agent type, context, task ID).

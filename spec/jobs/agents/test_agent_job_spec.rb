@@ -7,7 +7,12 @@ RSpec.describe "TestAgent (async via AgentJob)", type: :job do
     VCR.use_cassette("agents/openrouter_llm") do
       begin
         perform_enqueued_jobs do
-          Agents::AgentJob.set(queue: Agents::TestAgent.queue_name).perform_later("Agents::TestAgent", "llm_echo: Hello from TestAgent!", model: :fast)
+          task = Task.create!(title: "Test task for agent job", state: "pending")
+          Agents::AgentJob.set(queue: Agents::TestAgent.queue_name).perform_later(
+            "Agents::TestAgent",
+            "llm_echo: Hello from TestAgent!",
+            { model: :fast, task_id: task.id }
+          )
         end
       rescue => e
         puts "\n--- Exception Raised in TestAgentJob: ---"
