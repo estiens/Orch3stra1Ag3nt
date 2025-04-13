@@ -8,11 +8,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
     services:
       postgres:
-        image: postgres
+        image: pgvector/pgvector:pg17
         env:
+          POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: postgres
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -23,7 +23,8 @@ jobs:
     steps:
       - name: Install packages
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y google-chrome-stable curl libjemalloc2 libvips postgresql-client libpq-dev
-
+      - name: Install PgVector
+        run: psql -h localhost -U postgres -c 'CREATE EXTENSION vector'
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -32,12 +33,14 @@ jobs:
         with:
           ruby-version: .ruby-version
           bundler-cache: true
-
-      - name: Run tests
+      - name: Setup DB
         env:
           RAILS_ENV: test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
-        run: bin/rails db:create && db:migrate && bundle exec rspec --format documentation
+        run: bin/rails db:create db:migrate
+      
+      - name: Specs
+        run: bundle exec rspec --format documentation --color
 
   scan_ruby:
     runs-on: ubuntu-latest
