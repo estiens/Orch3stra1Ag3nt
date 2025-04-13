@@ -25,7 +25,7 @@ RSpec.describe InterviewAgent, type: :agent, vcr: true do
       )
 
       # Stub the llm.chat call to return a predictable result
-      allow_any_instance_of(Langchain::LLM::Base).to receive(:chat).and_return(
+      allow_any_instance_of(Langchain::LLM::OpenRouter).to receive(:chat).and_return(
         OpenStruct.new(
           content: "This is a simulated response to the ethical question. AI systems should be deployed with careful consideration of fairness, transparency, and accountability.",
           prompt_tokens: 20,
@@ -55,7 +55,7 @@ RSpec.describe InterviewAgent, type: :agent, vcr: true do
       )
 
       # Simulate an error condition
-      allow_any_instance_of(Langchain::LLM::Base).to receive(:chat).and_raise(StandardError.new("API connection error"))
+      allow_any_instance_of(Langchain::LLM::OpenRouter).to receive(:chat).and_raise(StandardError.new("API connection error"))
 
       result = agent.ask_llm_question("This question should trigger an error")
 
