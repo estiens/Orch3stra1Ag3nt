@@ -9,6 +9,8 @@ module DashboardHelper
                      'badge-danger'
                    when 'waiting', 'pending'
                      'badge-warning'
+                   when 'paused'
+                     'badge-secondary'
                    else
                      'badge-secondary'
                    end
