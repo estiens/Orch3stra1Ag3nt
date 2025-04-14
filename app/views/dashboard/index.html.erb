@@ -46,6 +46,14 @@
         <%= render partial: "human_input_requests", locals: { human_input_requests: @human_input_requests } %>
       </div>
     </div>
+    
+    <!-- Tasks Section -->
+    <div class="dashboard-section">
+      <h2>Active Tasks</h2>
+      <div id="tasks-container" class="card-container">
+        <%= render partial: "tasks", locals: { tasks: @tasks } %>
+      </div>
+    </div>
   </div>
 </div>
 

@@ -17,3 +17,7 @@
 <%= turbo_stream.replace "human-input-requests-container" do %>
   <%= render partial: "human_input_requests", locals: { human_input_requests: @human_input_requests } %>
 <% end %>
+
+<%= turbo_stream.replace "tasks-container" do %>
+  <%= render partial: "tasks", locals: { tasks: @tasks } %>
+<% end %>
