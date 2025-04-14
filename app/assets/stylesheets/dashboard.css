@@ -269,6 +269,47 @@
   background-color: #9e9e9e;
 }
 
+/* Empty State */
+.empty-state {
+  padding: 30px;
+  text-align: center;
+  color: #757575;
+  font-style: italic;
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  border: 1px dashed #ccc;
+}
+
+/* Code and pre formatting */
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.whitespace-pre-wrap {
+  white-space: pre-wrap;
+}
+
+/* Collapsible sections */
+.collapsible-trigger {
+  cursor: pointer;
+}
+
+/* Input request cards */
+.input-request-card.required {
+  border-left: 4px solid #f44336;
+}
+
+.input-request-card.optional {
+  border-left: 4px solid #ff9800;
+}
+
+/* LLM call cards */
+.llm-call-card {
+  border-left: 4px solid #673ab7;
+}
+
 /* Animation for new items */
 @keyframes highlight {
   0% { background-color: rgba(255, 251, 130, 0.8); }
