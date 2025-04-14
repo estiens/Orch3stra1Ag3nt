@@ -4,14 +4,16 @@ export default class extends Controller {
   static targets = ["container"]
   
   connect() {
-    // Make the modal active when it's connected to the DOM
-    this.element.classList.add('active')
-    
-    // Prevent scrolling on the body
-    document.body.classList.add('modal-open')
-    
-    // Setup keyboard events
-    this.setupKeyboardEvents()
+    // Only make the modal active if it has content
+    if (this.element.innerHTML.trim() !== '') {
+      this.element.classList.add('active')
+      
+      // Prevent scrolling on the body
+      document.body.classList.add('modal-open')
+      
+      // Setup keyboard events
+      this.setupKeyboardEvents()
+    }
   }
   
   disconnect() {

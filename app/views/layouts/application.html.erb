@@ -59,7 +59,9 @@
       </main>
 
       <div id="modal" class="modal" data-controller="modal" data-action="click->modal#closeBackground">
-        <%= yield :modal %>
+        <% if content_for?(:modal) %>
+          <%= yield :modal %>
+        <% end %>
       </div>
     </div>
   </body>
