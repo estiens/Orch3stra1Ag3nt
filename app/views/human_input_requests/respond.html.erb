@@ -1,27 +1,61 @@
 <div class="modal-content">
-  <h2>Respond to Input Request</h2>
+  <div class="flex justify-between items-center mb-4">
+    <h2 class="text-xl font-bold text-gray-900">Respond to Input Request</h2>
+    <button type="button" class="text-gray-400 hover:text-gray-500" data-action="click->modal#close">
+      <span class="sr-only">Close</span>
+      <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  </div>
   
-  <div class="input-request-details">
-    <p><strong>Question:</strong> <%= @human_input_request.question %></p>
-    <p><strong>Task:</strong> <%= @human_input_request.task.title %></p>
-    <p><strong>Type:</strong> <%= @human_input_request.required ? 'Required' : 'Optional' %></p>
-    <% if @human_input_request.expires_at.present? %>
-      <p><strong>Expires:</strong> <%= distance_of_time_in_words(Time.now, @human_input_request.expires_at) %></p>
-    <% end %>
+  <div class="bg-gray-50 rounded-md p-4 mb-6">
+    <div class="mb-2">
+      <span class="text-sm font-medium text-gray-500">Question:</span>
+      <p class="mt-1 text-gray-900"><%= @human_input_request.question %></p>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+      <div>
+        <span class="font-medium text-gray-500">Task:</span>
+        <p class="text-gray-900"><%= @human_input_request.task.title %></p>
+      </div>
+      
+      <div>
+        <span class="font-medium text-gray-500">Type:</span>
+        <p>
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+            <%= @human_input_request.required ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800' %>">
+            <%= @human_input_request.required ? 'Required' : 'Optional' %>
+          </span>
+        </p>
+      </div>
+      
+      <% if @human_input_request.expires_at.present? %>
+        <div>
+          <span class="font-medium text-gray-500">Expires:</span>
+          <p class="<%= @human_input_request.expires_at > Time.now ? 'text-yellow-600' : 'text-red-600' %>">
+            <%= distance_of_time_in_words(Time.now, @human_input_request.expires_at) %>
+          </p>
+        </div>
+      <% end %>
+    </div>
   </div>
   
   <%= form_with url: submit_response_human_input_request_path(@human_input_request), method: :post do |form| %>
-    <div class="form-group">
-      <%= form.label :response, "Your Response" %>
-      <%= form.text_area :response, rows: 5, class: "form-control" %>
+    <div class="mb-4">
+      <%= form.label :response, "Your Response", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= form.text_area :response, rows: 5, class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" %>
     </div>
     
-    <div class="form-actions">
-      <%= form.submit "Submit Response", class: "button button-primary" %>
+    <div class="flex justify-end space-x-3 mt-6">
+      <%= link_to "Cancel", "#", class: "inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500", data: { action: "click->modal#close" } %>
+      
       <% if !@human_input_request.required %>
-        <%= button_to "Ignore", ignore_human_input_request_path(@human_input_request), method: :post, class: "button button-warning" %>
+        <%= button_to "Ignore", ignore_human_input_request_path(@human_input_request), method: :post, class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500" %>
       <% end %>
-      <%= link_to "Cancel", "#", class: "button", data: { action: "click->modal#close" } %>
+      
+      <%= form.submit "Submit Response", class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
     </div>
   <% end %>
 </div>

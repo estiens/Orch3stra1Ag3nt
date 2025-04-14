@@ -23,8 +23,8 @@
 
 .modal-content {
   background-color: white;
-  border-radius: 12px;
-  padding: 24px;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
   width: 90%;
   max-width: 700px;
   max-height: 90vh;

@@ -2,13 +2,17 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static targets = ["trigger"]
+  static values = { id: String }
   
   toggle(event) {
-    const targetId = event.currentTarget.dataset.id
+    const targetId = this.idValue || event.currentTarget.dataset.id
     const targetElement = document.getElementById(targetId)
     
     if (targetElement) {
       targetElement.classList.toggle('hidden')
+      
+      // Toggle the open class on the trigger for styling
+      event.currentTarget.classList.toggle('open')
       
       // Toggle the arrow icon
       const iconElement = event.currentTarget.querySelector('svg')
