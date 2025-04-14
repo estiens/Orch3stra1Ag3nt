@@ -1,0 +1,13 @@
+<% agent_activities.each do |activity| %>
+  <div id="<%= dom_id(activity) %>" class="dashboard-card activity-card <%= activity.status %>">
+    <h3><%= activity.agent_type %></h3>
+    <div class="card-details">
+      <p><strong>Status:</strong> <%= activity.status %></p>
+      <p><strong>Task:</strong> <%= activity.task&.title || "N/A" %></p>
+      <p><strong>Started:</strong> <%= time_ago_in_words(activity.created_at) %> ago</p>
+      <% if activity.completed_at %>
+        <p><strong>Duration:</strong> <%= distance_of_time_in_words(activity.created_at, activity.completed_at) %></p>
+      <% end %>
+    </div>
+  </div>
+<% end %>

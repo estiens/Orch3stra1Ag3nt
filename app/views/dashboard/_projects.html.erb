@@ -1,0 +1,13 @@
+<% projects.each do |project| %>
+  <div id="<%= dom_id(project) %>" class="dashboard-card project-card">
+    <h3><%= project.title %></h3>
+    <div class="card-details">
+      <p><strong>Status:</strong> <%= project.status %></p>
+      <p><strong>Tasks:</strong> <%= project.tasks.count %></p>
+      <p><strong>Created:</strong> <%= time_ago_in_words(project.created_at) %> ago</p>
+    </div>
+    <div class="card-actions">
+      <%= link_to "View", project_path(project), class: "button" %>
+    </div>
+  </div>
+<% end %>

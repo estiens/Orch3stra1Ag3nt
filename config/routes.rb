@@ -9,6 +9,9 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
+  # Dashboard for monitoring agent activities
+  get "dashboard" => "dashboard#index", as: :dashboard
+  
   # Project management
   resources :projects do
     member do

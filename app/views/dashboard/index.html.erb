@@ -1,0 +1,36 @@
+<div class="dashboard-container">
+  <h1>Agent System Dashboard</h1>
+  
+  <div class="dashboard-grid">
+    <!-- Projects Section -->
+    <div class="dashboard-section">
+      <h2>Active Projects</h2>
+      <div id="projects-container" class="card-container">
+        <%= render partial: "projects", locals: { projects: @projects } %>
+      </div>
+    </div>
+    
+    <!-- Agent Activities Section -->
+    <div class="dashboard-section">
+      <h2>Recent Agent Activities</h2>
+      <div id="agent-activities-container" class="card-container">
+        <%= render partial: "agent_activities", locals: { agent_activities: @agent_activities } %>
+      </div>
+    </div>
+    
+    <!-- Events Section -->
+    <div class="dashboard-section">
+      <h2>Latest Events</h2>
+      <div id="events-container" class="card-container">
+        <%= render partial: "events", locals: { events: @events } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%= turbo_stream_from "dashboard" %>
+
+<div data-controller="dashboard-refresh" 
+     data-dashboard-refresh-interval-value="5000"
+     data-dashboard-refresh-url-value="<%= dashboard_path(format: :turbo_stream) %>">
+</div>

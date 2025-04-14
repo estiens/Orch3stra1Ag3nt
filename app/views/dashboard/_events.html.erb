@@ -1,0 +1,19 @@
+<% events.each do |event| %>
+  <div id="<%= dom_id(event) %>" class="dashboard-card event-card <%= event.event_type.parameterize %>">
+    <h3><%= event.event_type %></h3>
+    <div class="card-details">
+      <p><strong>Agent:</strong> <%= event.agent_activity&.agent_type || "N/A" %></p>
+      <p><strong>Time:</strong> <%= time_ago_in_words(event.created_at) %> ago</p>
+      <% if event.data.present? && event.data.is_a?(Hash) %>
+        <div class="event-data">
+          <% if event.data["tool_name"].present? %>
+            <p><strong>Tool:</strong> <%= event.data["tool_name"] %></p>
+          <% end %>
+          <% if event.data["duration"].present? %>
+            <p><strong>Duration:</strong> <%= event.data["duration"].round(2) %>s</p>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>

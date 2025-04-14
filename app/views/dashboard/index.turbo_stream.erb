@@ -1,0 +1,11 @@
+<%= turbo_stream.replace "projects-container" do %>
+  <%= render partial: "projects", locals: { projects: @projects } %>
+<% end %>
+
+<%= turbo_stream.replace "agent-activities-container" do %>
+  <%= render partial: "agent_activities", locals: { agent_activities: @agent_activities } %>
+<% end %>
+
+<%= turbo_stream.replace "events-container" do %>
+  <%= render partial: "events", locals: { events: @events } %>
+<% end %>
