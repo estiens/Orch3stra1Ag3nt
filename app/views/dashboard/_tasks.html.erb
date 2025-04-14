@@ -2,7 +2,7 @@
   <div id="<%= dom_id(task) %>" class="dashboard-card task-card <%= task.state %>">
     <div class="flex justify-between items-start">
       <h3 class="text-lg font-medium">
-        <%= link_to task.title, task_path(task), class: "hover:text-blue-600 hover:underline" %>
+        <%= link_to task.title, project_task_path(task.project, task), class: "hover:text-blue-600 hover:underline" %>
       </h3>
       <%= status_badge(task.state) %>
     </div>
@@ -21,7 +21,7 @@
     </div>
     <div class="card-actions mt-3 flex justify-between items-center">
       <div>
-        <%= link_to "View Details", task_path(task), class: "text-blue-600 text-sm hover:underline" %>
+        <%= link_to "View Details", project_task_path(task.project, task), class: "text-blue-600 text-sm hover:underline" %>
       </div>
       <div>
         <% if task.pending? %>
