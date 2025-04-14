@@ -25,11 +25,11 @@
       </div>
       <div>
         <% if task.pending? %>
-          <%= button_to "Start", activate_task_path(task), method: :post, class: "button button-success" %>
+          <%= button_to "Start", activate_task_path(task), method: :post, class: "button button-success", form: { data: { turbo: true } } %>
         <% elsif task.active? %>
-          <%= button_to "Pause", pause_task_path(task), method: :post, class: "button button-warning" %>
+          <%= button_to "Pause", pause_task_path(task), method: :post, class: "button button-warning", form: { data: { turbo: true } } %>
         <% elsif task.paused? %>
-          <%= button_to "Resume", activate_task_path(task), method: :post, class: "button button-success" %>
+          <%= button_to "Resume", resume_task_path(task), method: :post, class: "button button-success", form: { data: { turbo: true } } %>
         <% end %>
       </div>
     </div>

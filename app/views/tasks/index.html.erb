@@ -1,0 +1,29 @@
+<div class="container">
+  <h1>Tasks</h1>
+
+  <div class="actions mb-4">
+    <%= link_to 'New Task', new_task_path, class: "button button-primary" %>
+  </div>
+
+  <div class="tasks-list">
+    <% @tasks.each do |task| %>
+      <div class="task-item">
+        <h2><%= link_to task.title, task %></h2>
+        <div class="task-meta">
+          <span class="status"><%= status_badge(task.state) %></span>
+          <span class="type"><%= task.task_type.humanize %></span>
+          <% if task.project %>
+            <span class="project">Project: <%= link_to task.project.name, task.project %></span>
+          <% end %>
+        </div>
+        <div class="task-description">
+          <%= truncate(task.description, length: 150) %>
+        </div>
+        <div class="task-actions">
+          <%= link_to 'Edit', edit_task_path(task), class: "button button-small" %>
+          <%= link_to 'Delete', task, method: :delete, data: { confirm: 'Are you sure?' }, class: "button button-small button-danger" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

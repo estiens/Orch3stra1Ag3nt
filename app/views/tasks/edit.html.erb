@@ -1,0 +1,10 @@
+<div class="container">
+  <h1>Editing Task</h1>
+
+  <%= render 'form', task: @task %>
+
+  <div class="actions mt-4">
+    <%= link_to 'Show', @task, class: "button" %>
+    <%= link_to 'Back', tasks_path, class: "button" %>
+  </div>
+</div>

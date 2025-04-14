@@ -1,0 +1,78 @@
+<div class="task-details">
+  <h1><%= @task.title %></h1>
+  
+  <div class="task-metadata">
+    <p>
+      <strong>Status:</strong>
+      <%= status_badge(@task.state) %>
+    </p>
+    
+    <p>
+      <strong>Type:</strong>
+      <%= @task.task_type.humanize %>
+    </p>
+    
+    <% if @task.project %>
+      <p>
+        <strong>Project:</strong>
+        <%= link_to @task.project.name, @task.project %>
+      </p>
+    <% end %>
+    
+    <p>
+      <strong>Created:</strong>
+      <%= time_ago_in_words(@task.created_at) %> ago
+    </p>
+  </div>
+  
+  <div class="task-description">
+    <h2>Description</h2>
+    <div class="content">
+      <%= simple_format(@task.description) %>
+    </div>
+  </div>
+  
+  <% if @task.metadata.present? %>
+    <div class="task-metadata">
+      <h2>Metadata</h2>
+      <pre><%= JSON.pretty_generate(@task.metadata) %></pre>
+    </div>
+  <% end %>
+  
+  <div class="task-actions">
+    <% if @task.pending? %>
+      <%= button_to "Start Task", activate_task_path(@task), method: :post, class: "button button-success" %>
+    <% elsif @task.active? %>
+      <%= button_to "Pause Task", pause_task_path(@task), method: :post, class: "button button-warning" %>
+    <% elsif @task.paused? %>
+      <%= button_to "Resume Task", resume_task_path(@task), method: :post, class: "button button-success" %>
+    <% end %>
+    
+    <%= link_to "Edit Task", edit_task_path(@task), class: "button" %>
+    <%= link_to "Back to Dashboard", dashboard_path, class: "button" %>
+  </div>
+  
+  <% if @task.agent_activities.any? %>
+    <div class="agent-activities">
+      <h2>Agent Activities</h2>
+      <div class="activities-list">
+        <% @task.agent_activities.order(created_at: :desc).each do |activity| %>
+          <div class="activity-item">
+            <h3><%= activity.agent_type %></h3>
+            <p><strong>Status:</strong> <%= activity.status %></p>
+            <p><strong>Started:</strong> <%= time_ago_in_words(activity.created_at) %> ago</p>
+            <% if activity.completed_at %>
+              <p><strong>Completed:</strong> <%= time_ago_in_words(activity.completed_at) %> ago</p>
+            <% end %>
+            <% if activity.result.present? %>
+              <div class="activity-result">
+                <h4>Result</h4>
+                <pre><%= activity.result %></pre>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>

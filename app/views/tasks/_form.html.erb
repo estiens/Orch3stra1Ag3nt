@@ -1,0 +1,65 @@
+<%= form_with(model: task) do |form| %>
+  <% if task.errors.any? %>
+    <div class="error-messages">
+      <h2><%= pluralize(task.errors.count, "error") %> prohibited this task from being saved:</h2>
+      <ul>
+        <% task.errors.each do |error| %>
+          <li><%= error.full_message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="field">
+    <%= form.label :title %>
+    <%= form.text_field :title, class: "form-input" %>
+  </div>
+
+  <div class="field">
+    <%= form.label :description %>
+    <%= form.text_area :description, rows: 5, class: "form-input" %>
+  </div>
+
+  <div class="field">
+    <%= form.label :task_type %>
+    <%= form.select :task_type, 
+                   options_for_select([
+                     ['General', 'general'],
+                     ['Research', 'research'],
+                     ['Development', 'development'],
+                     ['Analysis', 'analysis']
+                   ], task.task_type),
+                   {}, { class: "form-select" } %>
+  </div>
+
+  <div class="field">
+    <%= form.label :priority %>
+    <%= form.select :priority, 
+                   options_for_select([
+                     ['Low', 'low'],
+                     ['Normal', 'normal'],
+                     ['High', 'high'],
+                     ['Urgent', 'urgent']
+                   ], task.priority),
+                   {}, { class: "form-select" } %>
+  </div>
+
+  <div class="field">
+    <%= form.label :project_id %>
+    <%= form.collection_select :project_id, Project.all, :id, :name, { include_blank: 'None' }, { class: "form-select" } %>
+  </div>
+
+  <div class="field">
+    <%= form.label :parent_id, "Parent Task" %>
+    <%= form.collection_select :parent_id, 
+                              Task.where.not(id: task.id), 
+                              :id, 
+                              :title, 
+                              { include_blank: 'None' }, 
+                              { class: "form-select" } %>
+  </div>
+
+  <div class="actions">
+    <%= form.submit class: "button button-primary" %>
+  </div>
+<% end %>

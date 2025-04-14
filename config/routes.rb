@@ -19,6 +19,18 @@ Rails.application.routes.draw do
       post :pause
       post :resume
     end
+    
+    # Nested tasks under projects
+    resources :tasks
+  end
+  
+  # Tasks can also be accessed directly
+  resources :tasks do
+    member do
+      post :activate
+      post :pause
+      post :resume
+    end
   end
   
   # Agent activities management
