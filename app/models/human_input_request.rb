@@ -1,6 +1,8 @@
 # HumanInputRequest: Tracks requests for human input during agent tasks
 # Used for both required (task-blocking) and optional (non-blocking) input
 class HumanInputRequest < ApplicationRecord
+  include EventPublisher
+  
   belongs_to :task
   belongs_to :agent_activity, optional: true
 
@@ -26,17 +28,24 @@ class HumanInputRequest < ApplicationRecord
   # Callback to set expiration time if provided
   before_create :set_expiry
 
+  # Add attribute accessor for timeout_minutes (not stored in DB)
+  attr_accessor :timeout_minutes
+
   # Provide an answer to this input request
   def answer!(response, user_id = nil)
-    update!(
+    # Make a full update with all fields
+    result = update!(
       status: "answered",
       response: response,
-      answered_at: Time.current,
+      responded_at: Time.current,
       answered_by: user_id
     )
+    
+    # Log the update to verify it happened
+    Rails.logger.info "HumanInputRequest #{id} answered: status=#{status}, response=#{response ? response[0..20] + '...' : 'nil'}"
 
-    # Emit event about this new answer
-    Event.publish(
+    # Emit event about this new answer using the concern's method
+    publish_event(
       "human_input_provided",
       {
         request_id: id,
@@ -49,6 +58,8 @@ class HumanInputRequest < ApplicationRecord
 
     # Resume task if it was waiting for this input
     resume_task if required && task.waiting_on_human?
+    
+    return result
   end
 
   # Mark this input request as ignored (for optional requests)
@@ -59,12 +70,12 @@ class HumanInputRequest < ApplicationRecord
     update!(
       status: "ignored",
       response: reason,
-      answered_at: Time.current,
+      responded_at: Time.current,
       answered_by: user_id
     )
 
-    # Emit event
-    Event.publish(
+    # Emit event using the concern's method
+    publish_event(
       "human_input_ignored",
       {
         request_id: id,
@@ -86,8 +97,8 @@ class HumanInputRequest < ApplicationRecord
 
     update!(status: "expired")
 
-    # Emit event
-    Event.publish(
+    # Emit event using the concern's method
+    publish_event(
       "human_input_expired",
       {
         request_id: id,
@@ -132,8 +143,8 @@ class HumanInputRequest < ApplicationRecord
     if task.metadata&.dig("waiting_for_input_id") == id.to_s
       task.activate! if task.may_activate?
 
-      # Emit task resumed event
-      Event.publish(
+      # Emit task resumed event using the concern's method
+      publish_event(
         "task_resumed_from_human_input",
         {
           task_id: task.id,
@@ -160,15 +171,15 @@ class HumanInputRequest < ApplicationRecord
       agent_activity: agent_activity
     )
 
-    # Emit task timeout event
-    Event.publish(
+    # Emit task timeout event using the concern's method
+    publish_event(
       "task_input_timeout",
       {
         task_id: task.id,
         input_request_id: id,
         question: question
       },
-      priority: Event::HIGH_PRIORITY
+      { priority: Event::HIGH_PRIORITY }
     )
   end
 end

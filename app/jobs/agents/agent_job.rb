@@ -36,39 +36,49 @@ class Agents::AgentJob < ApplicationJob
     begin
       # Add thread isolation for agents if enabled
       maybe_with_ractor(agent_klass) do
-        # Instantiate agent with a purpose (all model logic is handled by the agent itself)
+        # Instantiate agent with required keyword arguments
         agent = agent_klass.new(
-          options[:purpose] || "Agent run in async job",
-          model: options[:model],
+          purpose: options[:purpose] || "Agent run in async job",
+          llm: options[:llm],
           task: task,
           agent_activity: agent_activity
         )
 
-        prompt = agent_prompt || "Say hello!"
+        # Determine the actual prompt/input for the agent's run method
+        # Prioritize task details, append agent_prompt if provided.
+        base_prompt = ""
+        base_prompt += "Task Title: #{task&.title}\n\n" if task&.title.present?
+        base_prompt += "Task Description:\n#{task&.description}" if task&.description.present?
+
+        prompt_for_run = if agent_prompt.present?
+                           # If agent_prompt is provided, add it as specific instructions
+                           # Ensure base_prompt has content before adding newlines
+                           prefix = base_prompt.present? ? "#{base_prompt}\n\nSpecific Instructions for this Run:\n" : "Specific Instructions for this Run:\n"
+                           "#{prefix}#{agent_prompt}"
+        elsif base_prompt.present?
+                           # Otherwise, just use the base task details if they exist
+                           base_prompt
+        else
+                           # Fallback if neither task details nor agent_prompt are available
+                           "Default prompt: No task details or specific instructions provided."
+        end
 
         # Log the start of agent execution
         Rails.logger.info("Starting agent job for #{agent_klass.name}, task_id: #{task_id}")
 
         # The before_run hook will be called by the agent
         # Run the agent
-        result = agent.run(prompt)
+        result = agent.run(prompt_for_run)
         # The after_run hook will be called by the agent
-
-        # Update agent activity with results
-        agent_activity.update!(
-          status: "completed",
-          result: result,
-          completed_at: Time.current
-        )
 
         # Emit event for completed agent activity
         agent_activity.events.create!(
           event_type: "agent_completed",
-          data: { result: result }
+          data: { result: result.to_s.truncate(1000) }
         )
 
         # If this is the last activity for the task, mark the task as completed
-        if task.agent_activities.where.not(status: "completed").none?
+        if task.reload.agent_activities.where.not(status: [ "completed", "failed" ]).none?
           task.complete! if task.may_complete?
         end
 

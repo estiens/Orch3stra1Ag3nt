@@ -34,16 +34,17 @@ class SummarizerAgent < BaseAgent
   # --- End Tools ---
 
   # --- Core Logic ---
-  def run(input = nil) # Input should be the text to summarize
+  def run(input = nil) # Input should contain the text/details to summarize
     before_run(input)
-    text_to_process = input || task&.description || ""
+    # Trust the input from AgentJob, which should now contain task details/instructions
+    text_to_process = input.present? ? input : ""
 
     unless task
       Rails.logger.warn "[SummarizerAgent] Running without an associated task record. Metadata persistence will be skipped."
     end
 
     if text_to_process.blank?
-      result = "SummarizerAgent Error: No input text provided directly or via task description."
+      result = "SummarizerAgent Error: No input text provided."
       Rails.logger.error result
       @session_data[:output] = result
       after_run(result)

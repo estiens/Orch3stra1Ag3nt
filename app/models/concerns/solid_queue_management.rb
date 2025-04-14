@@ -5,18 +5,42 @@ module SolidQueueManagement
 
   included do
     # Limit per-queue agent concurrency using SolidQueue's semaphore
-    def self.with_concurrency_control(key = nil)
-      semaphore_key = key || "#{queue_name}_concurrency"
-      concurrency_limit = self.concurrency_limit
+    def self.with_concurrency_control(&block)
+      # Ensure queue_name and concurrency_limit are available here
+      # Either pass them in, or ensure they are accessible class methods
+      limit = respond_to?(:concurrency_limit) ? concurrency_limit : 5 # Default limit
+      q_name = respond_to?(:queue_name) ? queue_name : name.demodulize.underscore.to_sym
 
-      # Attempt to acquire the semaphore
-      SolidQueue::Semaphore.new(
-        semaphore_key,
-        concurrency_limit,
-        expires_at: 30.minutes.from_now
-      ).acquire do
-        # Will only execute if successfully acquired the semaphore
-        yield
+      begin
+        semaphore = SolidQueue::Semaphore.new(name: q_name, limit: limit, expires_in: 30.minutes)
+
+
+        acquired = semaphore.acquire
+
+        if acquired
+          begin
+            # Lock acquired, execute the original block content
+            yield
+          ensure
+            # IMPORTANT: Release the lock after the block executes or if an error occurs
+            semaphore.release
+            Rails.logger.debug "[*SolidQueueManagement] Released semaphore lock for #{q_name}."
+          end
+        else
+          # Failed to acquire the lock
+          Rails.logger.warn "[*SolidQueueManagement] Failed to acquire semaphore lock for #{q_name}. Job not enqueued."
+          # Prevent the job from being enqueued by returning nil or raising an error
+          nil # Returning nil seems reasonable here.
+        end
+      rescue NameError => e
+         # Handle cases where SolidQueue::Semaphore might not be defined yet or gem missing
+         Rails.logger.warn "[*SolidQueueManagement] SolidQueue::Semaphore not available? Running without lock. Error: #{e.message}"
+         yield # Fallback to running without lock
+      rescue => e
+         Rails.logger.error "[*SolidQueueManagement] Error during semaphore operation for #{q_name}: #{e.message}"
+         # Decide whether to raise or fallback
+         # Raising might be safer to prevent unexpected behavior
+         raise # Re-raise other semaphore errors
       end
     end
 

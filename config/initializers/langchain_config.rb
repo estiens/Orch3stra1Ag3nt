@@ -13,7 +13,7 @@ Rails.application.configure do
   config.llm = {
     models: {
       fast: "deepseek/deepseek-chat-v3-0324",
-      thinking: "optimus-alpha",
+      thinking: "openai/gpt-4.1",
       tools: "deepseek/deepseek-chat-v3-0324",
       web_search: "openai/gpt-4o-mini-search-preview",
       multimodal: "meta-llama/llama-3.2-11b-vision-instruct"

@@ -1,267 +1,217 @@
-# Agent Implementation with LangchainRB
+# Agent Implementation Pattern (using langchainrb)
 
 ## Overview
 
-This document outlines the implementation pattern for AI agents in our application using the `langchainrb` gem. Each agent inherits from `BaseAgent`, which provides a standard structure for initialization, tool definition, chain execution, and integration with our background job system (Solid Queue) and activity tracking (`AgentActivity` model).
+This document outlines the implementation pattern for AI agents in this application, leveraging parts of the `langchainrb` gem (v0.19.4 or similar) and custom base classes. Each agent inherits from `BaseAgent`, which provides a structure for initialization, tool definition, manual logging, and background job integration (Solid Queue).
+
+**Key Difference from Python LangChain:** As of this writing, `langchainrb` does **not** have built-in concepts of composable `Chain` classes (like `LLMChain`, `ToolChain`) or an automatic callback system. Therefore, agent orchestration logic (the sequence of LLM calls and tool usage) must be implemented imperatively within each agent subclass, typically by overriding the `run` method.
+
+## BaseAgent Functionality
+
+`app/agents/base_agent.rb` provides:
+
+-   **Initialization (`initialize`)**: Sets up `@purpose`, `@task`, `@agent_activity`, `@llm`, and registered `@tools`.
+-   **Tool Definition DSL**: `.tool` (for block-based tools) and `.custom_tool_objects` (for tool classes).
+-   **Tool Execution Helper (`execute_tool`)**: A method to run defined tools, which *also* handles logging tool start/finish/error events to the associated `AgentActivity` (if present).
+-   **LLM Instance (`@llm`)**: Provides a configured `langchainrb` LLM instance (e.g., `Langchain::LLM::OpenRouter`).
+-   **Lifecycle Hooks**: `before_run`, `after_run`, `handle_run_error` for standard agent start/finish/error handling and updating `AgentActivity` status.
+-   **Manual Logging Helpers**: `log_direct_llm_call` (for logging LLM calls made directly within agent code) and `persist_tool_executions` (called by hooks).
+-   **SolidQueue Integration**: `.enqueue` method for background job processing.
 
 ## Agent Structure
 
 ### Basic Pattern
 
-All agents should inherit from `BaseAgent` and generally follow this structure:
+All specific agents should inherit from `BaseAgent` and implement their core logic by overriding the `run` method.
 
 ```ruby
-# app/agents/my_special_agent.rb
-require_relative '../callbacks/agent_activity_callback_handler' # Ensure callbacks are loaded
-
-class MySpecialAgent < BaseAgent
-  # Optional: Include EventSubscriber if needed
-  # include EventSubscriber
-
+# app/agents/my_orchestrating_agent.rb
+class MyOrchestratingAgent < BaseAgent
   # === Configuration ===
-
-  # Queue configuration for Solid Queue
   def self.queue_name
-    :my_special_agent # Use a descriptive queue name
+    :my_orchestrating_agent
   end
 
   def self.concurrency_limit
-    3 # Adjust based on agent resource needs and external API limits
+    1 # Example
   end
-
-  # Optional: Define a default LLM for this agent class
-  # def self.default_llm
-  #   # Return a configured Langchain::LLM instance
-  #   Langchain::LLM::OpenRouter.new(...)
-  # end
-
-  # Optional: Define default custom tool *objects* for this agent class
-  # def self.custom_tool_objects
-  #   [ MyCustomTool.new, AnotherTool.new(api_key: ENV['...']) ]
-  # end
 
   # === Tool Definitions ===
-  # Define tools using blocks (creates Langchain::Tool::Function)
-  tool :my_block_tool, "Description of what this tool does" do |arg1, arg2|
-    # Tool implementation logic here...
-    # Access instance variables like @task or @agent_activity if needed
-    result = perform_action(arg1, arg2)
-    result # Return value is passed back to the agent chain
+  tool :step_one, "Performs the first step" do |input|
+    # ... logic for step one ...
+    "Step one result for #{input}"
   end
 
-  # You can define multiple tools
-
-  # === Initialization ===
-  # Inherits initialize from BaseAgent. Key parameters:
-  # - purpose: (String) The goal of this specific agent instance.
-  # - llm: (Langchain::LLM::Base, optional) Override default LLM.
-  # - retriever: (Langchain::Retriever::Base, optional) Provide a retriever.
-  # - tools: (Array<Langchain::Tool::Base>, optional) Override default tools.
-  # - task: (Task, optional) Associated Task record.
-  # - agent_activity: (AgentActivity, optional) Associated AgentActivity for logging.
-
-  # === Chain Setup ===
-  # BaseAgent's `setup_chain!` automatically configures a suitable chain
-  # (LLMChain, ToolChain, RetrievalQAChain) based on whether tools or a
-  # retriever are present. Override `setup_chain!` for custom chain logic.
+  tool :step_two, "Uses step one result" do |step_one_result|
+    # ... logic for step two ...
+    "Step two result based on: #{step_one_result}"
+  end
 
   # === Core Logic ===
-  # The main logic is executed by the `run` method inherited from BaseAgent,
-  # which calls `@chain.run`. For simple agents, you often don't need to
-  # override `run` or `setup_chain!`.
+  # Override the run method to define the agent's workflow
+  def run(input = nil)
+    before_run(input) # Start lifecycle hook
 
-  # === Lifecycle Hooks ===
-  # Optional overrides for custom setup/teardown:
-  # def before_run(input)
-  #   super # Call base implementation first
-  #   # Custom logic before chain execution
-  # end
-  #
-  # def after_run(result)
-  #   super # Call base implementation first
-  #   # Custom logic after chain execution
-  # end
-  #
-  # def handle_run_error(e)
-  #   super # Call base implementation first (logs error, marks activity failed)
-  #   # Custom error handling
-  # end
+    result_message = "Orchestration complete."
+    begin
+      # 1. Call the first tool using the helper for logging
+      step_one_output = execute_tool(:step_one, input || @purpose)
 
-  private
+      # 2. Make a direct LLM call (if needed) based on the result
+      prompt = "Based on step one output '#{step_one_output}', what should be done next?"
+      llm_response = @llm.chat(messages: [{ role: "user", content: prompt }])
+      log_direct_llm_call(prompt, llm_response) # Log this manual call
+      next_step_guidance = llm_response.chat_completion
 
-  def perform_action(arg1, arg2)
-    # Example private helper method used by a tool
-    "Processed #{arg1} and #{arg2}"
+      # 3. Call the second tool
+      # (Assuming guidance indicates calling step_two with step_one_output)
+      step_two_output = execute_tool(:step_two, step_one_output)
+
+      result_message = step_two_output # Set final result
+
+    rescue => e
+      handle_run_error(e) # Handle errors
+      raise # Re-raise after logging
+    end
+
+    @session_data[:output] = result_message # Store final output
+    after_run(result_message) # Final lifecycle hook
+    result_message
   end
+
+  # Optional: Override other hooks like after_run for specific cleanup
 end
 ```
 
 ## LLM Usage
 
-Agents use `langchainrb` LLM wrappers (e.g., `Langchain::LLM::OpenRouter`).
+-   **Configuration**: Handled by `BaseAgent.default_llm` or `llm:` option in `initialize`.
+-   **Access**: Use `@llm` instance variable.
+-   **Interaction**: Call `@llm.chat(...)` or `@llm.complete(...)` directly within your `run` method or tool implementations.
+-   **Logging**: If you make direct calls to `@llm`, you **must manually log** them using the `log_direct_llm_call(prompt, response)` helper method (provided by `BaseAgent`) if you want them tracked in the `AgentActivity`'s `llm_calls` association.
 
-- **Configuration**: The default LLM is configured in `BaseAgent.default_llm` or can be overridden per-agent class. An instance can also receive a specific LLM during initialization (`llm:` parameter).
-- **Access**: Within agent methods (like tools), access the configured LLM via the `@llm` instance variable.
-- **Interaction**: Use standard `langchainrb` methods like `@llm.chat(...)` or let the configured chain handle the interaction.
-
-```ruby
-# Inside a tool block or other instance method:
-prompt_content = "Translate 'hello' to French."
-response = @llm.chat(messages: [{ role: "user", content: prompt_content }])
-translation = response.chat_completion
-```
-
-## Tool Implementation
+## Tool Implementation & Usage
 
 ### Tool Definition
 
-There are two primary ways to define tools for an agent:
+Define tools using either:
 
-1.  **Block-Based (`self.tool`)**: Define simple tools directly in the agent class using the `self.tool` DSL. This creates a `Langchain::Tool::Function` instance.
-
+1.  **Block-Based (`self.tool`)**: Defined in the agent class. The block contains the tool's logic.
     ```ruby
-    tool :calculate, "Perform mathematical calculations" do |expression|
-      begin
-        # Ensure safe evaluation if using eval
-        result = SafeCalculator.evaluate(expression)
-        result.to_s
-      rescue => e
-        "Calculation error: #{e.message}"
-      end
+    tool :my_block_tool, "Description" do |arg1|
+      # self is the agent instance here
+      internal_helper_method(arg1)
+    end
+    ```
+2.  **Custom Tool Objects (`self.custom_tool_objects`)**: Separate classes, often extending `Langchain::ToolDefinition` (as seen in `PerplexitySearchTool.rb`). These are registered by returning instances from the class method `self.custom_tool_objects`.
+    ```ruby
+    # In MyAgent class
+    def self.custom_tool_objects
+      [ PerplexitySearchTool.new, AnotherCustomTool.new ]
     end
     ```
 
-2.  **Custom Tool Objects (`self.custom_tool_objects`)**: For complex tools, tools requiring configuration (e.g., API keys), or tools shared across agents, define them as separate classes that implement the `Langchain::Tool::Base` interface (typically just a `call` method). Register instances of these classes by overriding `self.custom_tool_objects` in your agent:
+### Tool Execution & Logging
 
+-   **Execution**: Within your agent's `run` method (or other helper methods), call tools using the `execute_tool(tool_name, *args)` helper provided by `BaseAgent`.
     ```ruby
-    # app/tools/my_api_tool.rb
-    class MyApiTool < Langchain::Tool::Base
-      def initialize(api_key:)
-        @client = MyApiClient.new(api_key)
-      end
-
-      def call(input:)
-        @client.fetch(input)
-      end
-    end
-
-    # app/agents/my_special_agent.rb
-    class MySpecialAgent < BaseAgent
-      def self.custom_tool_objects
-        [ MyApiTool.new(api_key: ENV['MY_API_KEY']) ]
-      end
-      # ... potentially other tools defined with self.tool ...
-    end
+    # Inside agent's run method
+    result = execute_tool(:my_block_tool, "some argument")
+    # For custom tools with defined functions:
+    # execute_tool expects the method name defined by define_function
+    perplexity_result = execute_tool(:search, { query: "AI agents in Ruby" })
     ```
-
-### Tool Usage
-
-- **Automatic Setup**: `BaseAgent` gathers all tools (from `self.tool` blocks and `self.custom_tool_objects`) and passes them to the appropriate `langchainrb` chain (e.g., `Langchain::Chains::ToolChain`) during `setup_chain!`.
-- **Chain Execution**: The chain (e.g., `ToolChain`, `ReAct`) decides when and how to call the tools based on the LLM's reasoning. You typically do *not* call tool methods directly within your agent's main flow; the chain handles it.
+-   **Logging**: The `execute_tool` method automatically handles logging `tool_execution_started`, `tool_execution_finished`, and `tool_execution_error` events to the `AgentActivity` (if present). You **do not** need to manually log tool calls made via `execute_tool`.
+-   **Custom Tool Logging**: If a custom tool object makes its *own* internal LLM calls, it would need access to the `agent_activity` (perhaps passed during initialization) and would need to call `log_direct_llm_call` itself.
 
 ## Activity Logging & Tracing
 
-Detailed logging of agent activity is crucial for debugging and monitoring. This is handled **automatically** when an `AgentActivity` record is associated with the agent instance.
+Logging relies on the presence of an `AgentActivity` record.
 
-- **Association**: Pass an `AgentActivity` instance during agent initialization:
-    ```ruby
-    activity = AgentActivity.create!(...)
-    agent = MySpecialAgent.new(purpose: "...", agent_activity: activity)
-    agent.run("some input")
-    ```
-- **Callback Handler**: `BaseAgent` initializes an `AgentActivityCallbackHandler` which subscribes to `langchainrb` execution events.
-- **Automatic Logging**:
-    - **LLM Calls**: Recorded automatically to `agent_activity.llm_calls` (creating `LlmCall` records).
-    - **Tool Calls**: Recorded automatically to `agent_activity.events` with `event_type: "tool_execution"`. Includes tool name, input (partial), and result preview.
-    - **Tool Errors**: Recorded automatically to `agent_activity.events` with `event_type: "tool_error"`. Includes tool name, input, and error details.
-    - **Final Status**: The `AgentActivity` status is updated to `finished` or `failed` in the `after_run` or `handle_run_error` hooks. The final output is stored in `agent_activity.output`.
-- **Session Data (`@session_data`)**: This attribute now primarily holds the final `:output` of the agent run. Detailed trace information resides in the associated `AgentActivity` record.
-
-**You do not need to manually log LLM calls or tool executions within your agent code if an `AgentActivity` is provided.**
+-   **Association**: Pass an `AgentActivity` instance during agent initialization (`agent_activity:` parameter).
+-   **Logging Summary**:
+    -   **LLM Calls**: Logged **only** when `log_direct_llm_call` is called manually after a direct `@llm.chat`/`@llm.complete` call within agent code.
+    -   **Tool Calls**: Logged **automatically** when tools are invoked via the `execute_tool` helper method. Records start/finish/error events.
+    -   **Final Status**: `AgentActivity` status (`running`, `finished`, `failed`) and final `output` are updated automatically by `BaseAgent`'s lifecycle hooks (`before_run`, `after_run`, `handle_run_error`).
+-   **Session Data (`@session_data`)**: Stores `:tool_executions` details captured by `execute_tool` during the run and the final `:output`.
 
 ## Job Integration (Solid Queue)
 
-Agents are typically executed asynchronously using background jobs.
+(This process remains the same)
 
-1.  **Create `AgentActivity`**: Before enqueuing, create an `AgentActivity` record to track the run.
-    ```ruby
-    activity = AgentActivity.create!(
-      agent_type: MySpecialAgent.name,
-      status: "queued",
-      task_id: relevant_task&.id,
-      # ... other relevant fields like parent_id ...
-    )
-    ```
-2.  **Enqueue Agent Job**: Use the agent's `enqueue` class method, passing necessary options, including the `agent_activity_id`.
-    ```ruby
-    MySpecialAgent.enqueue(
-      "Input prompt or description for the agent run",
-      {
-        task_id: relevant_task&.id,
-        agent_activity_id: activity.id, # Pass the ID
-        purpose: "Specific purpose for this run",
-        # ... other options needed by the agent's initialize ...
-      }
-    )
-    ```
-3.  **Job Execution**: The corresponding `AgentJob` (e.g., `app/jobs/agents/agent_job.rb`) will typically:
-    - Find the `AgentActivity` using the passed `agent_activity_id`.
-    - Instantiate the agent (`MySpecialAgent.new(...)`), passing the `agent_activity` instance and other options.
-    - Call `agent.run(...)`.
+1.  Create `AgentActivity` record.
+2.  Enqueue job using `MyAgent.enqueue(prompt, { agent_activity_id: activity.id, ... })`.
+3.  The `AgentJob` instantiates the agent, passing the `agent_activity` and other options, then calls `agent.run`.
 
 ## Best Practices
 
-1.  **Single Responsibility**: Design agents with clear, focused purposes.
-2.  **Appropriate Model Selection**: Use `self.default_llm` or initialization options to configure the right LLM for the agent's tasks.
-3.  **Effective Prompting**: Write clear, concise prompts for LLM interactions within chains or custom setups.
-4.  **Rely on Automatic Logging**: Ensure `AgentActivity` records are created and associated for automatic tracing via the callback handler. Avoid manual logging of LLM/tool calls.
-5.  **Robust Tool Design**: Create reliable tools. Handle errors gracefully within tool logic where possible. Tool errors are automatically logged by the callback handler.
-6.  **Custom Tool Objects**: Prefer separate tool classes (`self.custom_tool_objects`) for complex or shared tools.
-7.  **Configuration**: Use environment variables or Rails configuration for API keys or settings needed by tools or LLMs.
+1.  **Override `run`**: All specific agents **must** override the `run` method to define their orchestration logic.
+2.  **Use `execute_tool`**: Call tools via the `execute_tool` helper for automatic logging.
+3.  **Log Direct LLM Calls**: Manually call `log_direct_llm_call` after direct `@llm` interactions if logging is needed.
+4.  **Clear Purpose**: Design agents with single, clear responsibilities.
+5.  **Error Handling**: Implement error handling within the `run` method and tool logic.
+6.  **Configuration**: Use ENV vars or Rails config for external service keys/settings.
 
-## Example Agent (Revised)
+## Example Agent (Reflecting Final Pattern)
 
 ```ruby
-# app/agents/web_search_agent.rb
-class WebSearchAgent < BaseAgent
-  # Uses a custom tool object for searching
+# app/agents/simple_summarizer_agent.rb
+class SimpleSummarizerAgent < BaseAgent
 
-  # Define Queue
   def self.queue_name
-    :web_search
+    :simple_summarizer
   end
 
-  # Register Custom Tool Object
-  # Assumes SerpApiSearchTool is defined elsewhere and implements Langchain::Tool::Base
-  def self.custom_tool_objects
-    # Configuration (e.g., API key) should ideally happen within the tool
-    # or be passed via environment variables.
-    [ SerpApiSearchTool.new ] # Register an instance
+  # No tools defined for this simple example
+
+  # Override run for specific summarization logic
+  def run(input = nil)
+    before_run(input)
+
+    text_to_summarize = input || task&.description || @purpose || ""
+    if text_to_summarize.blank?
+      result = "Error: No text provided to summarize."
+      @session_data[:output] = result
+      after_run(result)
+      return result
+    end
+
+    result_message = "Summarization failed."
+    begin
+      prompt = "Please summarize the following text concisely:\n\n#{text_to_summarize}"
+      
+      # Direct LLM call
+      response = @llm.chat(messages: [{ role: "user", content: prompt }])
+      
+      # Manual logging
+      log_direct_llm_call(prompt, response)
+      
+      result_message = response.chat_completion
+
+    rescue => e
+      handle_run_error(e)
+      raise
+    end
+
+    @session_data[:output] = result_message
+    after_run(result_message)
+    result_message
   end
-
-  # No specific tools defined via self.tool block in this example
-
-  # BaseAgent handles initialization and chain setup.
-  # If custom_tool_objects are defined, BaseAgent will likely create a ToolChain.
-
-  # The default `run` method from BaseAgent will execute the ToolChain,
-  # which will use the LLM to decide when to call the SerpApiSearchTool.
-  # Logging of LLM calls and tool usage is automatic via AgentActivityCallbackHandler.
 end
 
-# --- Enqueuing the job ---
-# activity = AgentActivity.create!(agent_type: WebSearchAgent.name, status: 'queued', ...)
-# WebSearchAgent.enqueue(
-#   "Find recent news about AI agent frameworks.", # This becomes the input to agent.run
-#   { agent_activity_id: activity.id, purpose: "Web search for AI frameworks" }
+# --- Enqueuing --- 
+# activity = AgentActivity.create!(agent_type: SimpleSummarizerAgent.name, ...)
+# SimpleSummarizerAgent.enqueue(
+#   "The text to be summarized...", 
+#   { agent_activity_id: activity.id, purpose: "Summarize provided text" }
 # )
 ```
 
 ## Advanced Patterns
 
-Leverage the core structure for more complex scenarios:
+(These concepts still apply, but are implemented within the agent's `run` method)
 
-1.  **Agents with Memory**: Pass memory objects (e.g., `Langchain::Memory::ConversationBufferWindowMemory`) during chain setup (`setup_chain!`) or initialization.
-2.  **Multi-step Agents / Orchestration**: Use Coordinator agents (`CoordinatorAgent`, `ResearchCoordinatorAgent`) to break down tasks and assign subtasks to specialized agents using their respective `enqueue` methods.
-3.  **Event-driven Workflows**: Utilize the `EventSubscriber` mixin and system-wide `Event.publish` calls to trigger agents based on system occurrences.
-4.  **Retrieval-Augmented Generation (RAG)**: Provide a `retriever` during initialization. `BaseAgent`'s `setup_chain!` will attempt to create a `RetrievalQAChain`.
+-   **Memory**: Fetch/update memory manually within the `run` method.
+-   **Orchestration**: Implement multi-step logic, conditional tool calls, and agent spawning (using `.enqueue`) within the `run` method of coordinator agents.
+-   **Event-driven Workflows**: Event handlers trigger agent jobs (`.enqueue`), which then execute their `run` method.
+-   **RAG**: Implement retrieve-then-generate logic within the `run` method.

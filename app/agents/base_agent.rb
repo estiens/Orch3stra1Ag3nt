@@ -64,32 +64,51 @@ class BaseAgent
     begin
       result = if tool_definition.is_a?(Hash) && tool_definition[:block]
                  # Execute block-based tool in instance context
-                 instance_exec(*args, &tool_definition[:block])
-      elsif tool_definition.respond_to?(:execute) # Check for langchainrb tool pattern
-                  # Assuming standard tool execution might need keyword args
-                  if args.length == 1 && args.first.is_a?(Hash)
-                     tool_definition.execute(**args.first)
-                  else
-                     raise "Custom tool object expects keyword arguments in a hash for execute."
-                  end
-      elsif tool_definition.respond_to?(:call)
-                 # Handle older call pattern if necessary
+                 # Check if args contains a single hash, indicative of keyword arguments
                  if args.length == 1 && args.first.is_a?(Hash)
-                    tool_definition.call(**args.first)
+                   # Pass the hash using double splat for keyword arguments
+                   instance_exec(**args.first, &tool_definition[:block])
                  else
-                    tool_definition.call(*args)
+                   # Pass arguments directly (for positional args or no args)
+                   instance_exec(*args, &tool_definition[:block])
                  end
+
+      elsif tool_definition.respond_to?(tool_name) # Check if the object has the method matching tool_name
+                 # Handles tools defined using `define_function :method_name`
+                 # Assumes keyword arguments passed as a single hash
+                 if args.length == 1 && args.first.is_a?(Hash)
+                   tool_definition.send(tool_name, **args.first) # Use .send to call dynamically
+                 else
+                   # If args are not a hash, try calling directly (might work for simple positional args)
+                   # Consider raising an error if strict kwarg adherence is required.
+                   # For now, let's raise for clarity as define_function usually implies kwargs.
+                   # Raise our custom error for argument issues
+                   raise ToolExecutionError.new(
+                     "Tool '#{tool_name}' defined via define_function expects keyword arguments passed as a single Hash.",
+                     tool_name: tool_name
+                   )
+                 end
+      # Optional: Add checks for .execute or .call if other tool patterns are needed
+      # elsif tool_definition.respond_to?(:execute)
+      #   # ... logic ...
       else
-                 raise "Cannot execute tool: #{tool_name} - Invalid definition or missing execute/call method."
+                 # Raise our custom error for definition issues
+                 raise ToolExecutionError.new(
+                   "Cannot execute tool: #{tool_name} - Method '#{tool_name}' not found on tool object or invalid definition.",
+                   tool_name: tool_name
+                 )
       end
 
       tool_call_data[:result] = result
       log_tool_event("tool_execution_finished", tool_call_data)
       result
     rescue => e
-      tool_call_data[:error] = e
+      # If it's already our custom error, preserve it
+      original_error = e.is_a?(ToolExecutionError) ? e : ToolExecutionError.new(e.message, tool_name: tool_name, original_exception: e)
+
+      tool_call_data[:error] = original_error # Log the (potentially wrapped) error
       log_tool_event("tool_execution_error", tool_call_data)
-      raise e
+      raise original_error # Re-raise the (potentially wrapped) error
     ensure
       @session_data[:tool_executions] << tool_call_data
     end
@@ -102,12 +121,14 @@ class BaseAgent
   # This method MUST be overridden by subclasses to implement the agent's
   # specific logic, such as calling LLMs, using tools via `execute_tool`,
   # managing state, etc.
+  # The `input` argument will typically contain the task details (title, description)
+  # and any specific instructions passed during enqueue.
   def run(input = nil)
     before_run(input)
 
     # Default implementation does nothing useful - SUBCLASSES MUST OVERRIDE.
-    Rails.logger.warn "[#{self.class.name}] #run method not implemented. Returning input."
-    result = input # Placeholder result
+    Rails.logger.warn "[#{self.class.name}] #run method not implemented. Input received: #{input.inspect}"
+    result = "No operation performed by BaseAgent." # Default result
 
     @session_data[:output] = result
     after_run(result)
@@ -125,8 +146,8 @@ class BaseAgent
   end
 
   def after_run(result)
-    Rails.logger.info("[#{self.class.name}] Completed run [Activity ID: #{@agent_activity&.id}] [Output: #{result.inspect}]")
-    @agent_activity&.update(status: "finished", output: result.to_s.truncate(10000))
+    Rails.logger.info("[#{self.class.name}] Completed run [Activity ID: #{@agent_activity&.id}] [Output preview: #{result.to_s.truncate(100)}]")
+    @agent_activity&.update(status: "finished")
     persist_tool_executions
   end
 
@@ -151,12 +172,31 @@ class BaseAgent
   end
 
   def self.enqueue(prompt, options = {})
+    task_priority_string = options.delete(:task_priority) # Get priority string if passed
+    numeric_priority = map_priority_string_to_numeric(task_priority_string) # Implement this mapping
+
     with_concurrency_control do
       agent_class_name = self.name
-      job_options = { queue: queue_name }.merge(options.delete(:job_options) || {})
+      # Add numeric_priority to job_options if it's valid
+      job_options = { queue: queue_name }
+      job_options[:priority] = numeric_priority if numeric_priority.present?
+      # Allow overriding via passed-in job_options as well
+      job_options.merge!(options.delete(:job_options) || {})
+
       Agents::AgentJob.set(job_options).perform_later(agent_class_name, prompt, options)
     end
   end
+
+  # --- Helper for Priority Mapping ---
+  def self.map_priority_string_to_numeric(priority_string)
+    case priority_string&.downcase
+    when "high" then 0
+    when "normal" then 10
+    when "low" then 20
+    else nil # Use default if invalid or not provided
+    end
+  end
+  # --- End Helper ---
   # --- End SolidQueue Integration ---
 
   # --- Protected Logging Helpers ---

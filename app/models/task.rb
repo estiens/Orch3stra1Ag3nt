@@ -2,7 +2,8 @@ class Task < ApplicationRecord
   validates :title, presence: true
 
   has_many :agent_activities, dependent: :destroy
-  has_many :events, dependent: :destroy
+  # Events are associated with agent_activities, not directly with tasks
+  # has_many :events, dependent: :destroy
 
   # Project association
   belongs_to :project, optional: true
@@ -115,6 +116,30 @@ class Task < ApplicationRecord
       collection: collection,
       metadata: metadata.merge(task_id: id, task_title: title)
     )
+  end
+
+  # Access events through agent_activities (helper method)
+  def events
+    Event.where(agent_activity_id: agent_activities.pluck(:id))
+  end
+
+  # Task dependencies methods
+  def depends_on_task_ids
+    metadata&.dig("depends_on_task_ids") || []
+  end
+  
+  def depends_on_task_ids=(ids)
+    self.metadata ||= {}
+    self.metadata["depends_on_task_ids"] = Array(ids).map(&:to_i)
+    save if persisted?
+  end
+  
+  # Check if all dependencies are satisfied
+  def dependencies_satisfied?
+    return true if depends_on_task_ids.empty?
+    
+    completed_ids = Task.where(id: depends_on_task_ids, state: 'completed').pluck(:id)
+    depends_on_task_ids.all? { |id| completed_ids.include?(id) }
   end
 
   private
