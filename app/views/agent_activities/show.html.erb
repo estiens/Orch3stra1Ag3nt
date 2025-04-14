@@ -38,7 +38,13 @@
           </div>
           
           <div>
-            <p class="text-gray-600"><strong>Project:</strong> <%= link_to @agent_activity.task.project.name, @agent_activity.task.project %></p>
+            <p class="text-gray-600"><strong>Project:</strong> 
+              <% if @agent_activity.task.project.present? %>
+                <%= link_to @agent_activity.task.project.name, @agent_activity.task.project %>
+              <% else %>
+                N/A
+              <% end %>
+            </p>
             <% if @agent_activity.error_message.present? %>
               <p class="text-red-600"><strong>Error:</strong> <%= @agent_activity.error_message %></p>
             <% end %>
@@ -242,7 +248,9 @@
           </div>
           
           <div class="pt-2">
-            <%= link_to "View Project", @agent_activity.task.project, class: "button button-primary w-full text-center" %>
+            <% if @agent_activity.task.project.present? %>
+              <%= link_to "View Project", @agent_activity.task.project, class: "button button-primary w-full text-center" %>
+            <% end %>
           </div>
         </div>
       </div>

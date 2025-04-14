@@ -5,6 +5,14 @@ class AgentActivitiesController < ApplicationController
     # Load related data for the agent activity
     @llm_calls = @agent_activity.llm_calls.order(created_at: :desc)
     @events = @agent_activity.events.order(created_at: :desc)
+    
+    # Check for ancestry
+    if @agent_activity.ancestry.present?
+      @ancestors = @agent_activity.ancestors
+    end
+    
+    # Get children
+    @children = @agent_activity.children
   end
   
   def pause
