@@ -1,4 +1,6 @@
 class Event < ApplicationRecord
+  include DashboardBroadcaster
+  
   # Association with an agent activity - while optional in DB, validate presence
   belongs_to :agent_activity, optional: false
   validates :agent_activity, presence: true

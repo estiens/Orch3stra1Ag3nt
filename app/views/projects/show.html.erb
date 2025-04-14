@@ -1,0 +1,120 @@
+<div class="container mx-auto px-4 py-8">
+  <div class="mb-6">
+    <div class="flex justify-between items-center">
+      <h1 class="text-2xl font-bold"><%= @project.name %></h1>
+      <div class="flex space-x-2">
+        <%= link_to "Edit", edit_project_path(@project), class: "button" %>
+        <%= link_to "Back", projects_path, class: "button" %>
+        
+        <% if @project.status == "pending" %>
+          <%= button_to "Kickoff", kickoff_project_path(@project), method: :post, class: "button button-success" %>
+        <% elsif @project.status == "active" %>
+          <%= button_to "Pause", pause_project_path(@project), method: :post, class: "button button-warning" %>
+        <% elsif @project.status == "paused" %>
+          <%= button_to "Resume", resume_project_path(@project), method: :post, class: "button button-success" %>
+        <% end %>
+      </div>
+    </div>
+    
+    <div class="mt-2">
+      <span class="inline-block <%= @project.status == 'active' ? 'bg-green-100 text-green-800' : 
+                                  @project.status == 'paused' ? 'bg-yellow-100 text-yellow-800' : 
+                                  @project.status == 'completed' ? 'bg-blue-100 text-blue-800' : 
+                                  'bg-gray-100 text-gray-800' %> 
+            px-2 py-1 text-xs font-semibold rounded-full">
+        <%= @project.status.capitalize %>
+      </span>
+      <span class="text-gray-500 ml-4">Created <%= time_ago_in_words(@project.created_at) %> ago</span>
+    </div>
+  </div>
+  
+  <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">Project Details</h2>
+    <p class="mb-4"><%= @project.description %></p>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+      <div class="bg-gray-50 p-4 rounded">
+        <h3 class="font-medium text-gray-700">Priority</h3>
+        <p class="mt-1"><%= @project.priority.capitalize %></p>
+      </div>
+      
+      <div class="bg-gray-50 p-4 rounded">
+        <h3 class="font-medium text-gray-700">Due Date</h3>
+        <p class="mt-1"><%= @project.due_date ? @project.due_date.strftime("%B %d, %Y") : "Not set" %></p>
+      </div>
+      
+      <div class="bg-gray-50 p-4 rounded">
+        <h3 class="font-medium text-gray-700">Tasks</h3>
+        <p class="mt-1"><%= @project.tasks.count %> total</p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold">Tasks</h2>
+      <% if @project.status == "active" %>
+        <%= link_to "New Task", "#", class: "button button-primary" %>
+      <% end %>
+    </div>
+    
+    <% if @root_tasks.any? %>
+      <div class="divide-y divide-gray-200">
+        <% @root_tasks.each do |task| %>
+          <div class="py-4">
+            <div class="flex justify-between items-center">
+              <h3 class="font-medium"><%= task.title %></h3>
+              <span class="inline-block <%= task.state == 'active' ? 'bg-green-100 text-green-800' : 
+                                          task.state == 'completed' ? 'bg-blue-100 text-blue-800' : 
+                                          task.state == 'failed' ? 'bg-red-100 text-red-800' : 
+                                          'bg-gray-100 text-gray-800' %> 
+                    px-2 py-1 text-xs font-semibold rounded-full">
+                <%= task.state.capitalize %>
+              </span>
+            </div>
+            <p class="text-gray-600 mt-1"><%= task.description %></p>
+            <div class="mt-2 text-sm text-gray-500">
+              <span>Type: <%= task.task_type.capitalize %></span>
+              <span class="ml-4">Created: <%= time_ago_in_words(task.created_at) %> ago</span>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <div class="text-center py-8 text-gray-500">
+        <p>No tasks yet. Tasks will be created when the project is kicked off.</p>
+      </div>
+    <% end %>
+  </div>
+  
+  <div class="bg-white rounded-lg shadow-md p-6">
+    <h2 class="text-xl font-semibold mb-4">Project Stats</h2>
+    
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div class="bg-gray-50 p-4 rounded text-center">
+        <div class="text-2xl font-bold"><%= @stats[:total_tasks] %></div>
+        <div class="text-gray-600">Total Tasks</div>
+      </div>
+      
+      <div class="bg-gray-50 p-4 rounded text-center">
+        <div class="text-2xl font-bold text-yellow-600"><%= @stats[:pending_tasks] %></div>
+        <div class="text-gray-600">Pending</div>
+      </div>
+      
+      <div class="bg-gray-50 p-4 rounded text-center">
+        <div class="text-2xl font-bold text-green-600"><%= @stats[:active_tasks] %></div>
+        <div class="text-gray-600">Active</div>
+      </div>
+      
+      <div class="bg-gray-50 p-4 rounded text-center">
+        <div class="text-2xl font-bold text-blue-600"><%= @stats[:completed_tasks] %></div>
+        <div class="text-gray-600">Completed</div>
+      </div>
+      
+      <div class="bg-gray-50 p-4 rounded text-center">
+        <div class="text-2xl font-bold text-orange-600"><%= @stats[:waiting_on_human_tasks] %></div>
+        <div class="text-gray-600">Waiting</div>
+      </div>
+    </div>
+  </div>
+</div>

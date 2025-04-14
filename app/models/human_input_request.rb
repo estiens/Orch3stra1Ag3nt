@@ -2,6 +2,7 @@
 # Used for both required (task-blocking) and optional (non-blocking) input
 class HumanInputRequest < ApplicationRecord
   include EventPublisher
+  include DashboardBroadcaster
   
   belongs_to :task
   belongs_to :agent_activity, optional: true

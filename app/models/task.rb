@@ -1,4 +1,6 @@
 class Task < ApplicationRecord
+  include DashboardBroadcaster
+  
   validates :title, presence: true
 
   has_many :agent_activities, dependent: :destroy

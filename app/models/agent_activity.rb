@@ -1,5 +1,6 @@
 class AgentActivity < ApplicationRecord
   include EventPublisher
+  include DashboardBroadcaster
   
   validates :agent_type, presence: true
   validates :status, presence: true
