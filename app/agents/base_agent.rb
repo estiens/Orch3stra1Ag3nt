@@ -150,10 +150,11 @@ class BaseAgent
     @agent_activity&.update(status: "finished")
     persist_tool_executions
   end
-
   def handle_run_error(e)
     Rails.logger.error("[#{self.class.name}] Agent error [Activity ID: #{@agent_activity&.id}]: #{e.message}\n#{e.backtrace.first(10).join("\n")}")
-    @agent_activity&.mark_failed(e.message)
+    if @agent_activity
+      @agent_activity.mark_failed(e.message)
+    end
     persist_tool_executions
   end
   # --- End Lifecycle Hooks & Base Logging ---
@@ -205,15 +206,48 @@ class BaseAgent
   # Use this in subclasses when making direct LLM calls to log them
   def log_direct_llm_call(prompt, llm_response)
     return unless @agent_activity && llm_response
-    begin
-      model_name = @llm.try(:default_options)&.dig(:chat_model) || @llm.try(:model) || "unknown"
-      provider = "openrouter" # TODO: Make provider dynamic if needed
 
+    start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+    begin
+      # Get provider - try to extract from response or fallback to default
+      provider = llm_response.try(:provider) || "openrouter"
+
+      # Get model name - prioritize the one from the response
+      model_name = llm_response.try(:model) ||
+                   @llm.try(:default_options)&.dig(:chat_model) ||
+                   @llm.try(:model) ||
+                   "unknown"
+
+      # Format prompt and response
       prompt_text = prompt.is_a?(Array) ? prompt.to_json : prompt.to_s
       response_text = llm_response.try(:chat_completion) || llm_response.try(:completion) || llm_response.to_s
+
+      # Get token counts
       prompt_tokens = llm_response.try(:prompt_tokens) || 0
       completion_tokens = llm_response.try(:completion_tokens) || 0
       total_tokens = llm_response.try(:total_tokens) || (prompt_tokens + completion_tokens)
+
+      # Get request and response payloads
+      request_payload = if @llm.respond_to?(:last_request_payload)
+                          @llm.last_request_payload.to_json
+      else
+                          # Construct a minimal request payload
+                          {
+                            model: model_name,
+                            messages: prompt.is_a?(Array) ? prompt : [ { role: "user", content: prompt.to_s } ],
+                            temperature: @llm.try(:default_options)&.dig(:temperature) || 0.3
+                          }.to_json
+      end
+
+      # Get full response payload
+      response_payload = llm_response.try(:raw_response).to_json rescue nil
+
+      # Calculate duration
+      duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time
+
+      # Calculate cost based on token usage and model
+      cost = calculate_llm_cost(model_name, prompt_tokens, completion_tokens)
 
       @agent_activity.llm_calls.create!(
         provider: provider,
@@ -222,11 +256,55 @@ class BaseAgent
         response: response_text,
         prompt_tokens: prompt_tokens,
         completion_tokens: completion_tokens,
-        tokens_used: total_tokens
+        tokens_used: total_tokens,
+        request_payload: request_payload,
+        response_payload: response_payload,
+        duration: duration,
+        cost: cost
       )
     rescue => e
       Rails.logger.error "[BaseAgent] Failed to log direct LLM call: #{e.message}"
     end
+  end
+
+  # Helper method to calculate LLM cost based on model and token usage
+  def calculate_llm_cost(model, prompt_tokens, completion_tokens)
+    # Pricing per 1000 tokens in USD (as of April 2025)
+    # These rates should be moved to a configuration file in production
+    pricing = {
+      # OpenAI models
+      "openai/gpt-4" => { prompt: 0.03, completion: 0.06 },
+      "openai/gpt-4.1" => { prompt: 0.03, completion: 0.06 },
+      "openai/gpt-4o" => { prompt: 0.01, completion: 0.03 },
+      "openai/gpt-3.5-turbo" => { prompt: 0.0005, completion: 0.0015 },
+
+      # Anthropic models
+      "anthropic/claude-3-opus" => { prompt: 0.015, completion: 0.075 },
+      "anthropic/claude-3-sonnet" => { prompt: 0.003, completion: 0.015 },
+      "anthropic/claude-3-haiku" => { prompt: 0.00025, completion: 0.00125 },
+
+      # Mistral models
+      "mistralai/mistral-7b-instruct" => { prompt: 0.0002, completion: 0.0002 },
+      "mistralai/mistral-large" => { prompt: 0.002, completion: 0.006 },
+
+      # Default for unknown models
+      "default" => { prompt: 0.001, completion: 0.002 }
+    }
+
+    # Get pricing for the model or use default
+    model_pricing = if model.include?("/")
+                      pricing[model] || pricing["default"]
+    else
+                      # Handle cases where model is just the name without provider prefix
+                      pricing.find { |k, _| k.end_with?("/#{model}") }&.last || pricing["default"]
+    end
+
+    # Calculate cost
+    prompt_cost = prompt_tokens * model_pricing[:prompt] / 1000.0
+    completion_cost = completion_tokens * model_pricing[:completion] / 1000.0
+
+    # Return total cost rounded to 6 decimal places
+    (prompt_cost + completion_cost).round(6)
   end
   # --- End Protected Logging Helpers ---
 

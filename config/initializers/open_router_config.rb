@@ -1,5 +1,5 @@
 # OpenRouter configuration for LangChain integration
-require 'langchain'
+require "langchain"
 
 module Langchain
   module LLM
@@ -10,19 +10,19 @@ module Langchain
         embedding_model: "openrouter/auto"
       }.freeze
 
-      attr_reader :defaults, :client
+      attr_reader :defaults, :client, :last_request_payload
 
       def initialize(api_key:, default_options: {})
         @api_key = api_key
         @defaults = DEFAULTS.merge(default_options)
-        
+
         # Initialize parameters
         chat_parameters.update(
-          model: {default: @defaults[:chat_model]},
-          temperature: {default: @defaults[:temperature]},
-          providers: {default: []},
-          transforms: {default: []},
-          extras: {default: {}}
+          model: { default: @defaults[:chat_model] },
+          temperature: { default: @defaults[:temperature] },
+          providers: { default: [] },
+          transforms: { default: [] },
+          extras: { default: {} }
         )
       end
 
@@ -57,46 +57,73 @@ module Langchain
 
       def openrouter_request(messages, options = {})
         url = "https://openrouter.ai/api/v1/chat/completions"
-        
+
         headers = {
           "Content-Type" => "application/json",
           "Authorization" => "Bearer #{@api_key}",
           "HTTP-Referer" => ENV["OPENROUTER_REFERER"] || "https://localhost:3000",
           "X-Title" => ENV["OPENROUTER_SITE_NAME"] || "DoubleAgent"
         }
-        
+
         payload = {
           model: options[:model],
           messages: messages,
           temperature: options[:temperature] || 0.7
         }
-        
+
         # Add optional parameters if present
         payload[:providers] = options[:providers] if options[:providers].present?
         payload[:transforms] = options[:transforms] if options[:transforms].present?
-        
+
         # Add any extra parameters
         if options[:extras].present?
           payload.merge!(options[:extras])
         end
-        
+
+        # Store the request payload for logging purposes
+        @last_request_payload = payload.deep_dup
+
+        # Record start time for duration calculation
+        start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
         response = HTTParty.post(
           url,
           headers: headers,
           body: payload.to_json
         )
-        
+
+        # Calculate duration
+        duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time
+
         if response.code != 200
           raise "OpenRouter API error: #{response.code} - #{response.body}"
         end
-        
-        JSON.parse(response.body)
+
+        response_data = JSON.parse(response.body)
+
+        # Enhance the response data with additional metadata
+        response_data["_metadata"] = {
+          "duration" => duration,
+          "request_time" => Time.now.utc
+        }
+
+        response_data
       end
     end
 
     class OpenRouterResponse < BaseResponse
       def model
         raw_response["model"]
+      end
+
+      def provider
+        # Extract provider from model string if available (e.g., "openai/gpt-4" -> "openai")
+        model_str = raw_response["model"].to_s
+        if model_str.include?("/")
+          model_str.split("/").first
+        else
+          raw_response["provider"] || "openrouter"
+        end
       end
 
       def chat_completion
@@ -135,6 +162,22 @@ module Langchain
         if raw_response.dig("created")
           Time.at(raw_response.dig("created"))
         end
+      end
+
+      def duration
+        raw_response.dig("_metadata", "duration")
+      end
+
+      def request_time
+        raw_response.dig("_metadata", "request_time")
+      end
+
+      def id
+        raw_response["id"]
+      end
+
+      def finish_reason
+        raw_response.dig("choices", 0, "finish_reason")
       end
     end
   end

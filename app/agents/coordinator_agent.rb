@@ -73,7 +73,7 @@ class CoordinatorAgent < BaseAgent
         context: {
           event_type: "subtask_completed",
           subtask_id: subtask_id,
-          result: subtask.result
+          result: event.data["result"]
         }
       }
     )
@@ -136,13 +136,13 @@ class CoordinatorAgent < BaseAgent
       # Extract relevant data from the event
       tool_name = event.data["tool"]
       result_preview = event.data["result_preview"]
-      
+
       # Only process events for this agent's activity
       return unless event.agent_activity_id == agent_activity&.id
-      
+
       # Log the tool execution
       Rails.logger.info "[CoordinatorAgent #{agent_activity&.id}] Tool execution completed: #{tool_name}"
-      
+
       # Handle specific tool completions if needed
       case tool_name
       when "create_subtask"
@@ -169,23 +169,23 @@ class CoordinatorAgent < BaseAgent
       # Extract relevant data
       result = event.data["result"]
       agent_activity_id = event.agent_activity_id
-      
+
       return unless agent_activity_id
-      
+
       # Look up the completed activity
       agent_activity = AgentActivity.find_by(id: agent_activity_id)
       return unless agent_activity
-      
+
       # Get the associated task
       completed_task = agent_activity.task
       return unless completed_task
-      
+
       # Get the parent task (which this coordinator is handling)
       parent_task_id = completed_task.parent_id
       return unless parent_task_id && parent_task_id == task&.id
-      
+
       Rails.logger.info "[CoordinatorAgent #{agent_activity&.id}] Subtask #{completed_task.id} completed via agent activity #{agent_activity_id}"
-      
+
       # Process as a subtask completed event
       # Reuse the subtask_completed handler logic
       subtask_completed_event = Event.create!(
@@ -196,7 +196,7 @@ class CoordinatorAgent < BaseAgent
           result: result || "Task completed successfully"
         }
       )
-      
+
       handle_subtask_completed(subtask_completed_event)
     rescue => e
       Rails.logger.error "[CoordinatorAgent] Error handling agent_completed event: #{e.message}"
@@ -210,20 +210,20 @@ class CoordinatorAgent < BaseAgent
       request_id = event.data["request_id"]
       input_task_id = event.data["task_id"]
       response = event.data["response"]
-      
+
       # Skip if this doesn't relate to our task
       return unless task && input_task_id == task.id
-      
+
       Rails.logger.info "[CoordinatorAgent #{agent_activity&.id}] Human input provided for task #{task.id}: #{response&.truncate(100)}"
-      
+
       # Reload task to get current state
       task.reload
-      
+
       # If task is waiting on human input, try to activate it
       if task.waiting_on_human? && task.may_activate?
         task.activate!
         update_task_status("Resuming task after human input: #{response&.truncate(50)}")
-        
+
         # Start a new coordinator run to continue processing
         self.class.enqueue(
           "Resume after human input provided",
@@ -527,9 +527,9 @@ class CoordinatorAgent < BaseAgent
       Event.publish(
         "human_input_requested",
         { request_id: input_request.id, task_id: task.id, question: question, required: required },
-        { 
+        {
           agent_activity_id: agent_activity&.id,
-          priority: required ? Event::HIGH_PRIORITY : Event::NORMAL_PRIORITY 
+          priority: required ? Event::HIGH_PRIORITY : Event::NORMAL_PRIORITY
         }
       )
 
@@ -943,16 +943,16 @@ class CoordinatorAgent < BaseAgent
   # MODIFIED to return dependency indices
   def parse_subtasks_from_llm(llm_output)
     subtasks = []
-    
+
     # Split by common subtask separator patterns
     sections = llm_output.split(/---|\*{3}|={3}|Subtask\s+\d+:/).reject(&:empty?)
-    
+
     # If we don't find sections with the splitter, try another approach
     if sections.size <= 1
       # Try parsing with the numbered subtask format
       sections = llm_output.scan(/Subtask\s+\d+:.*?(?=Subtask\s+\d+:|$)/m)
     end
-    
+
     # Process each section
     sections.each do |section|
       # Extract basic components with less complex patterns
@@ -961,22 +961,22 @@ class CoordinatorAgent < BaseAgent
       priority_match = section.match(/Priority:?\s*([Hh]igh|[Nn]ormal|[Ll]ow)/)
       agent_match = section.match(/Agent:?\s*([A-Za-z]+Agent)/)
       deps_match = section.match(/Dependencies:?\s*(None|(?:\d+(?:,\s*\d+)*))/)
-      
+
       # Skip if we can't extract the minimum required information
       next unless title_match && description_match && priority_match
-      
+
       title = title_match[1].strip
       description = description_match[1].strip
       priority = priority_match[1].downcase.strip
       agent_type = agent_match ? agent_match[1].strip : "ResearcherAgent"
-      
+
       # Parse dependencies
       deps_str = deps_match ? deps_match[1].strip : "None"
       dependency_indices = deps_str.downcase == "none" ? [] : deps_str.split(/,\s*/).map(&:to_i)
-      
+
       # Don't add if title is empty or just whitespace
       next if title.empty?
-      
+
       subtasks << {
         title: title,
         description: description,
@@ -985,29 +985,29 @@ class CoordinatorAgent < BaseAgent
         dependencies: dependency_indices
       }
     end
-    
+
     Rails.logger.info "[CoordinatorAgent] Parsed #{subtasks.count} subtasks from analysis"
-    
+
     # Return early if we found subtasks
     return subtasks unless subtasks.empty?
-    
+
     # Last resort: try a very simple pattern matching approach for each subtask
     begin
       # Look for potential subtask titles
       potential_titles = llm_output.scan(/(?:^|\n)(?:Subtask\s+\d+:)?\s*([A-Z][\w\s,]+)(?:\n|$)/)
-      
+
       potential_titles.each_with_index do |title_match, index|
         title = title_match[0].strip
         # Get the section following this title (until the next potential title or end)
         next_title_pos = llm_output.index(potential_titles[index + 1]&.[](0)) if index + 1 < potential_titles.size
         section = next_title_pos ? llm_output[llm_output.index(title)...next_title_pos] : llm_output[llm_output.index(title)..-1]
-        
+
         # Try to extract description and priority
         desc_text = section.match(/(?:Description:?\s*)(.*?)(?:Priority:|Agent:|Dependencies:|$)/m)&.[](1)&.strip
         priority_text = section.match(/Priority:?\s*([Hh]igh|[Nn]ormal|[Ll]ow)/)&.[](1)&.downcase
-        
+
         next unless desc_text && priority_text
-        
+
         subtasks << {
           title: title,
           description: desc_text,
@@ -1019,7 +1019,7 @@ class CoordinatorAgent < BaseAgent
     rescue => parsing_error
       Rails.logger.error "[CoordinatorAgent] Error in fallback parsing: #{parsing_error.message}"
     end
-    
+
     Rails.logger.info "[CoordinatorAgent] Final parsed subtask count: #{subtasks.count}"
     subtasks
   rescue => e

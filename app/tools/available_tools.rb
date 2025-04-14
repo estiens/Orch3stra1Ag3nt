@@ -1,10 +1,12 @@
 class AvailableTools
     def self.list
-      [
+      tools = [
         PerplexitySearchTool,
-        ResearchTool,
-        SerpApiSearchTool,
-        VectorEmbeddingTool,
+        ResearchTool
+      ]
+
+      # Add Langchain built-in tools
+      tools += [
         Langchain::Tool::Calculator,
         Langchain::Tool::Database,
         Langchain::Tool::FileSystem,
@@ -13,6 +15,8 @@ class AvailableTools
         Langchain::Tool::Tavily,
         Langchain::Tool::Weather,
         Langchain::Tool::Wikipedia
-      ]
+      ] if defined?(Langchain::Tool)
+
+      tools
     end
 end

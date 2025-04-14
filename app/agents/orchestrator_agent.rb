@@ -253,20 +253,27 @@ class OrchestratorAgent < BaseAgent
 
   # Tool implementation: Escalate an issue to human operators
   def escalate_to_human(issue_description, urgency = "normal")
-    # ... (Implementation remains the same) ...
     intervention = HumanIntervention.create!(
       description: issue_description,
       urgency: urgency,
       status: "pending",
       agent_activity_id: agent_activity&.id
     )
+
+    # Set the appropriate priority based on urgency
+    event_priority = if urgency == "critical"
+                      Event::CRITICAL_PRIORITY
+    else
+                      Event::HIGH_PRIORITY
+    end
+
     Event.publish(
       "human_intervention_requested",
       { intervention_id: intervention.id, description: issue_description, urgency: urgency },
-      priority: urgency == "critical" ? Event::CRITICAL_PRIORITY : Event::HIGH_PRIORITY
+      { priority: event_priority }
     )
-    "Escalated to human operators with #{urgency} urgency. Intervention ID: #{intervention.id}"
 
+    "Escalated to human operators with #{urgency} urgency. Intervention ID: #{intervention.id}"
   rescue => e
     Rails.logger.error "[OrchestratorAgent] Error escalating to human: #{e.message}"
     "Error escalating issue: #{e.message}"
@@ -422,25 +429,10 @@ class OrchestratorAgent < BaseAgent
     super # Call BaseAgent's after_run first
 
     # For OrchestratorAgent, log decisions made during this run
-    # Access tool calls via session_data (needs population via callbacks)
-    # Example assuming session_data[:tool_calls] is populated by BaseAgent/Langchainrb:
     decision_log = "OrchestratorAgent Run Summary (Activity: #{agent_activity&.id}):\n"
     decision_log += "  Result: #{result.inspect}\n"
 
-    # TODO: Adapt this once BaseAgent populates session_data[:tool_calls] via callbacks
-    # Placeholder:
-    # tool_calls = session_data[:tool_calls] || []
-    # if tool_calls.any?
-    #   decision_log += "  Tool Calls:\n"
-    #   tool_calls.each do |call|
-    #     decision_log += "  - #{call[:tool]}(#{call[:args].inspect}) -> #{call[:result].inspect}\n"
-    #   end
-    # else
-    #   decision_log += "  No tool calls recorded in this run.\n"
-    # end
-
-
-    # Keep the specific decision logging for now, maybe redundant later
+    # Log tool executions
     session_trace_legacy = @session_data # Assuming @session_data holds old format temporarily
     if session_trace_legacy && session_trace_legacy[:tool_executions]
       decision_log += "  Legacy Tool Executions Log:\n"
@@ -459,6 +451,5 @@ class OrchestratorAgent < BaseAgent
     Rails.logger.info(decision_log)
   end
 
-  # Remove the private modifier if after_run is intended to be called externally (it isn't usually)
   # The base class handles the run cycle.
 end

@@ -35,7 +35,7 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
       <div class="bg-gray-50 p-4 rounded">
         <h3 class="font-medium text-gray-700">Priority</h3>
-        <p class="mt-1"><%= @project.priority&.capitalize || "Not set" %></p>
+        <p class="mt-1"><%= @project.priority || "Not set" %></p>
       </div>
       
       <div class="bg-gray-50 p-4 rounded">

@@ -12,12 +12,8 @@ class WebResearcherAgent < BaseAgent
   end
 
   # --- Tools ---
-  # Consider registering external tool objects (SerpApiSearchTool, etc.) via custom_tool_objects
+  # Consider registering external tool objects (PerplexitySearchTool, etc.) via custom_tool_objects
   # or passing them during initialization instead of creating them inside methods.
-
-  tool :search_web, "Search the web for information on a topic" do |query|
-    search_web(query)
-  end
 
   tool :search_with_perplexity, "Search the web using Perplexity for AI-enhanced results" do |query, focus = "web"|
     search_with_perplexity(query, focus)
@@ -92,41 +88,19 @@ class WebResearcherAgent < BaseAgent
   # --- End Core Logic ---
 
   # --- Tool Implementations ---
-  def search_web(query)
-    # Use our SerpApiSearchTool for web search
-    search_tool = SerpApiSearchTool.new # Consider dependency injection
-    search_results = search_tool.call(query: query, num_results: 5, include_snippets: true)
-
-    if search_results[:error]
-      return "Search error: #{search_results[:error]}"
-    end
-
-    # Format the results
-    formatted_results = "Search results for: #{query}\n\n"
-    search_results[:results].each_with_index do |result, index|
-      formatted_results += "#{index + 1}. #{result[:title]}\n   URL: #{result[:link]}\n   #{result[:snippet]}\n\n" if result[:snippet]
-    end
-    formatted_results += "Total results: approx #{search_results[:total_results_count]}. Search time: #{search_results[:search_time]}\n"
-
-    # Logging handled by AgentActivityCallbackHandler
-
-    formatted_results
-  rescue => e
-    Rails.logger.error "[WebResearcherAgent] Error in search_web: #{e.message}"
-    "Error performing web search: #{e.message}"
-  end
 
   def search_with_perplexity(query, focus = "web")
     search_tool = PerplexitySearchTool.new # Consider dependency injection
-    search_results = search_tool.call(query: query, focus: focus)
+    search_results = search_tool.search(query: query, focus: focus)
 
-    if search_results[:error]
+    # Handle error response from the API
+    if search_results.is_a?(Hash) && search_results[:error].present?
       return "Perplexity search error: #{search_results[:error]}"
     end
 
     # Format the response
     formatted_results = "Perplexity search results for: #{query}\n\n#{search_results[:response]}\n\n"
-    if search_results[:citations]
+    if search_results[:citations].present?
       formatted_results += "Sources:\n"
       search_results[:citations].each_with_index do |citation, index|
         formatted_results += "#{index + 1}. #{citation[:title]} - URL: #{citation[:url]}\n"
@@ -134,7 +108,6 @@ class WebResearcherAgent < BaseAgent
     end
 
     # Logging handled by AgentActivityCallbackHandler
-
     formatted_results
   rescue => e
     Rails.logger.error "[WebResearcherAgent] Error in search_with_perplexity: #{e.message}"
@@ -143,9 +116,10 @@ class WebResearcherAgent < BaseAgent
 
   def browse_url(url)
     scraper = WebScraperTool.new # Consider dependency injection
-    result = scraper.call(url: url, extract_type: "text")
+    result = scraper.scrape(url: url, extract_type: "text")
 
-    if result[:error]
+    # Handle error response from the scraper
+    if result.is_a?(Hash) && result[:error].present?
       return "Error browsing URL '#{url}': #{result[:error]}"
     end
 
@@ -154,7 +128,6 @@ class WebResearcherAgent < BaseAgent
     response += content.truncate(5000, omission: "... (truncated, #{content.length} chars total)")
 
     # Logging handled by AgentActivityCallbackHandler
-
     response
   rescue => e
     Rails.logger.error "[WebResearcherAgent] Error in browse_url for '#{url}': #{e.message}"
@@ -163,7 +136,7 @@ class WebResearcherAgent < BaseAgent
 
   def scrape_webpage(url, selector = nil, extract_type = "text")
     scraper = WebScraperTool.new # Consider dependency injection
-    result = scraper.call(url: url, selector: selector, extract_type: extract_type)
+    result = scraper.scrape(url: url, selector: selector, extract_type: extract_type)
 
     if result[:error]
       return "Error scraping webpage '#{url}': #{result[:error]}"

@@ -1,0 +1,102 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"Provide
+        a detailed explanation of the following code (ruby):\n\n```ruby\nclass User\n  attr_accessor
+        :name, :email\n  \n  def initialize(name, email)\n    @name = name\n    @email
+        = email\n  end\n  \n  def to_s\n    \"#{@name} \u003c#{@email}\u003e\"\n  end\nend\n\n```\n\nExplain:\n1.
+        Overall purpose and functionality.\n2. Line-by-line walkthrough (if feasible,
+        otherwise key sections).\n3. Notable patterns or techniques.\n4. Potential
+        issues, edge cases, or improvements.\n\nFORMAT:\n## Overall Purpose\n[Description]\n\n##
+        Explanation\n[Walkthrough/Key Sections]\n\n## Key Patterns/Techniques\n- [Pattern
+        1]\n\n## Potential Improvements\n- [Suggestion 1]\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:12:57 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e4169c3da21e-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n\n         \n\n         \n\n         \n\n
+        \        \n\n         \n\n         \n\n         \n\n         \n\n         \n\n
+        \        \n\n         \n\n         \n{\"id\":\"gen-1744672377-LaHsHBMGDHvHne516PvK\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672377,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"##
+        Overall Purpose\\n\\nThis Ruby code defines a simple `User` class that models
+        a user with a `name` and an `email`. It provides a way to create user objects,
+        access or modify their attributes, and display them as formatted strings.\\n\\n---\\n\\n##
+        Explanation\\n\\nLet's break down the code section by section:\\n\\n```ruby\\nclass
+        User\\n```\\n- Declares a new class named `User`.\\n\\n```ruby\\n  attr_accessor
+        :name, :email\\n```\\n- Creates getter and setter methods for the `name` and
+        `email` attributes. This means you can read and write these attributes directly
+        (e.g., `user.name = \\\"Alice\\\"`).\\n\\n```ruby\\n  def initialize(name,
+        email)\\n    @name = name\\n    @email = email\\n  end\\n```\\n- Defines the
+        constructor method. When you create a new `User` (e.g., `User.new(\\\"Alice\\\",
+        \\\"alice@example.com\\\")`), this method is called.\\n- It takes two arguments
+        (`name` and `email`) and assigns them to instance variables (`@name` and `@email`).\\n\\n```ruby\\n
+        \ def to_s\\n    \\\"#{@name} <#{@email}>\\\"\\n  end\\n```\\n- Defines a
+        `to_s` method, which returns a string representation of the user in the format:
+        `\\\"Name <email>\\\"`.\\n- This method is called automatically when you print
+        the object or interpolate it in a string.\\n\\n```ruby\\nend\\n```\\n- Ends
+        the class definition.\\n\\n---\\n\\n## Key Patterns/Techniques\\n\\n- **attr_accessor**:
+        This Ruby macro automatically creates both getter and setter methods for the
+        specified attributes, reducing boilerplate code.\\n- **Instance Variables**:
+        Uses `@name` and `@email` to store data unique to each instance of the class.\\n-
+        **Custom `to_s` Method**: Overrides the default string representation to provide
+        a human-readable format.\\n\\n---\\n\\n## Potential Improvements\\n\\n- **Input
+        Validation**: The constructor does not validate the `name` or `email`. You
+        might want to check that `email` is a valid format or that neither field is
+        empty.\\n- **Immutability**: If you don't want users to change `name` or `email`
+        after creation, use `attr_reader` instead of `attr_accessor`.\\n- **Documentation**:
+        Adding comments or documentation strings would help clarify the class's purpose
+        and usage.\\n- **Equality Methods**: Implementing `==` or `eql?` methods could
+        help compare users meaningfully.\\n- **Serialization**: Adding methods to
+        serialize to/from JSON or hashes could be useful for storage or API interaction.\\n-
+        **Error Handling**: Consider raising exceptions or handling errors if invalid
+        data is provided.\\n\\nExample improvement for input validation:\\n\\n```ruby\\ndef
+        initialize(name, email)\\n  raise ArgumentError, \\\"Name cannot be empty\\\"
+        if name.nil? || name.strip.empty?\\n  raise ArgumentError, \\\"Invalid email\\\"
+        unless email =~ /\\\\A[^@\\\\s]+@[^@\\\\s]+\\\\z/\\n  @name = name\\n  @email
+        = email\\nend\\n```\\nThis would ensure only valid users are created.\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_7439084672\",\"usage\":{\"prompt_tokens\":162,\"completion_tokens\":641,\"total_tokens\":803,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:13:03 GMT
+recorded_with: VCR 6.3.1

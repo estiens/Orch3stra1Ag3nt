@@ -1,0 +1,431 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# ROLE
+        AND GOAL\nYou are a meticulous Automated Code Explorer. Your primary objective
+        is to systematically navigate and understand the codebase to gather information
+        that comprehensively answers the user''s question.\nUSER QUESTION: What are
+        the best practices for error handling in Ruby?\n\n# ANTI-REPETITION DIRECTIVE\nYou
+        MUST avoid redundant actions. Do NOT:\n- Examine directories already listed
+        below.\n- Run commands substantially similar to those already run.\n- Take
+        notes covering information already recorded.\n\n# CURRENT EXPLORATION STATUS\nIteration:
+        1/3\n\nDIRECTORIES ALREADY EXAMINED (via ''examine_directory''):\n- None yet\n\nRECENT
+        SHELL COMMANDS ALREADY RUN (via ''shell_command''):\n- None yet\n\nNOTES TAKEN
+        SO FAR (Significant findings discovered):\n```\nNo notes taken yet.\n```\n\nLAST
+        TOOL RESULT (Output or error from your previous action):\n```\nNo tool executed
+        yet.\n```\n\nAVAILABLE TOOLS (Use these to explore and gather information):\n-
+        analyze_code_question: Break down a code-related research question\n- shell_command:
+        Execute a shell command (safely within allowed directories)\n- search_code_base:
+        Search the code base for code examples using ripgrep (takes ''query: \u003cyour
+        query here\u003e'') \n- examine_directory: Examine a directory and generate
+        a textual summary of its contents using the code2prompt tool. Takes ''directory_path:
+        \u003cpath to directory\u003e''.\n- search_for_examples: Search for code examples
+        on a topic\n- explain_code: Explain how a piece of code works\n- take_notes:
+        IMPORTANT: Document findings about the codebase. Use this after discoveries
+        to build the final report. Each note should contain specific, detailed observations.
+        Pass (note: \u003cnote)\n- compile_findings: Compile research notes into structured
+        findings\n\n=== YOUR TASK ===\nBased on the USER QUESTION, CURRENT NOTES,
+        and LAST TOOL RESULT, determine the single best *next action* to progress
+        towards answering the question.\n\n=== STRATEGIC THINKING PROCESS (Follow
+        these steps): ===\n1.  **Analyze Goal:** Re-read the USER QUESTION. What specific
+        information is still needed?\n2.  **Review Context:** Examine CURRENT NOTES.
+        What parts of the codebase have been explored? What remains unknown?\n3.  **Evaluate
+        Last Result:** Analyze the LAST TOOL RESULT.\n    *   If it contains useful
+        information (file listing, file content, search results, directory summary):
+        What key insight does it provide? Does it suggest the next file/directory
+        to examine? Should I use `take_notes` *now* to record this insight before
+        moving on?\n    *   If it was an error: Why did it fail (e.g., file not found,
+        command error)? Can I try an alternative (different path, simpler command,
+        different tool)? Should I use `take_notes` to record the obstacle?\n4.  **Plan
+        Next Step:** Decide the most logical next exploration target (e.g., examine
+        root directory, list files in `app/models`, read `app/controllers/users_controller.rb`,
+        search for `User.find`).\n5.  **Select Optimal Tool:** Choose the *single
+        tool* that directly achieves your planned next step. Prioritize `take_notes`
+        if step 3 identified key info to save *before* exploring further.\n6.  **Formulate
+        Action:** Construct the arguments for the chosen tool precisely.\n\n=== TOOL
+        USAGE GUIDELINES ===\n*   `shell_command`: Your primary exploration tool.
+        Use specific commands:\n    *   `ls -l \u003cdirectory\u003e`: To list contents
+        of a directory. Start broad (e.g., `ls -l .`) then explore subdirectories.\n    *   `cat
+        \u003cfile_path\u003e`: To read the contents of a *specific* file identified
+        via `ls` or other tools.\n    *   `grep \u003cpattern\u003e \u003cfile\u003e`:
+        For simple searches within a known file.\n    *   **AVOID**: Generic commands
+        like just `explore`. Be specific.\n*   `examine_directory`: Use when you need
+        a *summary* of *all* files in a directory, processed by `code2prompt`. Useful
+        for getting an overview of a complex area like `app/services` *before* diving
+        into individual files with `cat`. More costly than `ls`.\n*   `search_code_base`:
+        Use *only* when you need to find specific code snippets, function calls, or
+        keywords *across the entire codebase* (uses `rg`). Less useful for general
+        structure exploration than `ls` or `examine_directory`.\n*   `explain_code`:
+        Use *sparingly* only for short, specific code snippets already retrieved via
+        `cat` or `search_code_base` that you cannot understand from context.\n*   `take_notes`:
+        **CRITICAL**. Use frequently to record **significant findings** directly contributing
+        to the answer:\n    *   Purpose of a directory or important file.\n    *   Key
+        logic or data flow identified.\n    *   Relationships between different code
+        parts.\n    *   Direct evidence answering the USER QUESTION.\n    *   Obstacles
+        or errors encountered during exploration.\n    *   **Do NOT** use for trivial
+        actions like \"Executed ls command\". Notes form the basis of the final answer.\n*   `analyze_code_question`:
+        Usually only needed once at the start if the initial question is unclear (rarely
+        needed in the loop).\n*   `finish`: Use **ONLY** when you are confident that
+        the CURRENT NOTES contain enough information gathered through exploration
+        to comprehensively answer the original USER QUESTION. Do not finish prematurely.\n\n===
+        RESPONSE FORMATTING ===\nRespond ONLY with a valid JSON object adhering to
+        the schema below.\nDO NOT include any other text, explanations, or markdown
+        formatting (like ```json ... ```) outside of the JSON object itself.\nYour
+        entire response must be ONLY the JSON object.\n--- SCHEMA START ---\nYou must
+        format your output as a JSON value that adheres to a given \"JSON Schema\"
+        instance.\n\n\"JSON Schema\" is a declarative language that allows you to
+        annotate and validate JSON documents.\n\nFor example, the example \"JSON Schema\"
+        instance {\"properties\": {\"foo\": {\"description\": \"a list of test words\",
+        \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}}\nwould
+        match an object with one required property, \"foo\". The \"type\" property
+        specifies \"foo\" must be an \"array\", and the \"description\" property semantically
+        describes it as \"a list of test words\". The items within \"foo\" must be
+        strings.\nThus, the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted
+        instance of this example \"JSON Schema\". The object {\"properties\": {\"foo\":
+        [\"bar\", \"baz\"]}}} is not well-formatted.\n\nYour output will be parsed
+        and type-checked according to the provided schema instance, so make sure all
+        fields in your output match the schema exactly and there are no trailing commas!\n\nHere
+        is the JSON Schema instance your output must adhere to. Include the enclosing
+        markdown codeblock:\n```json\n{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"description\":\"The
+        name of the tool to use or ''finish''.\",\"enum\":[\"analyze_code_question\",\"shell_command\",\"search_code_base\",\"examine_directory\",\"search_for_examples\",\"explain_code\",\"take_notes\",\"compile_findings\",\"finish\"]},\"arguments\":{\"type\":\"object\",\"description\":\"A
+        hash of arguments for the chosen tool (string keys and values). Empty if action
+        is ''finish''. Arguments should be passed as keyword arguments.\",\"additionalProperties\":{\"type\":\"string\"}}},\"required\":[\"action\",\"arguments\"],\"additionalProperties\":false}\n```\n\n---
+        SCHEMA END ---\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:16:15 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e8eeea085114-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n{\"id\":\"gen-1744672576-fB3I1ZwPelX79mYNInun\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672576,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"```json\\n{\\\"action\\\":\\\"search_code_base\\\",\\\"arguments\\\":{\\\"query\\\":\\\"rescue|begin|raise|StandardError|Exception\\\"}}\\n```\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_cf18407276\",\"usage\":{\"prompt_tokens\":1581,\"completion_tokens\":29,\"total_tokens\":1610,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:16:16 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# ROLE
+        AND GOAL\nYou are a meticulous Automated Code Explorer. Your primary objective
+        is to systematically navigate and understand the codebase to gather information
+        that comprehensively answers the user''s question.\nUSER QUESTION: What are
+        the best practices for error handling in Ruby?\n\n# ANTI-REPETITION DIRECTIVE\nYou
+        MUST avoid redundant actions. Do NOT:\n- Examine directories already listed
+        below.\n- Run commands substantially similar to those already run.\n- Take
+        notes covering information already recorded.\n\n# CURRENT EXPLORATION STATUS\nIteration:
+        2/3\n\nDIRECTORIES ALREADY EXAMINED (via ''examine_directory''):\n- None yet\n\nRECENT
+        SHELL COMMANDS ALREADY RUN (via ''shell_command''):\n- None yet\n\nNOTES TAKEN
+        SO FAR (Significant findings discovered):\n```\nNo notes taken yet.\n```\n\nLAST
+        TOOL RESULT (Output or error from your previous action):\n```\n{status: \"success\",
+        results: [], message: \"No matches found.\"}\n```\n\nAVAILABLE TOOLS (Use
+        these to explore and gather information):\n- analyze_code_question: Break
+        down a code-related research question\n- shell_command: Execute a shell command
+        (safely within allowed directories)\n- search_code_base: Search the code base
+        for code examples using ripgrep (takes ''query: \u003cyour query here\u003e'')
+        \n- examine_directory: Examine a directory and generate a textual summary
+        of its contents using the code2prompt tool. Takes ''directory_path: \u003cpath
+        to directory\u003e''.\n- search_for_examples: Search for code examples on
+        a topic\n- explain_code: Explain how a piece of code works\n- take_notes:
+        IMPORTANT: Document findings about the codebase. Use this after discoveries
+        to build the final report. Each note should contain specific, detailed observations.
+        Pass (note: \u003cnote)\n- compile_findings: Compile research notes into structured
+        findings\n\n=== YOUR TASK ===\nBased on the USER QUESTION, CURRENT NOTES,
+        and LAST TOOL RESULT, determine the single best *next action* to progress
+        towards answering the question.\n\n=== STRATEGIC THINKING PROCESS (Follow
+        these steps): ===\n1.  **Analyze Goal:** Re-read the USER QUESTION. What specific
+        information is still needed?\n2.  **Review Context:** Examine CURRENT NOTES.
+        What parts of the codebase have been explored? What remains unknown?\n3.  **Evaluate
+        Last Result:** Analyze the LAST TOOL RESULT.\n    *   If it contains useful
+        information (file listing, file content, search results, directory summary):
+        What key insight does it provide? Does it suggest the next file/directory
+        to examine? Should I use `take_notes` *now* to record this insight before
+        moving on?\n    *   If it was an error: Why did it fail (e.g., file not found,
+        command error)? Can I try an alternative (different path, simpler command,
+        different tool)? Should I use `take_notes` to record the obstacle?\n4.  **Plan
+        Next Step:** Decide the most logical next exploration target (e.g., examine
+        root directory, list files in `app/models`, read `app/controllers/users_controller.rb`,
+        search for `User.find`).\n5.  **Select Optimal Tool:** Choose the *single
+        tool* that directly achieves your planned next step. Prioritize `take_notes`
+        if step 3 identified key info to save *before* exploring further.\n6.  **Formulate
+        Action:** Construct the arguments for the chosen tool precisely.\n\n=== TOOL
+        USAGE GUIDELINES ===\n*   `shell_command`: Your primary exploration tool.
+        Use specific commands:\n    *   `ls -l \u003cdirectory\u003e`: To list contents
+        of a directory. Start broad (e.g., `ls -l .`) then explore subdirectories.\n    *   `cat
+        \u003cfile_path\u003e`: To read the contents of a *specific* file identified
+        via `ls` or other tools.\n    *   `grep \u003cpattern\u003e \u003cfile\u003e`:
+        For simple searches within a known file.\n    *   **AVOID**: Generic commands
+        like just `explore`. Be specific.\n*   `examine_directory`: Use when you need
+        a *summary* of *all* files in a directory, processed by `code2prompt`. Useful
+        for getting an overview of a complex area like `app/services` *before* diving
+        into individual files with `cat`. More costly than `ls`.\n*   `search_code_base`:
+        Use *only* when you need to find specific code snippets, function calls, or
+        keywords *across the entire codebase* (uses `rg`). Less useful for general
+        structure exploration than `ls` or `examine_directory`.\n*   `explain_code`:
+        Use *sparingly* only for short, specific code snippets already retrieved via
+        `cat` or `search_code_base` that you cannot understand from context.\n*   `take_notes`:
+        **CRITICAL**. Use frequently to record **significant findings** directly contributing
+        to the answer:\n    *   Purpose of a directory or important file.\n    *   Key
+        logic or data flow identified.\n    *   Relationships between different code
+        parts.\n    *   Direct evidence answering the USER QUESTION.\n    *   Obstacles
+        or errors encountered during exploration.\n    *   **Do NOT** use for trivial
+        actions like \"Executed ls command\". Notes form the basis of the final answer.\n*   `analyze_code_question`:
+        Usually only needed once at the start if the initial question is unclear (rarely
+        needed in the loop).\n*   `finish`: Use **ONLY** when you are confident that
+        the CURRENT NOTES contain enough information gathered through exploration
+        to comprehensively answer the original USER QUESTION. Do not finish prematurely.\n\n===
+        RESPONSE FORMATTING ===\nRespond ONLY with a valid JSON object adhering to
+        the schema below.\nDO NOT include any other text, explanations, or markdown
+        formatting (like ```json ... ```) outside of the JSON object itself.\nYour
+        entire response must be ONLY the JSON object.\n--- SCHEMA START ---\nYou must
+        format your output as a JSON value that adheres to a given \"JSON Schema\"
+        instance.\n\n\"JSON Schema\" is a declarative language that allows you to
+        annotate and validate JSON documents.\n\nFor example, the example \"JSON Schema\"
+        instance {\"properties\": {\"foo\": {\"description\": \"a list of test words\",
+        \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}}\nwould
+        match an object with one required property, \"foo\". The \"type\" property
+        specifies \"foo\" must be an \"array\", and the \"description\" property semantically
+        describes it as \"a list of test words\". The items within \"foo\" must be
+        strings.\nThus, the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted
+        instance of this example \"JSON Schema\". The object {\"properties\": {\"foo\":
+        [\"bar\", \"baz\"]}}} is not well-formatted.\n\nYour output will be parsed
+        and type-checked according to the provided schema instance, so make sure all
+        fields in your output match the schema exactly and there are no trailing commas!\n\nHere
+        is the JSON Schema instance your output must adhere to. Include the enclosing
+        markdown codeblock:\n```json\n{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"description\":\"The
+        name of the tool to use or ''finish''.\",\"enum\":[\"analyze_code_question\",\"shell_command\",\"search_code_base\",\"examine_directory\",\"search_for_examples\",\"explain_code\",\"take_notes\",\"compile_findings\",\"finish\"]},\"arguments\":{\"type\":\"object\",\"description\":\"A
+        hash of arguments for the chosen tool (string keys and values). Empty if action
+        is ''finish''. Arguments should be passed as keyword arguments.\",\"additionalProperties\":{\"type\":\"string\"}}},\"required\":[\"action\",\"arguments\"],\"additionalProperties\":false}\n```\n\n---
+        SCHEMA END ---\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:16:17 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e8f5bbbead17-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n{\"id\":\"gen-1744672577-u5r3N15vGGlfCmkdGKSO\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672577,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"```json\\n{\\\"action\\\":\\\"search_code_base\\\",\\\"arguments\\\":{\\\"query\\\":\\\"rescue\\\"}}\\n```\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_cf18407276\",\"usage\":{\"prompt_tokens\":1593,\"completion_tokens\":20,\"total_tokens\":1613,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:16:17 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# ROLE
+        AND GOAL\nYou are a meticulous Automated Code Explorer. Your primary objective
+        is to systematically navigate and understand the codebase to gather information
+        that comprehensively answers the user''s question.\nUSER QUESTION: What are
+        the best practices for error handling in Ruby?\n\n# ANTI-REPETITION DIRECTIVE\nYou
+        MUST avoid redundant actions. Do NOT:\n- Examine directories already listed
+        below.\n- Run commands substantially similar to those already run.\n- Take
+        notes covering information already recorded.\n\n# CURRENT EXPLORATION STATUS\nIteration:
+        3/3\n\nDIRECTORIES ALREADY EXAMINED (via ''examine_directory''):\n- None yet\n\nRECENT
+        SHELL COMMANDS ALREADY RUN (via ''shell_command''):\n- None yet\n\nNOTES TAKEN
+        SO FAR (Significant findings discovered):\n```\nNo notes taken yet.\n```\n\nLAST
+        TOOL RESULT (Output or error from your previous action):\n```\n{status: \"success\",
+        results: [], message: \"No matches found.\"}\n```\n\nAVAILABLE TOOLS (Use
+        these to explore and gather information):\n- analyze_code_question: Break
+        down a code-related research question\n- shell_command: Execute a shell command
+        (safely within allowed directories)\n- search_code_base: Search the code base
+        for code examples using ripgrep (takes ''query: \u003cyour query here\u003e'')
+        \n- examine_directory: Examine a directory and generate a textual summary
+        of its contents using the code2prompt tool. Takes ''directory_path: \u003cpath
+        to directory\u003e''.\n- search_for_examples: Search for code examples on
+        a topic\n- explain_code: Explain how a piece of code works\n- take_notes:
+        IMPORTANT: Document findings about the codebase. Use this after discoveries
+        to build the final report. Each note should contain specific, detailed observations.
+        Pass (note: \u003cnote)\n- compile_findings: Compile research notes into structured
+        findings\n\n=== YOUR TASK ===\nBased on the USER QUESTION, CURRENT NOTES,
+        and LAST TOOL RESULT, determine the single best *next action* to progress
+        towards answering the question.\n\n=== STRATEGIC THINKING PROCESS (Follow
+        these steps): ===\n1.  **Analyze Goal:** Re-read the USER QUESTION. What specific
+        information is still needed?\n2.  **Review Context:** Examine CURRENT NOTES.
+        What parts of the codebase have been explored? What remains unknown?\n3.  **Evaluate
+        Last Result:** Analyze the LAST TOOL RESULT.\n    *   If it contains useful
+        information (file listing, file content, search results, directory summary):
+        What key insight does it provide? Does it suggest the next file/directory
+        to examine? Should I use `take_notes` *now* to record this insight before
+        moving on?\n    *   If it was an error: Why did it fail (e.g., file not found,
+        command error)? Can I try an alternative (different path, simpler command,
+        different tool)? Should I use `take_notes` to record the obstacle?\n4.  **Plan
+        Next Step:** Decide the most logical next exploration target (e.g., examine
+        root directory, list files in `app/models`, read `app/controllers/users_controller.rb`,
+        search for `User.find`).\n5.  **Select Optimal Tool:** Choose the *single
+        tool* that directly achieves your planned next step. Prioritize `take_notes`
+        if step 3 identified key info to save *before* exploring further.\n6.  **Formulate
+        Action:** Construct the arguments for the chosen tool precisely.\n\n=== TOOL
+        USAGE GUIDELINES ===\n*   `shell_command`: Your primary exploration tool.
+        Use specific commands:\n    *   `ls -l \u003cdirectory\u003e`: To list contents
+        of a directory. Start broad (e.g., `ls -l .`) then explore subdirectories.\n    *   `cat
+        \u003cfile_path\u003e`: To read the contents of a *specific* file identified
+        via `ls` or other tools.\n    *   `grep \u003cpattern\u003e \u003cfile\u003e`:
+        For simple searches within a known file.\n    *   **AVOID**: Generic commands
+        like just `explore`. Be specific.\n*   `examine_directory`: Use when you need
+        a *summary* of *all* files in a directory, processed by `code2prompt`. Useful
+        for getting an overview of a complex area like `app/services` *before* diving
+        into individual files with `cat`. More costly than `ls`.\n*   `search_code_base`:
+        Use *only* when you need to find specific code snippets, function calls, or
+        keywords *across the entire codebase* (uses `rg`). Less useful for general
+        structure exploration than `ls` or `examine_directory`.\n*   `explain_code`:
+        Use *sparingly* only for short, specific code snippets already retrieved via
+        `cat` or `search_code_base` that you cannot understand from context.\n*   `take_notes`:
+        **CRITICAL**. Use frequently to record **significant findings** directly contributing
+        to the answer:\n    *   Purpose of a directory or important file.\n    *   Key
+        logic or data flow identified.\n    *   Relationships between different code
+        parts.\n    *   Direct evidence answering the USER QUESTION.\n    *   Obstacles
+        or errors encountered during exploration.\n    *   **Do NOT** use for trivial
+        actions like \"Executed ls command\". Notes form the basis of the final answer.\n*   `analyze_code_question`:
+        Usually only needed once at the start if the initial question is unclear (rarely
+        needed in the loop).\n*   `finish`: Use **ONLY** when you are confident that
+        the CURRENT NOTES contain enough information gathered through exploration
+        to comprehensively answer the original USER QUESTION. Do not finish prematurely.\n\n===
+        RESPONSE FORMATTING ===\nRespond ONLY with a valid JSON object adhering to
+        the schema below.\nDO NOT include any other text, explanations, or markdown
+        formatting (like ```json ... ```) outside of the JSON object itself.\nYour
+        entire response must be ONLY the JSON object.\n--- SCHEMA START ---\nYou must
+        format your output as a JSON value that adheres to a given \"JSON Schema\"
+        instance.\n\n\"JSON Schema\" is a declarative language that allows you to
+        annotate and validate JSON documents.\n\nFor example, the example \"JSON Schema\"
+        instance {\"properties\": {\"foo\": {\"description\": \"a list of test words\",
+        \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}}\nwould
+        match an object with one required property, \"foo\". The \"type\" property
+        specifies \"foo\" must be an \"array\", and the \"description\" property semantically
+        describes it as \"a list of test words\". The items within \"foo\" must be
+        strings.\nThus, the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted
+        instance of this example \"JSON Schema\". The object {\"properties\": {\"foo\":
+        [\"bar\", \"baz\"]}}} is not well-formatted.\n\nYour output will be parsed
+        and type-checked according to the provided schema instance, so make sure all
+        fields in your output match the schema exactly and there are no trailing commas!\n\nHere
+        is the JSON Schema instance your output must adhere to. Include the enclosing
+        markdown codeblock:\n```json\n{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"description\":\"The
+        name of the tool to use or ''finish''.\",\"enum\":[\"analyze_code_question\",\"shell_command\",\"search_code_base\",\"examine_directory\",\"search_for_examples\",\"explain_code\",\"take_notes\",\"compile_findings\",\"finish\"]},\"arguments\":{\"type\":\"object\",\"description\":\"A
+        hash of arguments for the chosen tool (string keys and values). Empty if action
+        is ''finish''. Arguments should be passed as keyword arguments.\",\"additionalProperties\":{\"type\":\"string\"}}},\"required\":[\"action\",\"arguments\"],\"additionalProperties\":false}\n```\n\n---
+        SCHEMA END ---\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:16:17 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e8fbca4e7816-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n{\"id\":\"gen-1744672578-64WcMzt9zZLEHMg1OrvJ\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672578,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"```json\\n{\\\"action\\\":\\\"search_code_base\\\",\\\"arguments\\\":{\\\"query\\\":\\\"rescue|begin|raise|StandardError|Exception\\\"}}\\n```\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_cf18407276\",\"usage\":{\"prompt_tokens\":1593,\"completion_tokens\":29,\"total_tokens\":1622,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:16:18 GMT
+recorded_with: VCR 6.3.1

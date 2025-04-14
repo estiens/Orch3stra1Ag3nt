@@ -1,0 +1,235 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"Analyze
+        the following code-related research question:\n\nQUESTION: What are some common
+        Ruby metaprogramming techniques?\n\nIdentify:\n1. Core technical concepts\n2.
+        Relevant programming languages/frameworks\n3. Type of answer sought (example,
+        explanation, comparison)\n4. What a good answer would include\n\nFORMAT:\nCORE
+        CONCEPTS:\n- [Concept 1]\n\nRELEVANT TECHNOLOGIES:\n- [Language/Framework
+        1]\n\nANSWER TYPE:\n[Type]\n\nGOOD ANSWER INCLUDES:\n- [Element 1]\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:11:06 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e1628b6ca1e5-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n\n         \n\n         \n\n         \n{\"id\":\"gen-1744672266-a8Em0QLF1h6r43E3fP0P\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672266,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"CORE
+        CONCEPTS:\\n- Metaprogramming\\n- Dynamic method definition\\n- Reflection\\n-
+        Code evaluation at runtime\\n\\nRELEVANT TECHNOLOGIES:\\n- Ruby\\n\\nANSWER
+        TYPE:\\nExplanation with examples\\n\\nGOOD ANSWER INCLUDES:\\n- Clear definitions
+        of metaprogramming in Ruby\\n- List and explanation of common techniques (e.g.,
+        define_method, method_missing, class_eval, instance_eval, send)\\n- Simple
+        code examples for each technique\\n- Brief discussion of use cases and potential
+        caveats or best practices\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_a1102cf978\",\"usage\":{\"prompt_tokens\":112,\"completion_tokens\":106,\"total_tokens\":218,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:11:09 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# CODE
+        RESEARCH SYNTHESIS TASK\n\nSynthesize these research notes into a comprehensive
+        technical documentation about:\nTOPIC: \"Research Ruby metaprogramming\"\n\n#
+        SOURCE NOTES\nNote 1:\nRuby metaprogramming includes techniques like method_missing,
+        define_method, and class_eval\n\n---\n\nNote 2:\nAnother important technique
+        is instance_eval for executing code in an object''s context\n\n# EXPECTED
+        OUTPUT FORMAT\nCreate a professional technical document with these sections:\n\n##
+        1. EXECUTIVE SUMMARY\n- Concise overview of findings (1-2 paragraphs)\n- Key
+        insights and recommendations\n\n## 2. CODEBASE ARCHITECTURE\n- Overall structure
+        and organization\n- Key components and their relationships\n- Design patterns
+        and architectural principles identified\n\n## 3. IMPLEMENTATION DETAILS\n-
+        Important classes, methods, and functions\n- Workflow and control flow\n-
+        Notable algorithms or techniques\n\n## 4. CODE QUALITY ASSESSMENT\n- Strengths
+        of the implementation\n- Potential issues or improvement areas\n- Code smells
+        or anti-patterns observed\n\n## 5. RECOMMENDATIONS\n- Specific actionable
+        recommendations\n- Refactoring opportunities\n- Best practices that could
+        be applied\n\nUse clear, technical language with concrete examples from the
+        codebase.\nStructure information hierarchically with proper markdown headings
+        and formatting.\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:11:09 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e1725be4a1df-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n\n         \n\n         \n\n         \n\n
+        \        \n\n         \n\n         \n\n         \n\n         \n\n         \n\n
+        \        \n\n         \n\n         \n\n         \n\n         \n\n         \n\n
+        \        \n\n         \n\n         \n\n         \n\n         \n\n         \n\n
+        \        \n\n         \n\n         \n\n         \n\n         \n\n         \n\n
+        \        \n\n         \n{\"id\":\"gen-1744672269-7mSPtsQd1DCmLqjTvUnP\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672269,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"##
+        1. EXECUTIVE SUMMARY\\n\\nThis document synthesizes research on Ruby metaprogramming,
+        focusing on advanced techniques such as `method_missing`, `define_method`,
+        `class_eval`, and `instance_eval`. These techniques empower developers to
+        write highly dynamic and flexible code by modifying classes and objects at
+        runtime. The findings highlight how these metaprogramming features can be
+        leveraged to create DSLs, intercept method calls, and dynamically define behaviors,
+        but also underscore the importance of using them judiciously due to potential
+        complexity and maintainability concerns.\\n\\n**Key Insights:**  \\n- Ruby
+        metaprogramming provides powerful tools for dynamic code generation and behavior
+        modification.\\n- Techniques such as `method_missing` and `define_method`
+        enable runtime method handling and definition.\\n- `class_eval` and `instance_eval`
+        allow for code execution within specific class or object contexts, facilitating
+        advanced customization.\\n- While these features enhance flexibility, they
+        can introduce code that is harder to understand, test, and maintain.\\n\\n**Recommendations:**
+        \ \\nUse metaprogramming techniques when they provide clear benefits, such
+        as reducing boilerplate or enabling extensibility, but avoid overuse. Ensure
+        that code remains readable and well-documented.\\n\\n---\\n\\n## 2. CODEBASE
+        ARCHITECTURE\\n\\n### Overall Structure and Organization\\n\\nA typical Ruby
+        codebase utilizing metaprogramming is organized around classes and modules
+        that encapsulate dynamic behaviors. The architecture often includes:\\n\\n-
+        **Core Classes/Modules:** Define the primary business logic and expose extension
+        points.\\n- **Metaprogramming Modules:** Contain methods that use `method_missing`,
+        `define_method`, `class_eval`, or `instance_eval` to alter or extend behavior
+        at runtime.\\n- **DSL or API Layers:** Where metaprogramming is often used
+        to provide a user-friendly interface.\\n\\n### Key Components and Relationships\\n\\n-
+        **Dynamic Method Handlers:** Classes or modules that intercept or define methods
+        dynamically (e.g., via `method_missing` or `define_method`).\\n- **Contextual
+        Evaluators:** Components that execute code within a specific class or object
+        context using `class_eval` or `instance_eval`.\\n- **User-facing Interfaces:**
+        APIs or DSLs that leverage the above mechanisms to provide flexible, expressive
+        syntax.\\n\\n### Design Patterns and Principles\\n\\n- **Proxy Pattern:**
+        `method_missing` is often used to implement proxies or delegators.\\n- **Builder/DSL
+        Patterns:** `define_method` and evaluation methods are used to build internal
+        DSLs.\\n- **Open/Closed Principle:** Metaprogramming enables extension of
+        classes without modifying their source code.\\n\\n---\\n\\n## 3. IMPLEMENTATION
+        DETAILS\\n\\n### Important Classes, Methods, and Functions\\n\\n- **`method_missing(symbol,
+        *args, &block)`:** Intercepts calls to undefined methods, allowing custom
+        handling or delegation.\\n    ```ruby\\n    class DynamicProxy\\n      def
+        method_missing(name, *args, &block)\\n        puts \\\"Intercepted call to
+        #{name}\\\"\\n      end\\n    end\\n    ```\\n- **`define_method(symbol, &block)`:**
+        Defines a method at runtime.\\n    ```ruby\\n    class DynamicMethods\\n      [:foo,
+        :bar].each do |method_name|\\n        define_method(method_name) do\\n          puts
+        \\\"#{method_name} called\\\"\\n        end\\n      end\\n    end\\n    ```\\n-
+        **`class_eval(string or block)`:** Evaluates code in the context of a class,
+        allowing dynamic method or constant definition.\\n    ```ruby\\n    MyClass.class_eval
+        do\\n      def dynamic_method\\n        puts \\\"Defined at runtime\\\"\\n
+        \     end\\n    end\\n    ```\\n- **`instance_eval(string or block)`:** Evaluates
+        code in the context of a specific object, enabling singleton method definition
+        or internal state manipulation.\\n    ```ruby\\n    obj.instance_eval do\\n
+        \     def singleton_method\\n        puts \\\"Only on this instance\\\"\\n
+        \     end\\n    end\\n    ```\\n\\n### Workflow and Control Flow\\n\\n1. **Intercept
+        or Define:** When a method is called, `method_missing` can intercept undefined
+        calls, or `define_method` can predefine methods dynamically.\\n2. **Contextual
+        Execution:** `class_eval` and `instance_eval` execute code within class or
+        object contexts, modifying their behavior at runtime.\\n3. **User Interaction:**
+        DSLs or APIs expose these dynamic behaviors to users, allowing flexible and
+        expressive usage.\\n\\n### Notable Algorithms or Techniques\\n\\n- **Dynamic
+        Dispatch:** Using `method_missing` to route method calls based on runtime
+        information.\\n- **Code Injection:** Using `class_eval` or `instance_eval`
+        to inject methods or state into classes/objects.\\n\\n---\\n\\n## 4. CODE
+        QUALITY ASSESSMENT\\n\\n### Strengths\\n\\n- **Flexibility:** Enables highly
+        dynamic and adaptable code.\\n- **Reduced Boilerplate:** Can eliminate repetitive
+        code through dynamic method generation.\\n- **Expressiveness:** Facilitates
+        creation of readable and powerful DSLs.\\n\\n### Potential Issues or Improvement
+        Areas\\n\\n- **Readability:** Metaprogramming can obscure control flow and
+        make code harder to follow.\\n- **Debuggability:** Errors may occur at runtime,
+        making debugging more challenging.\\n- **Performance:** Excessive use may
+        impact performance due to dynamic dispatch and method generation.\\n\\n###
+        Code Smells or Anti-patterns Observed\\n\\n- **Overuse of `method_missing`:**
+        Can lead to silent failures or hard-to-trace bugs.\\n- **Unclear Boundaries:**
+        Excessive use of `class_eval`/`instance_eval` may break encapsulation and
+        make code brittle.\\n- **Lack of Documentation:** Dynamic code is harder to
+        understand without thorough documentation.\\n\\n---\\n\\n## 5. RECOMMENDATIONS\\n\\n###
+        Specific Actionable Recommendations\\n\\n- **Limit Scope:** Use metaprogramming
+        only where it provides significant benefit; prefer explicit code for simple
+        cases.\\n- **Document Extensively:** Clearly document any metaprogramming
+        logic, including the intent and expected behaviors.\\n- **Fallbacks in `method_missing`:**
+        Always call `super` in `method_missing` to preserve standard error handling.\\n-
+        **Testing:** Write comprehensive tests to cover dynamic behaviors and edge
+        cases.\\n\\n### Refactoring Opportunities\\n\\n- **Replace `method_missing`
+        with `define_method` where possible:** Predefine methods dynamically to improve
+        performance and error reporting.\\n- **Encapsulate Metaprogramming Logic:**
+        Isolate dynamic code in dedicated modules or classes to reduce coupling.\\n\\n###
+        Best Practices\\n\\n- **Use `respond_to_missing?` with `method_missing`:**
+        Ensure objects accurately report their capabilities.\\n- **Prefer `define_method`
+        over `class_eval` for method definition:** Safer and less error-prone.\\n-
+        **Avoid String Evaluation:** Prefer block forms of `class_eval` and `instance_eval`
+        to reduce security risks.\\n\\n---\\n\\nBy following these guidelines, Ruby
+        developers can harness the power of metaprogramming while maintaining code
+        quality, readability, and maintainability.\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_ac00b0000c\",\"usage\":{\"prompt_tokens\":274,\"completion_tokens\":1394,\"total_tokens\":1668,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:11:22 GMT
+recorded_with: VCR 6.3.1
