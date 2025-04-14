@@ -2,7 +2,9 @@ class AgentActivitiesController < ApplicationController
   before_action :set_agent_activity, only: [:show, :pause, :resume]
   
   def show
-    # Show details of a specific agent activity
+    # Load related data for the agent activity
+    @llm_calls = @agent_activity.llm_calls.order(created_at: :desc)
+    @events = @agent_activity.events.order(created_at: :desc)
   end
   
   def pause

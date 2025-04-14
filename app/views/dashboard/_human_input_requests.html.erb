@@ -1,17 +1,25 @@
 <% if human_input_requests.any? %>
   <% human_input_requests.each do |request| %>
     <div id="<%= dom_id(request) %>" class="dashboard-card input-request-card <%= request.required ? 'required' : 'optional' %>">
-      <h3><%= truncate(request.question, length: 50) %></h3>
-      <div class="card-details">
+      <div class="flex justify-between items-start">
+        <h3 class="text-lg font-medium"><%= truncate(request.question, length: 50) %></h3>
+        <span class="inline-block px-2 py-1 text-xs font-semibold rounded-full <%= request.required ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800' %>">
+          <%= request.required ? 'Required' : 'Optional' %>
+        </span>
+      </div>
+      <div class="card-details mt-2">
         <p><strong>Task:</strong> <%= request.task.title %></p>
-        <p><strong>Type:</strong> <%= request.required ? 'Required' : 'Optional' %></p>
         <p><strong>Requested:</strong> <%= time_ago_in_words(request.created_at) %> ago</p>
         <% if request.expires_at.present? %>
-          <p><strong>Expires:</strong> <%= distance_of_time_in_words(Time.now, request.expires_at) %></p>
+          <% if request.expires_at > Time.now %>
+            <p><strong>Expires:</strong> <span class="text-orange-600"><%= distance_of_time_in_words(Time.now, request.expires_at) %></span></p>
+          <% else %>
+            <p><strong>Expired:</strong> <span class="text-red-600"><%= time_ago_in_words(request.expires_at) %> ago</span></p>
+          <% end %>
         <% end %>
       </div>
-      <div class="card-actions">
-        <%= link_to "Respond", respond_human_input_request_path(request), class: "button", data: { turbo_frame: "modal" } %>
+      <div class="card-actions mt-3 flex justify-end">
+        <%= link_to "Respond", respond_human_input_request_path(request), class: "button button-primary", data: { turbo_frame: "modal" } %>
       </div>
     </div>
   <% end %>

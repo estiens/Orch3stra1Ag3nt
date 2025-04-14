@@ -2,8 +2,11 @@
 .main-header {
   background-color: #1a237e;
   color: white;
-  padding: 12px 0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 14px 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .header-container {
@@ -16,13 +19,21 @@
 }
 
 .logo {
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   font-weight: bold;
 }
 
 .logo a {
   color: white;
   text-decoration: none;
+  display: flex;
+  align-items: center;
+}
+
+.logo a:before {
+  content: "🤖";
+  margin-right: 8px;
+  font-size: 1.4rem;
 }
 
 .main-nav {
@@ -33,31 +44,51 @@
 .main-nav a {
   color: white;
   text-decoration: none;
-  padding: 5px 10px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
+  padding: 8px 14px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  font-weight: 500;
 }
 
 .main-nav a:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.main-nav a.active {
+  background-color: rgba(255, 255, 255, 0.2);
 }
 
 /* Flash Messages */
 .flash {
-  padding: 12px 20px;
-  margin: 10px 0;
-  border-radius: 4px;
+  padding: 14px 20px;
+  margin: 15px auto;
+  border-radius: 8px;
   text-align: center;
+  max-width: 1200px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  animation: flashAppear 0.3s ease-out;
+}
+
+@keyframes flashAppear {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .flash-notice {
   background-color: #e3f2fd;
   color: #0d47a1;
-  border: 1px solid #bbdefb;
+  border-left: 4px solid #2196f3;
 }
 
 .flash-alert {
   background-color: #ffebee;
   color: #b71c1c;
-  border: 1px solid #ffcdd2;
+  border-left: 4px solid #f44336;
 }

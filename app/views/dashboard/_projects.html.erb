@@ -1,21 +1,31 @@
 <% projects.each do |project| %>
   <div id="<%= dom_id(project) %>" class="dashboard-card project-card <%= project.status %>">
-    <h3><%= project.name %></h3>
-    <div class="card-details">
-      <p><strong>Status:</strong> <%= status_badge(project.status) %></p>
+    <div class="flex justify-between items-start">
+      <h3 class="text-lg font-medium">
+        <%= link_to project.name, project_path(project), class: "hover:text-blue-600 hover:underline" %>
+      </h3>
+      <%= status_badge(project.status) %>
+    </div>
+    <div class="card-details mt-2">
       <p><strong>Tasks:</strong> <%= project.tasks.count %></p>
       <p><strong>Created:</strong> <%= time_ago_in_words(project.created_at) %> ago</p>
-    </div>
-    <div class="card-actions">
-      <%= link_to "View", project_path(project), class: "button" %>
-      
-      <% if project.status == "pending" %>
-        <%= button_to "Kickoff", kickoff_project_path(project), method: :post, class: "button button-success" %>
-      <% elsif project.status == "active" %>
-        <%= button_to "Pause", pause_project_path(project), method: :post, class: "button button-warning" %>
-      <% elsif project.status == "paused" %>
-        <%= button_to "Resume", resume_project_path(project), method: :post, class: "button button-success" %>
+      <% if project.description.present? %>
+        <p class="mt-2 text-gray-600 line-clamp-2"><%= project.description %></p>
       <% end %>
+    </div>
+    <div class="card-actions mt-3 flex justify-between items-center">
+      <div>
+        <%= link_to "View Details", project_path(project), class: "text-blue-600 text-sm hover:underline" %>
+      </div>
+      <div>
+        <% if project.status == "pending" %>
+          <%= button_to "Kickoff", kickoff_project_path(project), method: :post, class: "button button-success" %>
+        <% elsif project.status == "active" %>
+          <%= button_to "Pause", pause_project_path(project), method: :post, class: "button button-warning" %>
+        <% elsif project.status == "paused" %>
+          <%= button_to "Resume", resume_project_path(project), method: :post, class: "button button-success" %>
+        <% end %>
+      </div>
     </div>
   </div>
 <% end %>

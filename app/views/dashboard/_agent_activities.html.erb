@@ -1,20 +1,32 @@
 <% agent_activities.each do |activity| %>
   <div id="<%= dom_id(activity) %>" class="dashboard-card activity-card <%= activity.status %>">
-    <h3><%= activity.agent_type %></h3>
-    <div class="card-details">
-      <p><strong>Status:</strong> <%= status_badge(activity.status) %></p>
+    <div class="flex justify-between items-start">
+      <h3 class="text-lg font-medium">
+        <%= link_to activity.agent_type, agent_activity_path(activity), class: "hover:text-blue-600 hover:underline" %>
+      </h3>
+      <%= status_badge(activity.status) %>
+    </div>
+    <div class="card-details mt-2">
       <p><strong>Task:</strong> <%= activity.task&.title || "N/A" %></p>
       <p><strong>Started:</strong> <%= time_ago_in_words(activity.created_at) %> ago</p>
       <% if activity.completed_at %>
         <p><strong>Duration:</strong> <%= distance_of_time_in_words(activity.created_at, activity.completed_at) %></p>
       <% end %>
-    </div>
-    <div class="card-actions">
-      <% if activity.status == "running" %>
-        <%= button_to "Pause", pause_agent_activity_path(activity), method: :post, class: "button button-warning" %>
-      <% elsif activity.status == "paused" %>
-        <%= button_to "Resume", resume_agent_activity_path(activity), method: :post, class: "button button-success" %>
+      <% if activity.llm_calls.any? %>
+        <p><strong>LLM Calls:</strong> <%= activity.llm_calls.count %></p>
       <% end %>
+    </div>
+    <div class="card-actions mt-3 flex justify-between items-center">
+      <div>
+        <%= link_to "Details", agent_activity_path(activity), class: "text-blue-600 text-sm hover:underline" %>
+      </div>
+      <div>
+        <% if activity.status == "running" %>
+          <%= button_to "Pause", pause_agent_activity_path(activity), method: :post, class: "button button-warning" %>
+        <% elsif activity.status == "paused" %>
+          <%= button_to "Resume", resume_agent_activity_path(activity), method: :post, class: "button button-success" %>
+        <% end %>
+      </div>
     </div>
   </div>
 <% end %>

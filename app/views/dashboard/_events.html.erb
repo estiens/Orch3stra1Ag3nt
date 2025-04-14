@@ -1,9 +1,18 @@
 <% events.each do |event| %>
   <div id="<%= dom_id(event) %>" class="dashboard-card event-card <%= event.event_type.parameterize %>">
-    <h3><%= event.event_type %></h3>
-    <div class="card-details">
-      <p><strong>Agent:</strong> <%= event.agent_activity&.agent_type || "N/A" %></p>
-      <p><strong>Time:</strong> <%= time_ago_in_words(event.created_at) %> ago</p>
+    <div class="flex justify-between items-start">
+      <h3 class="text-lg font-medium"><%= event.event_type %></h3>
+      <span class="text-xs text-gray-500"><%= time_ago_in_words(event.created_at) %> ago</span>
+    </div>
+    <div class="card-details mt-2">
+      <p><strong>Agent:</strong> 
+        <% if event.agent_activity %>
+          <%= link_to event.agent_activity.agent_type, agent_activity_path(event.agent_activity), class: "text-blue-600 hover:underline" %>
+        <% else %>
+          N/A
+        <% end %>
+      </p>
+      
       <% if event.data.present? && event.data.is_a?(Hash) %>
         <div class="event-data">
           <% if event.data["tool_name"].present? %>
@@ -15,5 +24,24 @@
         </div>
       <% end %>
     </div>
+    
+    <% if event.data.present? && event.data.is_a?(Hash) && !event.data.empty? %>
+      <div class="mt-3">
+        <button class="text-blue-600 text-sm flex items-center" 
+                data-controller="collapsible"
+                data-action="click->collapsible#toggle" 
+                data-collapsible-target="trigger"
+                data-id="event-details-<%= event.id %>">
+          <span>View Details</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        
+        <div id="event-details-<%= event.id %>" class="hidden mt-3 bg-gray-50 p-3 rounded text-sm">
+          <pre class="whitespace-pre-wrap bg-white p-2 rounded border border-gray-200 max-h-40 overflow-y-auto"><%= JSON.pretty_generate(event.data) %></pre>
+        </div>
+      </div>
+    <% end %>
   </div>
 <% end %>
