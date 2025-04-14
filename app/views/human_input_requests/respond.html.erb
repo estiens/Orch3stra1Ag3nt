@@ -1,0 +1,27 @@
+<div class="modal-content">
+  <h2>Respond to Input Request</h2>
+  
+  <div class="input-request-details">
+    <p><strong>Question:</strong> <%= @human_input_request.question %></p>
+    <p><strong>Task:</strong> <%= @human_input_request.task.title %></p>
+    <p><strong>Type:</strong> <%= @human_input_request.required ? 'Required' : 'Optional' %></p>
+    <% if @human_input_request.expires_at.present? %>
+      <p><strong>Expires:</strong> <%= distance_of_time_in_words(Time.now, @human_input_request.expires_at) %></p>
+    <% end %>
+  </div>
+  
+  <%= form_with url: submit_response_human_input_request_path(@human_input_request), method: :post do |form| %>
+    <div class="form-group">
+      <%= form.label :response, "Your Response" %>
+      <%= form.text_area :response, rows: 5, class: "form-control" %>
+    </div>
+    
+    <div class="form-actions">
+      <%= form.submit "Submit Response", class: "button button-primary" %>
+      <% if !@human_input_request.required %>
+        <%= button_to "Ignore", ignore_human_input_request_path(@human_input_request), method: :post, class: "button button-warning" %>
+      <% end %>
+      <%= link_to "Cancel", "#", class: "button", data: { action: "click->modal#close" } %>
+    </div>
+  <% end %>
+</div>

@@ -1,0 +1,11 @@
+<% llm_calls.each do |llm_call| %>
+  <div id="<%= dom_id(llm_call) %>" class="dashboard-card llm-call-card">
+    <h3><%= llm_call.model || "Unknown Model" %></h3>
+    <div class="card-details">
+      <p><strong>Provider:</strong> <%= llm_call.provider || "Unknown" %></p>
+      <p><strong>Agent:</strong> <%= llm_call.agent_activity&.agent_type || "N/A" %></p>
+      <p><strong>Tokens:</strong> <%= llm_call.tokens_used || 0 %></p>
+      <p><strong>Time:</strong> <%= time_ago_in_words(llm_call.created_at) %> ago</p>
+    </div>
+  </div>
+<% end %>

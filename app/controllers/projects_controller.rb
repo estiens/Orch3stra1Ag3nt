@@ -1,5 +1,5 @@
 class ProjectsController < ApplicationController
-  before_action :set_project, only: [ :show, :edit, :update, :destroy, :kickoff ]
+  before_action :set_project, only: [ :show, :edit, :update, :destroy, :kickoff, :pause, :resume ]
 
   # GET /projects
   def index
@@ -68,6 +68,36 @@ class ProjectsController < ApplicationController
   end
 
   private
+
+  # POST /projects/1/pause
+  def pause
+    if @project.pause!
+      respond_to do |format|
+        format.html { redirect_back(fallback_location: dashboard_path, notice: "Project paused successfully.") }
+        format.turbo_stream { flash.now[:notice] = "Project paused successfully." }
+      end
+    else
+      respond_to do |format|
+        format.html { redirect_back(fallback_location: dashboard_path, alert: "Could not pause project.") }
+        format.turbo_stream { flash.now[:alert] = "Could not pause project." }
+      end
+    end
+  end
+  
+  # POST /projects/1/resume
+  def resume
+    if @project.resume!
+      respond_to do |format|
+        format.html { redirect_back(fallback_location: dashboard_path, notice: "Project resumed successfully.") }
+        format.turbo_stream { flash.now[:notice] = "Project resumed successfully." }
+      end
+    else
+      respond_to do |format|
+        format.html { redirect_back(fallback_location: dashboard_path, alert: "Could not resume project.") }
+        format.turbo_stream { flash.now[:alert] = "Could not resume project." }
+      end
+    end
+  end
 
   def set_project
     @project = Project.find(params[:id])

@@ -1,0 +1,22 @@
+<% if human_input_requests.any? %>
+  <% human_input_requests.each do |request| %>
+    <div id="<%= dom_id(request) %>" class="dashboard-card input-request-card <%= request.required ? 'required' : 'optional' %>">
+      <h3><%= truncate(request.question, length: 50) %></h3>
+      <div class="card-details">
+        <p><strong>Task:</strong> <%= request.task.title %></p>
+        <p><strong>Type:</strong> <%= request.required ? 'Required' : 'Optional' %></p>
+        <p><strong>Requested:</strong> <%= time_ago_in_words(request.created_at) %> ago</p>
+        <% if request.expires_at.present? %>
+          <p><strong>Expires:</strong> <%= distance_of_time_in_words(Time.now, request.expires_at) %></p>
+        <% end %>
+      </div>
+      <div class="card-actions">
+        <%= link_to "Respond", respond_human_input_request_path(request), class: "button", data: { turbo_frame: "modal" } %>
+      </div>
+    </div>
+  <% end %>
+<% else %>
+  <div class="empty-state">
+    <p>No pending input requests</p>
+  </div>
+<% end %>

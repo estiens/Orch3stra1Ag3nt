@@ -23,8 +23,34 @@
   </head>
 
   <body>
+    <header class="main-header">
+      <div class="header-container">
+        <div class="logo">
+          <%= link_to "AI Agent System", root_path %>
+        </div>
+        <nav class="main-nav">
+          <%= link_to "Dashboard", dashboard_path %>
+          <%= link_to "Projects", projects_path %>
+          <% if defined?(admin_path) %>
+            <%= link_to "Admin", admin_path %>
+          <% end %>
+        </nav>
+      </div>
+    </header>
+
+    <% if notice %>
+      <div class="flash flash-notice"><%= notice %></div>
+    <% end %>
+    <% if alert %>
+      <div class="flash flash-alert"><%= alert %></div>
+    <% end %>
+
     <main class="container mx-auto mt-28 px-5 flex">
       <%= yield %>
     </main>
+
+    <div id="modal" class="modal" data-controller="modal" data-action="click->modal#closeBackground">
+      <%= yield :modal %>
+    </div>
   </body>
 </html>
