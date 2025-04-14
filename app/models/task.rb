@@ -31,12 +31,17 @@ class Task < ApplicationRecord
   aasm column: "state" do
     state :pending, initial: true
     state :active
+    state :paused
     state :waiting_on_human
     state :completed
     state :failed
 
     event :activate do
-      transitions from: :pending, to: :active
+      transitions from: [:pending, :paused], to: :active
+    end
+    
+    event :pause do
+      transitions from: :active, to: :paused
     end
 
     event :wait_on_human do
@@ -44,11 +49,11 @@ class Task < ApplicationRecord
     end
 
     event :complete do
-      transitions from: [ :active, :waiting_on_human ], to: :completed
+      transitions from: [:active, :waiting_on_human, :paused], to: :completed
     end
 
     event :fail do
-      transitions from: [ :pending, :active, :waiting_on_human ], to: :failed
+      transitions from: [:pending, :active, :waiting_on_human, :paused], to: :failed
     end
   end
 

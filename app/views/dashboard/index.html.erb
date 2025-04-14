@@ -1,6 +1,11 @@
 <div class="dashboard-container">
   <h1>Agent System Dashboard</h1>
   
+  <div class="dashboard-actions">
+    <%= link_to "New Project", new_project_path, class: "button button-primary" %>
+    <%= link_to "Projects", projects_path, class: "button" %>
+  </div>
+  
   <div class="dashboard-grid">
     <!-- Projects Section -->
     <div class="dashboard-section">
@@ -18,6 +23,14 @@
       </div>
     </div>
     
+    <!-- LLM Calls Section -->
+    <div class="dashboard-section">
+      <h2>Recent LLM Calls</h2>
+      <div id="llm-calls-container" class="card-container">
+        <%= render partial: "llm_calls", locals: { llm_calls: @llm_calls } %>
+      </div>
+    </div>
+    
     <!-- Events Section -->
     <div class="dashboard-section">
       <h2>Latest Events</h2>
@@ -25,10 +38,21 @@
         <%= render partial: "events", locals: { events: @events } %>
       </div>
     </div>
+    
+    <!-- Human Input Requests Section -->
+    <div class="dashboard-section">
+      <h2>Pending Human Input</h2>
+      <div id="human-input-requests-container" class="card-container">
+        <%= render partial: "human_input_requests", locals: { human_input_requests: @human_input_requests } %>
+      </div>
+    </div>
   </div>
 </div>
 
 <%= turbo_stream_from "dashboard" %>
+
+<!-- Turbo frame for modal dialogs -->
+<%= turbo_frame_tag "modal" %>
 
 <div data-controller="dashboard-refresh" 
      data-dashboard-refresh-interval-value="5000"

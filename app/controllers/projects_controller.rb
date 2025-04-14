@@ -71,7 +71,8 @@ class ProjectsController < ApplicationController
 
   # POST /projects/1/pause
   def pause
-    if @project.pause!
+    if @project.status == "active"
+      @project.update(status: "paused")
       respond_to do |format|
         format.html { redirect_back(fallback_location: dashboard_path, notice: "Project paused successfully.") }
         format.turbo_stream { flash.now[:notice] = "Project paused successfully." }
@@ -86,7 +87,8 @@ class ProjectsController < ApplicationController
   
   # POST /projects/1/resume
   def resume
-    if @project.resume!
+    if @project.status == "paused"
+      @project.update(status: "active")
       respond_to do |format|
         format.html { redirect_back(fallback_location: dashboard_path, notice: "Project resumed successfully.") }
         format.turbo_stream { flash.now[:notice] = "Project resumed successfully." }

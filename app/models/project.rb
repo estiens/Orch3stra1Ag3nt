@@ -88,6 +88,51 @@ class Project < ApplicationRecord
       metadata: metadata
     )
   end
+  
+  # Pause this project and all its active tasks
+  def pause!
+    return false if status == "paused"
+    
+    # Update project status
+    update(status: "paused")
+    
+    # Pause all active tasks
+    tasks.where(state: "active").each do |task|
+      task.update(state: "paused") if task.respond_to?(:state)
+    end
+    
+    # Publish event
+    Event.publish(
+      "project_paused",
+      {
+        project_id: id,
+        project_name: name
+      },
+      {}
+    ) if defined?(Event)
+    
+    true
+  end
+  
+  # Resume this project
+  def resume!
+    return false unless status == "paused"
+    
+    # Update project status
+    update(status: "active")
+    
+    # Publish event
+    Event.publish(
+      "project_resumed",
+      {
+        project_id: id,
+        project_name: name
+      },
+      {}
+    ) if defined?(Event)
+    
+    true
+  end
 
   private
 

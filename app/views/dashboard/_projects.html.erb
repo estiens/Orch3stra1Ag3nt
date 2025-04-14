@@ -1,13 +1,21 @@
 <% projects.each do |project| %>
-  <div id="<%= dom_id(project) %>" class="dashboard-card project-card">
-    <h3><%= project.title %></h3>
+  <div id="<%= dom_id(project) %>" class="dashboard-card project-card <%= project.status %>">
+    <h3><%= project.name %></h3>
     <div class="card-details">
-      <p><strong>Status:</strong> <%= project.status %></p>
+      <p><strong>Status:</strong> <%= status_badge(project.status) if defined?(status_badge) %><%= project.status unless defined?(status_badge) %></p>
       <p><strong>Tasks:</strong> <%= project.tasks.count %></p>
       <p><strong>Created:</strong> <%= time_ago_in_words(project.created_at) %> ago</p>
     </div>
     <div class="card-actions">
       <%= link_to "View", project_path(project), class: "button" %>
+      
+      <% if project.status == "pending" %>
+        <%= button_to "Kickoff", kickoff_project_path(project), method: :post, class: "button button-success" %>
+      <% elsif project.status == "active" %>
+        <%= button_to "Pause", pause_project_path(project), method: :post, class: "button button-warning" %>
+      <% elsif project.status == "paused" %>
+        <%= button_to "Resume", resume_project_path(project), method: :post, class: "button button-success" %>
+      <% end %>
     </div>
   </div>
 <% end %>

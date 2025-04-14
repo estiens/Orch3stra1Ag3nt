@@ -16,6 +16,25 @@ Rails.application.routes.draw do
   resources :projects do
     member do
       post :kickoff
+      post :pause
+      post :resume
+    end
+  end
+  
+  # Agent activities management
+  resources :agent_activities, only: [:show] do
+    member do
+      post :pause
+      post :resume
+    end
+  end
+  
+  # Human input requests
+  resources :human_input_requests, only: [:show] do
+    member do
+      get :respond
+      post :submit_response
+      post :ignore
     end
   end
 

@@ -28,6 +28,42 @@ class AgentActivity < ApplicationRecord
     )
   end
   
+  # Pause this agent activity
+  def pause!
+    return false if status == "paused"
+    
+    update(status: "paused")
+    
+    # Publish event for agent paused
+    publish_event(
+      "agent_paused",
+      {
+        task_id: task_id,
+        agent_type: agent_type
+      }
+    )
+    
+    true
+  end
+  
+  # Resume this agent activity
+  def resume!
+    return false unless status == "paused"
+    
+    update(status: "running")
+    
+    # Publish event for agent resumed
+    publish_event(
+      "agent_resumed",
+      {
+        task_id: task_id,
+        agent_type: agent_type
+      }
+    )
+    
+    true
+  end
+  
   # Helper to create events with proper context
   def create_event(event_type, data = {})
     events.create!(

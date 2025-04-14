@@ -9,3 +9,11 @@
 <%= turbo_stream.replace "events-container" do %>
   <%= render partial: "events", locals: { events: @events } %>
 <% end %>
+
+<%= turbo_stream.replace "llm-calls-container" do %>
+  <%= render partial: "llm_calls", locals: { llm_calls: @llm_calls } %>
+<% end %>
+
+<%= turbo_stream.replace "human-input-requests-container" do %>
+  <%= render partial: "human_input_requests", locals: { human_input_requests: @human_input_requests } %>
+<% end %>

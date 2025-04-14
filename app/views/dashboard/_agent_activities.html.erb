@@ -2,11 +2,18 @@
   <div id="<%= dom_id(activity) %>" class="dashboard-card activity-card <%= activity.status %>">
     <h3><%= activity.agent_type %></h3>
     <div class="card-details">
-      <p><strong>Status:</strong> <%= activity.status %></p>
+      <p><strong>Status:</strong> <%= status_badge(activity.status) if defined?(status_badge) %><%= activity.status unless defined?(status_badge) %></p>
       <p><strong>Task:</strong> <%= activity.task&.title || "N/A" %></p>
       <p><strong>Started:</strong> <%= time_ago_in_words(activity.created_at) %> ago</p>
       <% if activity.completed_at %>
         <p><strong>Duration:</strong> <%= distance_of_time_in_words(activity.created_at, activity.completed_at) %></p>
+      <% end %>
+    </div>
+    <div class="card-actions">
+      <% if activity.status == "running" %>
+        <%= button_to "Pause", pause_agent_activity_path(activity), method: :post, class: "button button-warning" %>
+      <% elsif activity.status == "paused" %>
+        <%= button_to "Resume", resume_agent_activity_path(activity), method: :post, class: "button button-success" %>
       <% end %>
     </div>
   </div>
