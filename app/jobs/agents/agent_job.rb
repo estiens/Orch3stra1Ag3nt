@@ -4,9 +4,9 @@ class Agents::AgentJob < ApplicationJob
   # Queue as agents by default, but allow override
   queue_as :agents
 
-  # Arguments: agent_class (Regent::Agent subclass), run_args (for agent), options (hash)
+  # Arguments: agent_class (BaseAgent subclass), run_args (for agent), options (hash)
   # Example: perform(OrchestratorAgent, { task_id: 123 }, { model: :thinking })
-  # agent_prompt should be a String or an array of hashes, as per Regent agent.run.
+  # agent_prompt should be a String or an array of hashes, as per agent.run.
   def perform(agent_class, agent_prompt = nil, options = {})
     # Extract task_id from options
     task_id = options[:task_id]
@@ -17,8 +17,10 @@ class Agents::AgentJob < ApplicationJob
 
     # Accept agent_class as String or constant
     agent_klass = agent_class.is_a?(String) ? agent_class.constantize : agent_class
-    unless agent_klass < Regent::Agent
-      raise ArgumentError, "agent_class must inherit from Regent::Agent"
+
+    # Validate agent class is a BaseAgent subclass
+    unless agent_klass <= BaseAgent
+      raise ArgumentError, "agent_class must inherit from BaseAgent"
     end
 
     # NOTE: To use per-agent queueing, enqueue with set(queue: agent_class.queue_name)

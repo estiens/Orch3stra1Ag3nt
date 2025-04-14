@@ -1,65 +1,29 @@
 require "httparty"
 require "json"
 
-class PerplexitySearchTool < BaseTool
-  def initialize
-    super("perplexity_search", "Search the web using Perplexity AI")
+# PerplexitySearchTool: Provides perplexity search capabilities
+class PerplexitySearchTool
+  extend Langchain::ToolDefinition
+
+  define_function :search, description: "Search the web using Perplexity AI" do
+    property :query, type: "string", description: "The search query", required: true
+    property :focus, type: "string", description: "Search focus (web, academic, news, writing)", required: false
   end
-  
-  def call(args)
-    query = args.is_a?(Hash) ? args[:query] : args
-    focus = args.is_a?(Hash) ? args[:focus] || "web" : "web"
+
+  def initialize
+    @api_key = ENV.fetch("PERPLEXITY_API_KEY", nil)
+    raise "PERPLEXITY_API_KEY is not set cannot use PerplexitySearchTool" unless @api_key
+  end
+
+  def search(query:, focus: "web")
+    @query = query
+    @focus = validate_focus(focus)
+
     begin
-      # Validate the API key
-      api_key = ENV["PERPLEXITY_API_KEY"]
-      unless api_key
-        return { error: "PERPLEXITY_API_KEY environment variable is not set" }
-      end
-
-      # Validate the query
-      if query.to_s.strip.empty?
-        return { error: "Search query cannot be empty" }
-      end
-
-      # Validate and normalize focus
-      valid_focuses = %w[web academic news writing]
-      focus = focus.to_s.downcase
-      unless valid_focuses.include?(focus)
-        focus = "web"
-      end
-
-      # Setup API endpoint and headers
-      url = "https://api.perplexity.ai/chat/completions"
-      headers = {
-        "Authorization" => "Bearer #{api_key}",
-        "Content-Type" => "application/json"
-      }
-
-      # Prepare the request body
-      body = {
-        model: "sonar-medium-online",
-        messages: [
-          {
-            role: "system",
-            content: "You are a helpful research assistant. Please search the web and provide comprehensive, accurate information."
-          },
-          {
-            role: "user",
-            content: query
-          }
-        ],
-        max_tokens: 1024,
-        temperature: 0.2,
-        options: {
-          search_focus: focus
-        }
-      }
-
-      # Make the API request
       response = HTTParty.post(
-        url,
+        base_url,
         headers: headers,
-        body: body.to_json,
+        body: request_body.to_json,
         timeout: 30
       )
 
@@ -69,9 +33,9 @@ class PerplexitySearchTool < BaseTool
 
         # Format the response
         result = {
-          query: query,
+          query: @query,
           response: data["choices"][0]["message"]["content"],
-          focus: focus
+          focus: @focus
         }
 
         # Add citation information if available
@@ -103,5 +67,50 @@ class PerplexitySearchTool < BaseTool
     rescue => e
       { error: "Error executing Perplexity search: #{e.message}" }
     end
+  end
+
+  private
+
+  def validate_focus(focus)
+    valid_focuses = %w[web academic news writing]
+
+    focus = focus.to_s.downcase
+    unless valid_focuses.include?(focus)
+      Rails.logger.warn("Invalid focus: #{focus}. Defaulting to 'web'.")
+      focus = "web"
+    end
+    focus
+  end
+
+  def base_url
+    "https://api.perplexity.ai/chat/completions"
+  end
+
+  def headers
+    {
+      "Authorization" => "Bearer #{@api_key}",
+      "Content-Type" => "application/json"
+    }
+  end
+
+  def request_body
+    {
+      model: "sonar-medium-online",
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful research assistant. Please search the web and provide comprehensive, accurate information."
+        },
+        {
+          role: "user",
+          content: @query
+        }
+      ],
+      max_tokens: 1024,
+      temperature: 0.2,
+      options: {
+        search_focus: @focus
+      }
+    }
   end
 end

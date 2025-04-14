@@ -11,280 +11,267 @@ class WebResearcherAgent < BaseAgent
     3
   end
 
-  # Tools that the web researcher can use
-  tool :search_web, "Search the web for information on a topic"
-  tool :search_with_perplexity, "Search the web using Perplexity for AI-enhanced results"
-  tool :browse_url, "Browse a specific URL to gather information"
-  tool :scrape_webpage, "Scrape and extract content from a webpage"
-  tool :semantic_memory, "Store and retrieve information using vector embeddings"
-  tool :take_notes, "Record important information discovered during research"
-  tool :compile_findings, "Compile research notes into structured findings"
+  # --- Tools ---
+  # Consider registering external tool objects (SerpApiSearchTool, etc.) via custom_tool_objects
+  # or passing them during initialization instead of creating them inside methods.
 
-  # Tool implementation: Search the web
+  tool :search_web, "Search the web for information on a topic" do |query|
+    search_web(query)
+  end
+
+  tool :search_with_perplexity, "Search the web using Perplexity for AI-enhanced results" do |query, focus = "web"|
+    search_with_perplexity(query, focus)
+  end
+
+  tool :browse_url, "Browse a specific URL to gather text content" do |url|
+    browse_url(url)
+  end
+
+  tool :scrape_webpage, "Scrape and extract specific content (text, links) from a webpage" do |url, selector = nil, extract_type = "text"|
+    scrape_webpage(url, selector, extract_type)
+  end
+
+  # Placeholder for Vector DB tool
+  tool :semantic_memory, "Store and retrieve information using vector embeddings (Not Implemented)" do |query|
+    "Vector DB search/retrieval not implemented yet."
+  end
+
+  tool :take_notes, "Record important information discovered during research" do |note|
+    take_notes(note)
+  end
+
+  tool :compile_findings, "Compile research notes into structured findings" do
+    compile_findings
+  end
+  # --- End Tools ---
+
+  # --- Core Logic ---
+  def run(input = nil) # Input should be the research topic/question
+    before_run(input)
+    research_topic = input || task&.title || "Unknown topic"
+
+    unless task
+      Rails.logger.warn "[WebResearcherAgent] Running without an associated task record."
+    end
+
+    result_message = "Web research run completed for: #{research_topic}"
+    begin
+      Rails.logger.info "[WebResearcherAgent-#{task&.id || 'no-task'}] Starting research for: #{research_topic}"
+
+      # Step 1: Initial Search (using Perplexity first, then maybe standard web)
+      search_results_text = execute_tool(:search_with_perplexity, query: research_topic)
+      execute_tool(:take_notes, "Initial Perplexity Search Results:\n#{search_results_text}")
+
+      # TODO: Parse search results to find promising URLs/Snippets
+      # Placeholder: Just try browsing the first URL if found
+      first_url = search_results_text.match(/URL:\s*(https?\S+)/i)&.[](1)
+
+      if first_url
+         # Step 2: Browse/Scrape promising source
+         Rails.logger.info "[WebResearcherAgent-#{task&.id || 'no-task'}] Browsing first URL: #{first_url}"
+         browsed_content = execute_tool(:browse_url, first_url)
+         execute_tool(:take_notes, "Content from #{first_url}:\n#{browsed_content.truncate(1000)}")
+      else
+         Rails.logger.info "[WebResearcherAgent-#{task&.id || 'no-task'}] No URL found in initial search results to browse."
+      end
+
+      # Step 3: Compile findings based on notes
+      Rails.logger.info "[WebResearcherAgent-#{task&.id || 'no-task'}] Compiling findings..."
+      final_findings = execute_tool(:compile_findings)
+      result_message = final_findings # The compiled findings are the main result
+
+    rescue => e
+      handle_run_error(e)
+      raise # Re-raise after handling
+    end
+
+    @session_data[:output] = result_message
+    after_run(result_message)
+    result_message
+  end
+  # --- End Core Logic ---
+
+  # --- Tool Implementations ---
   def search_web(query)
     # Use our SerpApiSearchTool for web search
-    search_tool = SerpApiSearchTool.new
+    search_tool = SerpApiSearchTool.new # Consider dependency injection
     search_results = search_tool.call(query: query, num_results: 5, include_snippets: true)
 
-    # Check for errors
     if search_results[:error]
       return "Search error: #{search_results[:error]}"
     end
 
-    # Format the results for the agent
+    # Format the results
     formatted_results = "Search results for: #{query}\n\n"
-
     search_results[:results].each_with_index do |result, index|
-      formatted_results += "#{index + 1}. #{result[:title]}\n"
-      formatted_results += "   URL: #{result[:link]}\n"
-      formatted_results += "   #{result[:snippet]}\n\n" if result[:snippet]
+      formatted_results += "#{index + 1}. #{result[:title]}\n   URL: #{result[:link]}\n   #{result[:snippet]}\n\n" if result[:snippet]
     end
+    formatted_results += "Total results: approx #{search_results[:total_results_count]}. Search time: #{search_results[:search_time]}\n"
 
-    # Add search metadata
-    formatted_results += "Total results: approximately #{search_results[:total_results_count]}\n"
-    formatted_results += "Search time: #{search_results[:search_time]}"
-
-    # Record this as an event
-    if agent_activity
-      agent_activity.events.create!(
-        event_type: "web_search_performed",
-        data: {
-          query: query,
-          num_results: search_results[:results].count
-        }
-      )
-    end
+    # Logging handled by AgentActivityCallbackHandler
 
     formatted_results
+  rescue => e
+    Rails.logger.error "[WebResearcherAgent] Error in search_web: #{e.message}"
+    "Error performing web search: #{e.message}"
   end
 
-  # Tool implementation: Search with Perplexity
   def search_with_perplexity(query, focus = "web")
-    # Use our PerplexitySearchTool for AI-enhanced search
-    search_tool = PerplexitySearchTool.new
+    search_tool = PerplexitySearchTool.new # Consider dependency injection
     search_results = search_tool.call(query: query, focus: focus)
 
-    # Check for errors
     if search_results[:error]
       return "Perplexity search error: #{search_results[:error]}"
     end
 
     # Format the response
-    formatted_results = "Perplexity search results for: #{query}\n\n"
-    formatted_results += "#{search_results[:response]}\n\n"
-
-    # Add citations if available
+    formatted_results = "Perplexity search results for: #{query}\n\n#{search_results[:response]}\n\n"
     if search_results[:citations]
       formatted_results += "Sources:\n"
       search_results[:citations].each_with_index do |citation, index|
-        formatted_results += "#{index + 1}. #{citation[:title]}\n"
-        formatted_results += "   URL: #{citation[:url]}\n\n"
+        formatted_results += "#{index + 1}. #{citation[:title]} - URL: #{citation[:url]}\n"
       end
     end
 
-    # Record this as an event
-    if agent_activity
-      agent_activity.events.create!(
-        event_type: "perplexity_search_performed",
-        data: {
-          query: query,
-          focus: focus
-        }
-      )
-    end
+    # Logging handled by AgentActivityCallbackHandler
 
     formatted_results
+  rescue => e
+    Rails.logger.error "[WebResearcherAgent] Error in search_with_perplexity: #{e.message}"
+    "Error performing Perplexity search: #{e.message}"
   end
 
-  # Tool implementation: Browse a URL - now uses WebScraperTool
   def browse_url(url)
-    # Use WebScraperTool to get the content
-    scraper = WebScraperTool.new
+    scraper = WebScraperTool.new # Consider dependency injection
     result = scraper.call(url: url, extract_type: "text")
 
-    # Check for errors
     if result[:error]
-      return "Error browsing URL: #{result[:error]}"
+      return "Error browsing URL '#{url}': #{result[:error]}"
     end
 
-    # Format the response
-    response = "Title: #{result[:title]}\n"
-    response += "URL: #{url}\n\n"
+    content = result[:content].to_s
+    response = "Title: #{result[:title]}\nURL: #{url}\n\n"
+    response += content.truncate(5000, omission: "... (truncated, #{content.length} chars total)")
 
-    # Truncate content if too long
-    content = result[:content]
-    if content.length > 5000
-      response += content[0..5000] + "...\n\n[Content truncated due to length. Full length: #{content.length} characters]"
-    else
-      response += content
-    end
-
-    # Record this browsing activity
-    if agent_activity
-      agent_activity.events.create!(
-        event_type: "url_browsed",
-        data: {
-          url: url,
-          title: result[:title]
-        }
-      )
-    end
+    # Logging handled by AgentActivityCallbackHandler
 
     response
+  rescue => e
+    Rails.logger.error "[WebResearcherAgent] Error in browse_url for '#{url}': #{e.message}"
+    "Error browsing URL '#{url}': #{e.message}"
   end
 
-  # Tool implementation: Scrape webpage - uses WebScraperTool
   def scrape_webpage(url, selector = nil, extract_type = "text")
-    # Use WebScraperTool to scrape content
-    scraper = WebScraperTool.new
-    result = scraper.call(
-      url: url,
-      selector: selector,
-      extract_type: extract_type
-    )
+    scraper = WebScraperTool.new # Consider dependency injection
+    result = scraper.call(url: url, selector: selector, extract_type: extract_type)
 
-    # Check for errors
     if result[:error]
-      return "Error scraping webpage: #{result[:error]}"
+      return "Error scraping webpage '#{url}': #{result[:error]}"
     end
 
-    # Format the response based on extraction type
-    response = "Title: #{result[:title]}\n"
-    response += "URL: #{url}\n"
-    response += "Selector: #{selector || 'None'}\n"
-    response += "Extract type: #{extract_type}\n\n"
-
+    response = "Title: #{result[:title]}\nURL: #{url}\nSelector: #{selector || 'None'}\nExtract type: #{extract_type}\n\n"
     if extract_type == "links"
-      response += "Links found:\n"
-      result[:links].each_with_index do |link, index|
-        response += "#{index + 1}. #{link[:text] || '[No text]'} - #{link[:href]}\n"
-      end
+      response += "Links found:
+"
+      result[:links].each_with_index { |link, i| response += "#{i + 1}. #{link[:text] || '[No text]'} - #{link[:href]}\n" }
     else
-      # Handle text or HTML content
-      content = result[:content]
-      if content.length > 5000
-        response += content[0..5000] + "...\n\n[Content truncated due to length. Full length: #{content.length} characters]"
-      else
-        response += content
-      end
+      content = result[:content].to_s
+      response += content.truncate(5000, omission: "... (truncated, #{content.length} chars total)")
     end
 
-    # Record this scraping activity
-    if agent_activity
-      agent_activity.events.create!(
-        event_type: "webpage_scraped",
-        data: {
-          url: url,
-          selector: selector,
-          extract_type: extract_type
-        }
-      )
-    end
+    # Logging handled by AgentActivityCallbackHandler
 
     response
+  rescue => e
+    Rails.logger.error "[WebResearcherAgent] Error in scrape_webpage for '#{url}': #{e.message}"
+    "Error scraping webpage '#{url}': #{e.message}"
   end
 
-  # Tool implementation: Take research notes
   def take_notes(note)
-    return "Error: No task available to store notes" unless task
-
-    # Add this note to the task's metadata
-    current_notes = task.metadata&.dig("research_notes") || []
-    updated_notes = current_notes + [ note ]
-
-    # Update the task's metadata
-    task.update!(
-      metadata: (task.metadata || {}).merge({ "research_notes" => updated_notes })
-    )
-
-    # Record this note as an event
-    agent_activity.events.create!(
-      event_type: "research_note_added",
-      data: {
-        task_id: task.id,
-        note: note
-      }
-    )
-
-    "Research note recorded: #{note}"
-  end
-
-  # Tool implementation: Compile findings
-  def compile_findings
-    return "Error: No task available to compile findings" unless task
-
-    # Get all the notes we've collected
-    notes = task.metadata&.dig("research_notes") || []
-
-    if notes.empty?
-      return "No research notes found to compile. Use take_notes tool first."
+    unless task
+      return "Error: Cannot take notes - Agent not associated with a task."
     end
 
-    # Format the notes for the prompt
-    formatted_notes = notes.map.with_index { |note, i| "#{i+1}. #{note}" }.join("\n\n")
+    begin
+      # Use Rails' store accessor for cleaner metadata updates if possible, otherwise merge.
+      current_notes = task.metadata&.dig("research_notes") || []
+      updated_notes = current_notes + [ note ]
+      task.update!(metadata: (task.metadata || {}).merge({ "research_notes" => updated_notes }))
 
-    # Create a prompt for the LLM to compile findings
-    prompt = <<~PROMPT
-      I've collected the following research notes on the topic: #{task.title}
+      # Logging handled by AgentActivityCallbackHandler
+
+      "Research note recorded: #{note.truncate(100)}"
+    rescue => e
+      Rails.logger.error "[WebResearcherAgent] Error taking notes for task #{task.id}: #{e.message}"
+      "Error recording note: #{e.message}"
+    end
+  end
+
+  def compile_findings
+    unless task
+      return "Error: Cannot compile findings - Agent not associated with a task."
+    end
+
+    notes = task.metadata&.dig("research_notes") || []
+    if notes.empty?
+      return "No research notes found to compile for task #{task.id}. Use take_notes tool first."
+    end
+
+    formatted_notes = notes.map.with_index { |note, i| "Note #{i + 1}:\n#{note}" }.join("\n\n---\n\n")
+
+    prompt_content = <<~PROMPT
+      Synthesize the following research notes regarding '#{task.title}'.
 
       RESEARCH NOTES:
       #{formatted_notes}
 
-      Please synthesize these notes into comprehensive research findings that:
-      1. Summarize the key information discovered
-      2. Organize the information in a logical structure
-      3. Highlight important facts, figures, and insights
-      4. Note any contradictions or uncertainties in the research
-      5. Suggest any important areas that may require further research
+      Compile these notes into comprehensive research findings.
+      Summarize key information, organize logically, highlight important facts/insights, and note any contradictions or gaps.
 
-      FORMAT YOUR RESPONSE AS:
-
+      FORMAT:
       RESEARCH FINDINGS: #{task.title}
 
       SUMMARY:
-      [Brief summary of findings]
+      [Brief summary]
 
       DETAILED FINDINGS:
-      [Organized presentation of all key information]
+      [Organized points]
 
       LIMITATIONS & GAPS:
-      [Any limitations or gaps in the research]
+      [Limitations/Gaps]
     PROMPT
 
-    # Use a thinking model for synthesis
-    thinking_model = Regent::LLM.new(REGENT_MODEL_DEFAULTS[:thinking], temperature: 0.3)
-    result = thinking_model.invoke(prompt)
+    begin
+      # Use the agent's LLM
+      response = @llm.chat(messages: [ { role: "user", content: prompt_content } ])
+      compiled_result = response.chat_completion # or response.content
 
-    # Log this LLM call
-    if agent_activity
-      agent_activity.llm_calls.create!(
-        provider: "openrouter",
-        model: REGENT_MODEL_DEFAULTS[:thinking],
-        prompt: prompt,
-        response: result.content,
-        tokens_used: (result.input_tokens || 0) + (result.output_tokens || 0)
-      )
-    end
+      # Manually log the LLM call
+      log_direct_llm_call(prompt_content, response)
 
-    # Store the findings in the task result
-    task.update!(result: result.content)
+      # Store findings as the task result
+      task.update!(result: compiled_result)
+      task.complete! if task.may_complete?
 
-    # Create an event for task completion
-    if task.may_complete?
-      task.complete!
+      # Publish event if this is a subtask (handled in BaseAgent now? No, compile should publish)
+      if task.parent_id
+        Event.publish(
+          "research_subtask_completed",
+          { subtask_id: task.id, parent_id: task.parent_id, result: compiled_result }
+        )
+      end
 
-      # Publish a research completed event
-      Event.publish(
-        "research_subtask_completed",
-        {
-          subtask_id: task.id,
-          result: result.content
-        }
-      )
-
-      "Research findings compiled and task marked as complete"
-    else
-      "Research findings compiled but task could not be marked complete from its current state"
+      compiled_result
+    rescue => e
+      Rails.logger.error "[WebResearcherAgent] LLM Error in compile_findings for task #{task.id}: #{e.message}"
+      "Error compiling findings: #{e.message}"
     end
   end
+  # --- End Tool Implementations ---
+
+  # Optional: Override after_run if specific actions needed after WebResearcher finishes
+  # def after_run(result)
+  #   super # Call base class hook first
+  #   # ... web researcher specific actions ...
+  # end
 end

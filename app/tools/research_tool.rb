@@ -1,14 +1,17 @@
 # ResearchTool: Provides research capabilities to agents
-class ResearchTool < BaseTool
-  def initialize
-    super("research", "Performs research on a given topic")
-  end
-  
-  # Implement the call method that will be invoked when the tool is used
-  def call(query)
-    # In a real implementation, this would connect to a search API
-    # For this example, we'll return a simulated response
+class ResearchTool
+  extend Langchain::ToolDefinition
 
+  define_function :research, description: "Performs research on a given topic" do
+    property :query, type: "string", description: "The search query or research topic", required: true
+  end
+
+  def initialize
+    @name = "research"
+    @description = "Performs research on a given topic"
+  end
+
+  def research(query:)
     # Log the search query
     Rails.logger.info("ResearchTool searching for: #{query}")
 

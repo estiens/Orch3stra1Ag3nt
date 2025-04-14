@@ -18,27 +18,59 @@ class ResearchCoordinatorAgent < BaseAgent
   subscribe_to "research_subtask_completed", :handle_research_completed
   subscribe_to "research_subtask_failed", :handle_research_failed
 
-  # Tools that the research coordinator can use
-  tool :analyze_research_question, "Break down a research question into specific research tasks"
-  tool :create_research_subtask, "Create a subtask for a specific research area"
-  tool :assign_researcher, "Assign a research subtask to an appropriate researcher agent"
-  tool :consolidate_findings, "Combine and synthesize research findings"
-  tool :check_existing_knowledge, "Check if we already have information on a topic in our database"
-  tool :semantic_memory, "Store and retrieve information using vector embeddings"
-  tool :store_research_finding, "Store a research finding in the vector database"
-  tool :request_human_guidance, "Request guidance from a human on research direction"
+  # --- Tools ---
+  tool :analyze_research_question, "Break down a research question into specific research tasks" do |research_question|
+    analyze_research_question(research_question)
+  end
 
-  # Handle new research task event
+  tool :create_research_subtask, "Create a subtask for a specific research area" do |title, description, methods = nil|
+    create_research_subtask(title, description, methods)
+  end
+
+  tool :assign_researcher, "Assign a research subtask to an appropriate researcher agent" do |subtask_id, methods = []|
+    assign_researcher(subtask_id, methods)
+  end
+
+  tool :consolidate_findings, "Combine and synthesize research findings" do
+    consolidate_findings
+  end
+
+  tool :check_existing_knowledge, "Check if we already have information on a topic in our database" do |query|
+    # Placeholder - Requires Vector DB implementation
+    check_existing_knowledge(query)
+  end
+
+  tool :store_research_finding, "Store a research finding in the vector database" do |finding, metadata = {}|
+    # Placeholder - Requires Vector DB implementation
+    store_research_finding(finding, metadata)
+  end
+
+  tool :request_human_guidance, "Request guidance from a human on research direction" do |question, context = nil|
+    request_human_guidance(question, context)
+  end
+  # --- End Tools ---
+
+  # --- Event Handlers ---
+  # Handle new research task event - Typically triggered by Orchestrator
   def handle_new_research_task(event)
     task_id = event.data["task_id"]
     return if task_id.blank?
 
-    task = Task.find(task_id)
-
-    run("Plan research approach for new task:\n" +
-        "Research Task: #{task.title}\n" +
-        "Description: #{task.description}\n" +
-        "Determine the best research strategy and break this down into focused subtasks.")
+    # This handler might run in a separate instance context than the agent run.
+    # Need to decide if it should trigger a *new* agent run or just log.
+    begin
+      research_task = Task.find(task_id)
+      Rails.logger.info "[ResearchCoordinatorAgentEventHandler] Received handle_new_research_task for Task #{task_id}: #{research_task.title}."
+      # Option 1: Trigger a new agent run (most likely needed to start the process)
+      # Note: This assumes the event triggers a job that *instantiates* and runs the agent.
+      # If the event handler is called on an existing instance, `self.run` might work differently.
+      # ResearchCoordinatorAgent.enqueue(
+      #   "Plan research for: #{research_task.title}",
+      #   { task_id: task_id, purpose: "Plan and execute research for task #{task_id}" }
+      # )
+    rescue ActiveRecord::RecordNotFound
+      Rails.logger.error "[ResearchCoordinatorAgentEventHandler] Task #{task_id} not found for handle_new_research_task."
+    end
   end
 
   # Handle research completion event
@@ -46,297 +78,369 @@ class ResearchCoordinatorAgent < BaseAgent
     subtask_id = event.data["subtask_id"]
     return if subtask_id.blank?
 
-    subtask = Task.find(subtask_id)
-    parent_task = subtask.parent
-    result = event.data["result"] || "No findings provided"
+    begin
+      subtask = Task.find(subtask_id)
+      parent_task = subtask.parent
+      return unless parent_task # Ensure it's a subtask
 
-    run("Integrate completed research findings and determine next steps:\n" +
-        "Subtask: #{subtask.title}\n" +
-        "Parent Research: #{parent_task.title}\n" +
-        "Findings: #{result}\n" +
-        "Consider how these findings impact the overall research goals.")
+      # Check if this event is relevant to an *active* coordinator for this parent task
+      # This logic might be complex depending on how coordinators are managed.
+      # For now, just log globally.
+      Rails.logger.info "[ResearchCoordinatorAgentEventHandler] Received handle_research_completed for Subtask #{subtask_id} (Parent: #{parent_task.id})."
+      # An active coordinator for parent_task.id might trigger its run or call consolidate_findings tool.
+
+    rescue ActiveRecord::RecordNotFound
+       Rails.logger.error "[ResearchCoordinatorAgentEventHandler] Subtask #{subtask_id} not found for handle_research_completed."
+    end
   end
 
   # Handle research failure event
   def handle_research_failed(event)
-    subtask_id = event.data["subtask_id"]
-    return if subtask_id.blank?
+     subtask_id = event.data["subtask_id"]
+     return if subtask_id.blank?
 
-    subtask = Task.find(subtask_id)
-    parent_task = subtask.parent
-    error = event.data["error"] || "Research failed with unknown error"
+     begin
+       subtask = Task.find(subtask_id)
+       parent_task = subtask.parent
+       return unless parent_task
 
-    run("Address research failure and determine recovery strategy:\n" +
-        "Subtask: #{subtask.title}\n" +
-        "Parent Research: #{parent_task.title}\n" +
-        "Error: #{error}\n" +
-        "Consider alternative research approaches or sources.")
+       error = event.data["error"] || "Research failed with unknown error"
+       Rails.logger.error "[ResearchCoordinatorAgentEventHandler] Received handle_research_failed for Subtask #{subtask_id} (Parent: #{parent_task.id}): #{error}"
+       # An active coordinator for parent_task.id might trigger its run or try other actions.
+
+     rescue ActiveRecord::RecordNotFound
+        Rails.logger.error "[ResearchCoordinatorAgentEventHandler] Subtask #{subtask_id} not found for handle_research_failed."
+     end
   end
+  # --- End Event Handlers ---
 
-  # Tool implementations
+  # --- Core Logic ---
+  def run(input = nil) # Input likely the research question/topic
+    before_run(input)
+
+    unless task
+      result = "ResearchCoordinatorAgent Error: Agent not associated with a task."
+      Rails.logger.error result
+      @session_data[:output] = result
+      after_run(result)
+      return result
+    end
+
+    result_message = "Research Coordinator run completed."
+    begin
+      if task.subtasks.empty?
+        Rails.logger.info "[ResearchCoordinator-#{task.id}] Analyzing research question: #{task.title}"
+        # Analyze the main research question
+        analysis = execute_tool(:analyze_research_question, input || task.description)
+
+        # TODO: Parse analysis to get subtask details (focus, methods, contribution)
+        # Placeholder parsing - assumes analysis provides structured info
+        subtasks_to_create = parse_research_subtasks(analysis)
+
+        if subtasks_to_create.any?
+          Rails.logger.info "[ResearchCoordinator-#{task.id}] Creating #{subtasks_to_create.count} research subtasks..."
+          subtasks_to_create.each do |subtask_data|
+             # Create subtask
+             create_result = execute_tool(:create_research_subtask,
+                                           subtask_data[:title],
+                                           subtask_data[:description],
+                                           subtask_data[:methods])
+             # Extract subtask ID (assuming create_tool returns it like "... ID 123")
+             subtask_id_match = create_result.match(/ID\s*(\d+)/)
+             if subtask_id_match
+                subtask_id = subtask_id_match[1].to_i
+                # Assign researcher based on methods
+                execute_tool(:assign_researcher, subtask_id, subtask_data[:methods])
+             else
+                Rails.logger.error "[ResearchCoordinator-#{task.id}] Could not extract subtask ID from create result: #{create_result}"
+             end
+          end
+           result_message = "Analyzed research question, created and assigned #{subtasks_to_create.count} subtasks."
+        else
+          Rails.logger.warn "[ResearchCoordinator-#{task.id}] Analysis did not yield subtasks."
+          result_message = "Analyzed research question, but no subtasks identified."
+          # Might need to assign the main task directly? Or mark complete?
+          # execute_tool(:assign_researcher, task.id, ["web"]) # Example: assign main task
+        end
+      else
+        # If subtasks exist, check status and consolidate if needed
+        Rails.logger.info "[ResearchCoordinator-#{task.id}] Checking research subtasks..."
+        task.reload # Refresh subtask states
+        completed_subtasks = task.subtasks.where(state: "completed")
+        failed_subtasks = task.subtasks.where(state: "failed")
+        active_subtasks = task.subtasks.where(state: "active")
+        pending_subtasks = task.subtasks.where(state: "pending")
+
+        if failed_subtasks.any?
+           result_message = "One or more research subtasks failed. Needs review."
+           # Optional: Escalate or trigger retry logic here
+           Rails.logger.warn "[ResearchCoordinator-#{task.id}] Failed subtasks: #{failed_subtasks.pluck(:id).join(', ')}"
+        elsif active_subtasks.any? || pending_subtasks.any?
+           result_message = "Research in progress. Waiting on #{active_subtasks.count} active and #{pending_subtasks.count} pending subtasks."
+           Rails.logger.info result_message
+        elsif completed_subtasks.count == task.subtasks.count
+           Rails.logger.info "[ResearchCoordinator-#{task.id}] All research subtasks completed. Consolidating findings..."
+           consolidation_result = execute_tool(:consolidate_findings)
+           # Mark the main task complete after consolidating
+           task.complete! if task.may_complete?
+           result_message = "Consolidated findings:\n#{consolidation_result}"
+        else
+           result_message = "Research status unclear. Subtasks: #{task.subtasks.count} total, #{completed_subtasks.count} completed."
+        end
+      end
+
+    rescue => e
+      handle_run_error(e)
+      raise
+    end
+
+    @session_data[:output] = result_message
+    after_run(result_message)
+    result_message
+  end
+  # --- End Core Logic ---
+
+  # --- Tool Implementations ---
   def analyze_research_question(research_question)
-    # Create a prompt for the LLM to break down the research
-    prompt = <<~PROMPT
-      I need to break down the following research question into specific, actionable research tasks:
+    prompt_content = <<~PROMPT
+      Break down the following research question into specific, actionable research tasks:
 
       RESEARCH QUESTION: #{research_question}
 
-      Please analyze this question and break it down into 3-5 focused research subtasks.
-      For each subtask, provide:
-      1. A clear research focus (what specific information we need)
-      2. Suggested research methods or sources
-      3. How this contributes to answering the overall question
+      Provide 3-5 focused subtasks with:
+      1. Research focus
+      2. Suggested methods/sources
+      3. Contribution to the overall question
 
-      FORMAT YOUR RESPONSE LIKE THIS:
-
+      FORMAT:
       Research Task 1: [FOCUS]
-      Methods: [SUGGESTED METHODS/SOURCES]
-      Contribution: [HOW THIS HELPS THE OVERALL QUESTION]
+      Methods: [METHODS/SOURCES]
+      Contribution: [CONTRIBUTION]
+      ...
 
-      Research Task 2: [FOCUS]
-      Methods: [SUGGESTED METHODS/SOURCES]
-      Contribution: [HOW THIS HELPS THE OVERALL QUESTION]
-
-      ...and so on.
-
-      Finally, provide a brief research plan explaining the order in which these tasks should be approached and why.
+      Finally, provide a brief research plan (order and rationale).
     PROMPT
 
-    # Use a thinking model for complex analysis
-    thinking_model = Regent::LLM.new(REGENT_MODEL_DEFAULTS[:thinking], temperature: 0.4)
-    result = thinking_model.invoke(prompt)
+    begin
+      # Use the agent's LLM instance provided by BaseAgent
+      response = @llm.chat(messages: [ { role: "user", content: prompt_content } ])
 
-    # Log this LLM call
-    if agent_activity
-      agent_activity.llm_calls.create!(
-        provider: "openrouter",
-        model: REGENT_MODEL_DEFAULTS[:thinking],
-        prompt: prompt,
-        response: result.content,
-        tokens_used: (result.input_tokens || 0) + (result.output_tokens || 0)
-      )
+      # Manually log the LLM call
+      log_direct_llm_call(prompt_content, response)
+
+      response.chat_completion # Or response.content
+    rescue => e
+      Rails.logger.error "[ResearchCoordinatorAgent] LLM Error in analyze_research_question: #{e.message}"
+      "Error analyzing research question: #{e.message}"
     end
-
-    # Return the LLM's analysis
-    result.content
   end
 
   def create_research_subtask(title, description, methods = nil)
-    # Validate that we have a parent task
     unless task
-      return "Error: No parent research task available to create subtask"
+      return "Error: Cannot create research subtask - Coordinator not associated with a main task."
     end
 
-    # Create the research subtask with parent association
-    metadata = {}
-    metadata[:research_methods] = methods if methods.present?
+    begin
+      metadata = {}
+      metadata[:research_methods] = Array(methods) if methods.present?
 
-    subtask = task.subtasks.create!(
-      title: title,
-      description: description,
-      priority: "normal",
-      state: "pending",
-      metadata: metadata
-    )
-
-    # Create an event for the new subtask
-    agent_activity.events.create!(
-      event_type: "research_subtask_created",
-      data: {
-        subtask_id: subtask.id,
-        parent_id: task.id,
-        title: title
-      }
-    )
-
-    # Also publish this as a system event
-    Event.publish(
-      "research_subtask_created",
-      {
-        subtask_id: subtask.id,
-        parent_id: task.id,
+      subtask = task.subtasks.create!(
         title: title,
-        methods: methods
-      }
-    )
+        description: description,
+        priority: "normal",
+        state: "pending",
+        metadata: metadata
+      )
 
-    "Created research subtask '#{title}' with ID #{subtask.id}"
+      # Event logging within the agent activity is handled by callbacks if this is called via a tool
+      # If called directly, manual logging might be needed, but tools are preferred.
+
+      # Publish system-wide event
+      Event.publish(
+        "research_subtask_created",
+        { subtask_id: subtask.id, parent_id: task.id, title: title, methods: methods }
+      )
+
+      "Created research subtask '#{title}' (ID: #{subtask.id}) for task #{task.id}"
+    rescue => e
+      Rails.logger.error "[ResearchCoordinatorAgent] Error creating research subtask: #{e.message}"
+      "Error creating research subtask '#{title}': #{e.message}"
+    end
   end
 
   def assign_researcher(subtask_id, methods = [])
-    # Find the subtask
-    subtask = Task.find(subtask_id)
+     unless task
+       return "Error: Cannot assign researcher - Coordinator not associated with a main task."
+     end
 
-    # Determine the appropriate researcher type based on methods
-    researcher_type = determine_researcher_type(methods)
+     begin
+       subtask = task.subtasks.find(subtask_id)
+     rescue ActiveRecord::RecordNotFound
+       return "Error: Subtask #{subtask_id} not found or does not belong to task #{task.id}."
+     end
 
-    begin
-      # Try to get the agent class
-      agent_class = researcher_type.constantize
+     researcher_type = determine_researcher_type(methods)
 
-      # Ensure it's a BaseAgent subclass
-      unless agent_class < BaseAgent
-        return "Error: #{researcher_type} is not a valid agent type"
-      end
+     begin
+       agent_class = researcher_type.constantize
+       unless agent_class < BaseAgent
+         return "Error: #{researcher_type} is not a valid BaseAgent subclass."
+       end
 
-      # Create options for the agent
-      agent_options = {
-        task_id: subtask.id,
-        parent_activity_id: agent_activity.id,
-        purpose: "Research: #{subtask.title}"
-      }
+       agent_options = {
+         task_id: subtask.id,
+         parent_activity_id: agent_activity&.id,
+         purpose: "Research: #{subtask.title}"
+       }
 
-      # Enqueue the agent job
-      agent_class.enqueue(
-        "Conduct research on: #{subtask.title}\n\n#{subtask.description}\n\nUse methods: #{methods.join(', ')}",
-        agent_options
-      )
+       agent_class.enqueue(
+         "Conduct research on: #{subtask.title}\n\n#{subtask.description}\n\nUse methods: #{Array(methods).join(', ')}",
+         agent_options
+       )
 
-      # Update subtask state to active
-      subtask.activate! if subtask.may_activate?
+       subtask.activate! if subtask.may_activate?
 
-      # Create event for assignment
-      agent_activity.events.create!(
-        event_type: "researcher_assigned",
-        data: {
-          subtask_id: subtask.id,
-          researcher_type: researcher_type,
-          methods: methods
-        }
-      )
+       # Event logging within activity handled by callbacks if called via tool
 
-      "Assigned research subtask #{subtask_id} to #{researcher_type}"
-    rescue NameError => e
-      "Error: Researcher type '#{researcher_type}' not found: #{e.message}"
-    rescue => e
-      "Error assigning researcher: #{e.message}"
-    end
+       # Publish system-wide event (optional, maybe redundant with callback log)
+       # Event.publish("researcher_assigned", { ... })
+
+       "Assigned research subtask #{subtask_id} ('#{subtask.title}') to #{researcher_type}."
+     rescue NameError
+       "Error: Researcher type '#{researcher_type}' not found."
+     rescue => e
+       Rails.logger.error "[ResearchCoordinatorAgent] Error assigning researcher for subtask #{subtask_id}: #{e.message}"
+       "Error assigning researcher: #{e.message}"
+     end
   end
 
   def consolidate_findings
-    return "Error: No parent research task available" unless task
+    unless task
+      return "Error: Cannot consolidate findings - Coordinator not associated with a main task."
+    end
 
-    # Get all completed research subtasks
+    task.reload
     completed_subtasks = task.subtasks.where(state: "completed")
 
     if completed_subtasks.empty?
-      return "No completed research subtasks found for consolidation"
+      return "No completed research subtasks found for consolidation for task #{task.id}."
     end
 
-    # Compile findings from completed subtasks
-    findings = completed_subtasks.map do |subtask|
-      "Research: #{subtask.title}\n" +
-      "Findings: #{subtask.result}"
-    end.join("\n\n")
+    findings = completed_subtasks.map do |st| "Subtask: #{st.title}\nFindings:\n#{st.result || '(No result recorded)'}" end.join("\n\n---\n\n")
 
-    # Create a prompt for the LLM to synthesize findings
-    prompt = <<~PROMPT
-      I need to synthesize findings from multiple research tasks into a coherent summary:
+    prompt_content = <<~PROMPT
+      Synthesize findings from multiple research tasks into a coherent summary.
 
-      RESEARCH QUESTION: #{task.title}
+      OVERALL RESEARCH QUESTION: #{task.title}
 
       INDIVIDUAL FINDINGS:
       #{findings}
 
-      Please synthesize these findings into a comprehensive summary that:
-      1. Addresses the original research question
-      2. Integrates insights from all research subtasks
-      3. Highlights key conclusions and any contradictions
-      4. Identifies remaining gaps or questions
+      Synthesize these findings into a comprehensive summary addressing the original question.
+      Highlight key conclusions, contradictions, and remaining gaps.
 
-      FORMAT YOUR RESPONSE AS:
-
+      FORMAT:
       SUMMARY:
-      [Comprehensive summary of all findings]
+      [Comprehensive summary]
 
       KEY INSIGHTS:
-      - [Key insight 1]
-      - [Key insight 2]
-      - [etc.]
+      - [Insight 1]
 
-      REMAINING QUESTIONS:
-      - [Question 1]
-      - [Question 2]
-      - [etc.]
+      CONTRADICTIONS/UNCERTAINTIES:
+      - [Contradiction 1]
+
+      GAPS/NEXT STEPS:
+      - [Gap 1]
     PROMPT
 
-    # Use a thinking model for synthesis
-    thinking_model = Regent::LLM.new(REGENT_MODEL_DEFAULTS[:thinking], temperature: 0.3)
-    result = thinking_model.invoke(prompt)
+    begin
+      # Use the agent's LLM
+      response = @llm.chat(messages: [ { role: "user", content: prompt_content } ])
 
-    # Log this LLM call
-    if agent_activity
-      agent_activity.llm_calls.create!(
-        provider: "openrouter",
-        model: REGENT_MODEL_DEFAULTS[:thinking],
-        prompt: prompt,
-        response: result.content,
-        tokens_used: (result.input_tokens || 0) + (result.output_tokens || 0)
-      )
+      # Manually log the LLM call
+      log_direct_llm_call(prompt_content, response)
+
+      consolidated_result = response.chat_completion # or response.content
+
+      # Store result in the parent task
+      task.update!(result: consolidated_result)
+
+      # Event logging handled by callbacks
+
+      # Publish system event (optional)
+      # Event.publish("findings_consolidated", { task_id: task.id, subtask_count: completed_subtasks.count })
+
+      consolidated_result
+    rescue => e
+      Rails.logger.error "[ResearchCoordinatorAgent] LLM Error in consolidate_findings: #{e.message}"
+      "Error consolidating findings: #{e.message}"
     end
-
-    # Store this consolidated result
-    task.update(result: result.content)
-
-    # Return the consolidated findings
-    result.content
   end
 
   def check_existing_knowledge(query)
-    # This is a placeholder - will be implemented with vector DB
-    "This tool will search our vector database for relevant existing knowledge. Functionality will be implemented when vector DB integration is complete."
+    # Placeholder for vector DB integration
+    Rails.logger.info "[ResearchCoordinatorAgent] Tool check_existing_knowledge called (Not Implemented Yet). Query: #{query}"
+    "Vector DB search not implemented yet. Cannot check existing knowledge."
   end
 
   def store_research_finding(finding, metadata = {})
-    # This is a placeholder - will be implemented with vector DB
-    "This tool will store research findings in our vector database. Functionality will be implemented when vector DB integration is complete."
+    # Placeholder for vector DB integration
+    Rails.logger.info "[ResearchCoordinatorAgent] Tool store_research_finding called (Not Implemented Yet). Finding: #{finding.truncate(50)}"
+    "Vector DB storage not implemented yet. Cannot store finding."
   end
 
   def request_human_guidance(question, context = nil)
-    # Create a human input request
-    input_request = HumanInputRequest.create!(
-      task: task,
-      question: question,
-      required: true,
-      status: "pending",
-      agent_activity: agent_activity,
-      metadata: { context: context }
-    )
-
-    # Change task state to waiting
-    if task.may_wait_on_human?
-      task.wait_on_human!
+    unless task
+      return "Error: Cannot request guidance - Coordinator not associated with a main task."
     end
 
-    # Publish event for dashboard notification
-    Event.publish(
-      "research_guidance_requested",
-      {
-        request_id: input_request.id,
-        task_id: task.id,
+    begin
+      input_request = HumanInputRequest.create!(
+        task: task,
         question: question,
-        context: context
-      },
-      priority: Event::HIGH_PRIORITY
-    )
+        required: true, # Guidance is usually required
+        status: "pending",
+        agent_activity: agent_activity,
+        metadata: { context: context }
+      )
 
-    "Research task is now waiting for human guidance on: '#{question}'"
+      task.wait_on_human! if task.may_wait_on_human?
+
+      # Event log handled by callback
+
+      # Publish system event
+      Event.publish(
+        "research_guidance_requested",
+        { request_id: input_request.id, task_id: task.id, question: question, context: context },
+        priority: Event::HIGH_PRIORITY
+      )
+
+      "Research task #{task.id} is now waiting for human guidance on: '#{question}' (Request ID: #{input_request.id})"
+    rescue => e
+       Rails.logger.error "[ResearchCoordinatorAgent] Error requesting human guidance: #{e.message}"
+       "Error requesting human guidance: #{e.message}"
+    end
   end
+  # --- End Tool Implementations ---
 
   private
 
   # Helper method to determine appropriate researcher type
   def determine_researcher_type(methods)
-    methods = Array(methods).map(&:downcase)
+    methods = Array(methods).map { |m| m.to_s.downcase }
 
-    if methods.empty? || methods.include?("web") || methods.include?("internet")
+    if methods.empty? || methods.any? { |m| m.include?("web") || m.include?("internet") }
       "WebResearcherAgent"
-    elsif methods.include?("code") || methods.include?("codebase")
+    elsif methods.any? { |m| m.include?("code") || m.include?("codebase") }
       "CodeResearcherAgent"
-    elsif methods.include?("summarize") || methods.include?("summary")
+    elsif methods.any? { |m| m.include?("summarize") || m.include?("summary") }
       "SummarizerAgent"
+    # Add more specific researcher types here based on methods if needed
+    # elsif methods.include?("database")
+    #   "DatabaseResearcherAgent"
     else
-      # Default to web researcher if we can't determine
+      # Default to web researcher if type cannot be determined
+      Rails.logger.warn "[ResearchCoordinatorAgent] Could not determine specific researcher type for methods: #{methods}. Defaulting to WebResearcherAgent."
       "WebResearcherAgent"
     end
   end

@@ -1,9 +1,2 @@
-# Define default models for LangChain if not already defined
-unless defined?(LANGCHAIN_MODEL_DEFAULTS)
-  LANGCHAIN_MODEL_DEFAULTS = {
-    fast: "anthropic/claude-3-haiku-20240307",
-    thinking: "anthropic/claude-3-sonnet-20240229",
-    multimodal: "anthropic/claude-3-opus-20240229",
-    summarizing: "anthropic/claude-3-sonnet-20240229"
-  }
-end
+# This file is no longer needed as model defaults are now defined in Rails.configuration.llm
+# See config/initializers/langchain_config.rb for current implementation

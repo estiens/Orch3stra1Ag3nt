@@ -1,0 +1,1314 @@
+```
+Project Path: base_agent.rb
+
+Source Tree:
+
+```
+base_agent.rb
+
+```
+
+`/Users/estiens/code/ai/DoubleAgent/app/agents/base_agent.rb`:
+
+```rb
+
+class BaseAgent
+  include SolidQueueManagement
+
+  attr_accessor :task, :agent_activity, :chain, :llm, :session_data, :context
+
+  def initialize(purpose, **kwargs)
+    # Store task and agent_activity if provided
+    @task = kwargs.delete(:task)
+    @agent_activity = kwargs.delete(:agent_activity)
+    @session_data = { llm_calls: [], tool_executions: [], result: nil }
+    @context = purpose
+
+    # Set up the LLM based on provided model or default
+    model_param = kwargs.delete(:model)
+    @llm = initialize_llm(model_param)
+
+    # Initialize purpose
+    @purpose = purpose
+
+    # Initialize tools registry
+    @tools = {}
+
+    # Register any tools defined in the class
+    register_class_tools
+  end
+
+  # Alias for llm to support legacy code expecting model
+  def model
+    @llm
+  end
+
+  # Get session trace data for debugging and analytics
+  def session_trace
+    @session_data
+  end
+
+  def run(input = nil)
+    before_run
+
+    begin
+      # Execute the agent's chain
+      result = execute_chain(input)
+      @session_data[:result] = result
+
+      after_run
+      result
+    rescue => e
+      Rails.logger.error("Agent error: #{e.message}")
+      Rails.logger.error(e.backtrace.join("\n"))
+
+      if @agent_activity
+        @agent_activity.mark_failed(e.message)
+      end
+
+      raise e
+    end
+  end
+
+  def execute_chain(input)
+    # Default implementation that can be overridden in subclasses
+    # Simply returns the input as the result
+    input
+  end
+
+  def self.queue_name
+    name.demodulize.underscore.to_sym
+  end
+
+  # Queue concurrency - override in subclass if needed
+  def self.concurrency_limit
+    5
+  end
+
+  # Helper method to get the queue class - useful for SolidQueue config
+  def self.queue_class
+    "Agents::#{name}Job"
+  end
+
+  # Method to create a job for this agent type
+  def self.enqueue(prompt, options = {})
+    with_concurrency_control do
+      Agents::AgentJob.set(queue: queue_name).perform_later(self.name, prompt, options)
+    end
+  end
+
+  # Tool registration and execution
+  def self.tool(name, description = nil, &block)
+    @tools ||= {}
+    @tools[name] = { description: description, block: block }
+  end
+
+  def self.tools
+    @tools || {}
+  end
+
+  def register_class_tools
+    self.class.tools.each do |name, tool_info|
+      @tools[name] = tool_info
+    end
+  end
+
+  def execute_tool(name, *args)
+    tool = @tools[name.to_sym]
+    raise "Tool not found: #{name}" unless tool
+
+    result = instance_exec(*args, &tool[:block])
+
+    # Record tool execution
+    @session_data[:tool_executions] << {
+      tool: name,
+      args: args,
+      result: result
+    }
+
+    result
+  end
+
+  # Common model definitions - can be referenced as :fast, :thinking, etc.
+  def fast_model
+    Langchain::LLM::OpenRouter.new(
+      api_key: ENV["OPEN_ROUTER_API_KEY"],
+      default_options: {
+        chat_model: Rails.configuration.llm[:models][:fast],
+        temperature: 0.2
+      }
+    )
+  end
+
+  def thinking_model
+    Langchain::LLM::OpenRouter.new(
+      api_key: ENV["OPEN_ROUTER_API_KEY"],
+      default_options: {
+        chat_model: Rails.configuration.llm[:models][:thinking],
+        temperature: 0.3
+      }
+    )
+  end
+
+  def multimodal_model
+    Langchain::LLM::OpenRouter.new(
+      api_key: ENV["OPEN_ROUTER_API_KEY"],
+      default_options: {
+        chat_model: Rails.configuration.llm[:models][:multimodal],
+        temperature: 0.2
+      }
+    )
+  end
+
+  def edge_model
+    Langchain::LLM::OpenRouter.new(
+      api_key: ENV["OPEN_ROUTER_API_KEY"],
+      default_options: {
+        chat_model: Rails.configuration.llm[:models][:fast], # Default to fast model for edge cases
+        temperature: 0.1
+      }
+    )
+  end
+
+  # Default model if none specified
+  def self.default_model
+    Rails.configuration.llm[:models][:thinking]
+  end
+
+  def default_model
+    Langchain::LLM::OpenRouter.new(
+      api_key: ENV["OPEN_ROUTER_API_KEY"],
+      default_options: {
+        chat_model: self.class.default_model,
+        temperature: 0.3
+      }
+    )
+  end
+
+  # Override this in subclasses for pre-run setup
+  # This is called before the agent starts processing
+  def before_run
+    Rails.logger.info("Agent #{self.class.name} starting run")
+
+    # Update agent_activity if present
+    if @agent_activity
+      @agent_activity.update(status: "running")
+    end
+  end
+
+  # Override this in subclasses for post-run actions
+  # This is called after the agent completes processing
+  def after_run
+    Rails.logger.info("Agent #{self.class.name} completed run")
+
+    # Record activity data if agent_activity is present
+    if @agent_activity
+      # Record the LLM call details
+      @session_data[:llm_calls].each do |llm_call|
+        @agent_activity.llm_calls.create!(
+          provider: llm_call[:provider] || "openrouter",
+          model: llm_call[:model],
+          prompt: llm_call[:input],
+          response: llm_call[:output],
+          tokens_used: llm_call[:tokens] || 0
+        )
+      end
+
+      # Record tool executions if any
+      @session_data[:tool_executions].each do |tool_exec|
+        @agent_activity.events.create!(
+          event_type: "tool_execution",
+          data: {
+            tool: tool_exec[:tool],
+            args: tool_exec[:args],
+            result: tool_exec[:result]
+          }
+        )
+      end
+    end
+  end
+
+  private
+
+  def initialize_llm(model_param)
+    if model_param.is_a?(Langchain::LLM::Base)
+      # Use the LLM instance as is
+      model_param
+    elsif model_param.is_a?(Symbol) && respond_to?("#{model_param}_model")
+      # Use a predefined model type (fast, thinking, etc)
+      send("#{model_param}_model")
+    elsif model_param.is_a?(String)
+      # Create a new LLM instance with the given model name
+      Langchain::LLM::OpenRouter.new(
+        api_key: ENV["OPEN_ROUTER_API_KEY"],
+        default_options: {
+          chat_model: model_param,
+          temperature: 0.3
+        }
+      )
+    else
+      # Fall back to default model
+      default_model
+    end
+  end
+
+  def record_llm_call(provider, model, input, output, tokens = 0)
+    @session_data[:llm_calls] << {
+      provider: provider || "openrouter",
+      model: model,
+      input: input,
+      output: output,
+      tokens: tokens
+    }
+  end
+end
+
+```
+
+Project Path: models
+
+Source Tree:
+
+```
+models
+├── project.rb
+├── human_input_request.rb
+├── human_intervention.rb
+├── vector_embedding.rb
+├── llm_call.rb
+├── agent_activity.rb
+├── application_record.rb
+├── event.rb
+├── concerns
+│   ├── solid_queue_management.rb
+│   └── event_subscriber.rb
+└── task.rb
+
+```
+
+`/Users/estiens/code/ai/DoubleAgent/app/models/project.rb`:
+
+```rb
+class Project < ApplicationRecord
+  # Associations
+  has_many :tasks, dependent: :destroy
+  has_many :vector_embeddings, dependent: :destroy
+
+  # Validations
+  validates :name, presence: true
+
+  # # Serialization
+  # serialize :settings, JSON
+  # serialize :metadata, JSON
+
+  # Scopes
+  scope :active, -> { where(status: "active") }
+  scope :completed, -> { where(status: "completed") }
+  scope :by_priority, -> { order(priority: :desc) }
+  scope :recent, -> { order(created_at: :desc) }
+
+  # Status values
+  STATUSES = %w[pending active paused completed archived].freeze
+  validates :status, inclusion: { in: STATUSES }
+
+  # Callback to set defaults
+  after_initialize :set_defaults, if: :new_record?
+
+  # Methods to get all root tasks (tasks without parents)
+  def root_tasks
+    tasks.where(parent_id: nil)
+  end
+
+  # Create initial orchestration task
+  def kickoff!
+    # Only kickoff if project is pending and has no tasks yet
+    return false unless status == "pending" && tasks.empty?
+
+    # Update status to active
+    update!(status: "active")
+
+    # Create the initial orchestration task
+    orchestration_task = tasks.create!(
+      title: "Project Orchestration: #{name}",
+      description: "Initial task to plan and coordinate project: #{description}",
+      task_type: "orchestration",
+      priority: "high",
+      metadata: {
+        project_kickoff: true,
+        project_settings: settings
+      }
+    )
+
+    # Publish event to trigger OrchestratorAgent
+    Event.publish(
+      "project_created",
+      {
+        project_id: id,
+        task_id: orchestration_task.id,
+        priority: priority
+      },
+      priority: Event::HIGH_PRIORITY
+    )
+
+    # Return the orchestration task
+    orchestration_task
+  end
+
+  # Get all task activities across the project
+  def all_agent_activities
+    task_ids = tasks.pluck(:id)
+    AgentActivity.where(task_id: task_ids)
+  end
+
+  # Simple search across project's embeddings
+  def search_knowledge(query, limit = 5)
+    VectorEmbedding.search(
+      text: query,
+      limit: limit,
+      project_id: id
+    )
+  end
+
+  # Store knowledge in project's semantic memory
+  def store_knowledge(content, content_type: "text", collection: "default", metadata: {})
+    VectorEmbedding.store(
+      content: content,
+      content_type: content_type,
+      collection: collection,
+      project: self,
+      metadata: metadata
+    )
+  end
+
+  private
+
+  def set_defaults
+    self.status ||= "pending"
+    self.settings ||= {
+      "max_concurrent_tasks" => 5,
+      "llm_budget_limit" => 10.0,  # In dollars
+      "task_timeout_hours" => 24,
+      "allow_web_search" => true,
+      "allow_code_execution" => false
+    }
+
+    self.metadata ||= {}
+  end
+end
+
+```
+
+`/Users/estiens/code/ai/DoubleAgent/app/models/human_input_request.rb`:
+
+```rb
+# HumanInputRequest: Tracks requests for human input during agent tasks
+# Used for both required (task-blocking) and optional (non-blocking) input
+class HumanInputRequest < ApplicationRecord
+  belongs_to :task
+  belongs_to :agent_activity, optional: true
+
+  # Validations
+  validates :question, presence: true
+  validates :status, presence: true
+
+  # Attributes
+  attribute :required, :boolean, default: false
+
+  # Status states
+  STATUS_STATES = %w[pending answered ignored expired].freeze
+  validates :status, inclusion: { in: STATUS_STATES }
+
+  # Scopes
+  scope :pending, -> { where(status: "pending") }
+  scope :answered, -> { where(status: "answered") }
+  scope :required_inputs, -> { where(required: true) }
+  scope :optional_inputs, -> { where(required: false) }
+  scope :recent, -> { order(created_at: :desc) }
+  scope :for_task, ->(task_id) { where(task_id: task_id) }
+
+  # Callback to set expiration time if provided
+  before_create :set_expiry
+
+  # Provide an answer to this input request
+  def answer!(response, user_id = nil)
+    update!(
+      status: "answered",
+      response: response,
+      answered_at: Time.current,
+      answered_by: user_id
+    )
+
+    # Emit event about this new answer
+    Event.publish(
+      "human_input_provided",
+      {
+        request_id: id,
+        task_id: task_id,
+        question: question,
+        response: response,
+        required: required
+      }
+    )
+
+    # Resume task if it was waiting for this input
+    resume_task if required && task.waiting_on_human?
+  end
+
+  # Mark this input request as ignored (for optional requests)
+  def ignore!(reason = nil, user_id = nil)
+    # Only optional inputs can be ignored
+    raise "Cannot ignore required input" if required
+
+    update!(
+      status: "ignored",
+      response: reason,
+      answered_at: Time.current,
+      answered_by: user_id
+    )
+
+    # Emit event
+    Event.publish(
+      "human_input_ignored",
+      {
+        request_id: id,
+        task_id: task_id,
+        question: question,
+        reason: reason
+      }
+    )
+  end
+
+  # Check if the request has expired
+  def expired?
+    expires_at.present? && expires_at <= Time.current
+  end
+
+  # Mark as expired if the time limit has passed
+  def check_expiration!
+    return unless pending? && expired?
+
+    update!(status: "expired")
+
+    # Emit event
+    Event.publish(
+      "human_input_expired",
+      {
+        request_id: id,
+        task_id: task_id,
+        question: question,
+        required: required
+      }
+    )
+
+    # If the input was required, handle the timeout based on configuration
+    if required
+      handle_expired_required_input
+    end
+  end
+
+  # Has the request been answered?
+  def answered?
+    status == "answered"
+  end
+
+  # Is the request still pending?
+  def pending?
+    status == "pending"
+  end
+
+  private
+
+  # Set expiry time if timeout is provided
+  def set_expiry
+    return unless timeout_minutes.present?
+
+    self.expires_at = timeout_minutes.minutes.from_now
+  end
+
+  # Resume the task if it was waiting for this input
+  def resume_task
+    # Only resume if this task was waiting for human input
+    return unless task.waiting_on_human?
+
+    # Only resume if this was what caused the task to pause
+    # Check if this specific input request was what caused the pause
+    if task.metadata&.dig("waiting_for_input_id") == id.to_s
+      task.activate! if task.may_activate?
+
+      # Emit task resumed event
+      Event.publish(
+        "task_resumed_from_human_input",
+        {
+          task_id: task.id,
+          input_request_id: id,
+          question: question,
+          response: response
+        }
+      )
+    end
+  end
+
+  # Handle expiration of required inputs
+  def handle_expired_required_input
+    # Different strategies can be implemented:
+    # 1. Fail the task
+    # 2. Escalate to human intervention
+    # 3. Use a default/fallback value
+
+    # Default approach: escalate to a human intervention
+    HumanIntervention.create!(
+      description: "Required input timed out: '#{question}'",
+      urgency: "high",
+      status: "pending",
+      agent_activity: agent_activity
+    )
+
+    # Emit task timeout event
+    Event.publish(
+      "task_input_timeout",
+      {
+        task_id: task.id,
+        input_request_id: id,
+        question: question
+      },
+      priority: Event::HIGH_PRIORITY
+    )
+  end
+end
+
+```
+
+`/Users/estiens/code/ai/DoubleAgent/app/models/human_intervention.rb`:
+
+```rb
+# HumanIntervention: Model for tracking human intervention requests
+# Used for critical issues that need human attention
+class HumanIntervention < ApplicationRecord
+  belongs_to :agent_activity, optional: true
+  has_one :task, through: :agent_activity
+
+  # Validations
+  validates :description, presence: true
+  validates :urgency, presence: true
+  validates :status, presence: true
+
+  # Urgency levels
+  URGENCY_LEVELS = %w[low normal high critical].freeze
+  validates :urgency, inclusion: { in: URGENCY_LEVELS }
+
+  # Status states
+  STATUS_STATES = %w[pending acknowledged resolved dismissed].freeze
+  validates :status, inclusion: { in: STATUS_STATES }
+
+  # Scopes
+  scope :pending, -> { where(status: "pending") }
+  scope :active, -> { where(status: %w[pending acknowledged]) }
+  scope :resolved, -> { where(status: "resolved") }
+  scope :dismissed, -> { where(status: "dismissed") }
+  scope :critical, -> { where(urgency: "critical") }
+  scope :high_priority, -> { where(urgency: %w[high critical]) }
+  scope :recent, -> { order(created_at: :desc) }
+
+  # Callback to notify admin systems upon creation
+  after_create :notify_admins, if: -> { urgency == "critical" }
+
+  # Mark this intervention as acknowledged by human
+  def acknowledge!(user_id = nil)
+    update!(
+      status: "acknowledged",
+      acknowledged_at: Time.current,
+      acknowledged_by: user_id
+    )
+
+    # Emit event for dashboard updates
+    Event.publish(
+      "human_intervention_acknowledged",
+      {
+        intervention_id: id,
+        description: description,
+        acknowledged_by: user_id
+      }
+    )
+  end
+
+  # Mark this intervention as resolved with optional resolution notes
+  def resolve!(resolution, user_id = nil)
+    update!(
+      status: "resolved",
+      resolved_at: Time.current,
+      resolution: resolution,
+      resolved_by: user_id
+    )
+
+    # Emit event for task resumption
+    Event.publish(
+      "human_intervention_resolved",
+      {
+        intervention_id: id,
+        description: description,
+        resolution: resolution,
+        resolved_by: user_id
+      }
+    )
+
+    # Resume any paused tasks
+    resume_paused_tasks if task.present?
+  end
+
+  # Dismiss intervention as not needed or erroneous
+  def dismiss!(reason, user_id = nil)
+    update!(
+      status: "dismissed",
+      dismissed_at: Time.current,
+      resolution: reason,
+      dismissed_by: user_id
+    )
+
+    # Emit event
+    Event.publish(
+      "human_intervention_dismissed",
+      {
+        intervention_id: id,
+        description: description,
+        reason: reason,
+        dismissed_by: user_id
+      }
+    )
+
+    # Resume any paused tasks
+    resume_paused_tasks if task.present?
+  end
+
+  private
+
+  # Send notifications for critical interventions
+  def notify_admins
+    # In a real application, this would send emails, Slack messages, etc.
+    Rails.logger.warn("CRITICAL INTERVENTION REQUESTED: #{description}")
+
+    # Can be used to add notification logic like:
+    # AdminMailer.critical_intervention(self).deliver_later
+    # SlackNotifier.notify("#ops-alerts", "Critical intervention needed: #{description}")
+  end
+
+  # Resume any tasks that were paused by this intervention
+  def resume_paused_tasks
+    return unless task&.waiting_on_human?
+
+    # Only resume if this was what caused the task to pause
+    if task.metadata&.dig("waiting_for_intervention_id") == id.to_s
+      task.activate! if task.may_activate?
+
+      # Emit task resumed event
+      Event.publish(
+        "task_resumed_from_human_intervention",
+        {
+          task_id: task.id,
+          intervention_id: id
+        }
+      )
+    end
+  end
+end
+
+```
+
+`/Users/estiens/code/ai/DoubleAgent/app/models/vector_embedding.rb`:
+
+```rb
+class VectorEmbedding < ApplicationRecord
+  belongs_to :task, optional: true
+  belongs_to :project, optional: true
+
+  # Set up nearest neighbor search on the embedding vector
+  has_neighbors :embedding
+
+  # Validations
+  validates :content, presence: true
+  validates :content_type, presence: true
+  validates :collection, presence: true
+
+  # Scopes
+  scope :in_collection, ->(collection) { where(collection: collection) }
+  scope :by_content_type, ->(type) { where(content_type: type) }
+  scope :for_task, ->(task_id) { where(task_id: task_id) }
+  scope :for_project, ->(project_id) { where(project_id: project_id) }
+
+  # Find similar embeddings with a vector similarity search using Neighbor
+  # @param query_embedding [Array] The query embedding vector
+  # @param limit [Integer] Maximum number of results to return
+  # @param collection [String] Optional collection to search within
+  # @param task_id [Integer] Optional task_id to filter by
+  # @param project_id [Integer] Optional project_id to filter by
+  # @param distance [String] The distance metric to use ("euclidean", "cosine", "inner_product")
+  # @return [Array<VectorEmbedding>] Matching embeddings sorted by similarity
+  def self.find_similar(query_embedding, limit: 5, collection: nil, task_id: nil, project_id: nil, distance: "cosine")
+    # Start with a nearest neighbors query
+    query = nearest_neighbors(:embedding, query_embedding, distance: distance)
+
+    # Add collection filter if specified
+    query = query.in_collection(collection) if collection.present?
+
+    # Add task filter if specified
+    query = query.for_task(task_id) if task_id.present?
+
+    # Add project filter if specified
+    query = query.for_project(project_id) if project_id.present?
+
+    # Get nearest neighbors
+    query.limit(limit)
+  end
+
+  # Generate an embedding for the given text using OpenAI's embeddings API
+  # @param text [String] The text to embed
+  # @return [Array<Float>] The embedding vector
+  def self.generate_embedding(text)
+    client = OpenAI::Client.new(access_token: ENV["OPENAI_API_KEY"])
+
+    # Truncate text if necessary (OpenAI has a token limit)
+    truncated_text = text.length > 8000 ? text[0..8000] : text
+
+    response = client.embeddings(
+      parameters: {
+        model: "text-embedding-ada-002",
+        input: truncated_text
+      }
+    )
+
+    if response["data"] && response["data"][0] && response["data"][0]["embedding"]
+      response["data"][0]["embedding"]
+    else
+      raise "Failed to generate embedding: #{response["error"]}"
+    end
+  end
+
+  # Store content with its embedding
+  # @param content [String] The content to store
+  # @param content_type [String] The type of content
+  # @param collection [String] The collection/namespace
+  # @param task [Task] Optional associated task
+  # @param project [Project] Optional associated project
+  # @param metadata [Hash] Additional metadata
+  # @return [VectorEmbedding] The created embedding
+  def self.store(content:, content_type: "text", collection: "default",
+                task: nil, project: nil, source_url: nil, source_title: nil, metadata: {})
+    # Resolve project from task if not provided directly
+    if project.nil? && task.present? && task.project.present?
+      project = task.project
+    end
+
+    # Generate the embedding
+    embedding = generate_embedding(content)
+
+    # Create the record
+    create!(
+      content: content,
+      content_type: content_type,
+      collection: collection,
+      task: task,
+      project: project,
+      source_url: source_url,
+      source_title: source_title,
+      metadata: metadata,
+      embedding: embedding
+    )
+  end
+
+  # Search for similar content
+  # @param text [String] The query text
+  # @param limit [Integer] Maximum number of results to return
+  # @param collection [String] Optional collection to search within
+  # @param task_id [Integer] Optional task_id to filter by
+  # @param project_id [Integer] Optional project_id to filter by
+  # @param distance [String] The distance metric to use ("euclidean", "cosine", "inner_product")
+  # @return [Array<VectorEmbedding>] Matching embeddings sorted by similarity
+  def self.search(text:, limit: 5, collection: nil, task_id: nil, project_id: nil, distance: "cosine")
+    # Generate embedding for the query text
+    query_embedding = generate_embedding(text)
+
+    # Search for similar embeddings
+    find_similar(
+      query_embedding,
+      limit: limit,
+      collection: collection,
+      task_id: task_id,
+      project_id: project_id,
+      distance: distance
+    )
+  end
+end
+
+```
+
+`/Users/estiens/code/ai/DoubleAgent/app/models/llm_call.rb`:
+
+```rb
+class LlmCall < ApplicationRecord
+  belongs_to :agent_activity
+end
+
+```
+
+`/Users/estiens/code/ai/DoubleAgent/app/models/agent_activity.rb`:
+
+```rb
+class AgentActivity < ApplicationRecord
+  validates :agent_type, presence: true
+  validates :status, presence: true
+
+  belongs_to :task
+  has_ancestry
+
+  has_many :llm_calls, dependent: :destroy
+  has_many :events, dependent: :destroy
+
+  # Mark this activity as failed with an error message
+  def mark_failed(error_message)
+    update(
+      status: "failed",
+      error_message: error_message
+    )
+  end
+end
+
+```
+
+`/Users/estiens/code/ai/DoubleAgent/app/models/application_record.rb`:
+
+```rb
+class ApplicationRecord < ActiveRecord::Base
+  primary_abstract_class
+end
+
+```
+
+`/Users/estiens/code/ai/DoubleAgent/app/models/event.rb`:
+
+```rb
+class Event < ApplicationRecord
+  # Association with an agent activity - while optional in DB, validate presence
+  belongs_to :agent_activity, optional: false
+  validates :agent_activity, presence: true
+
+  # Validations
+  validates :event_type, presence: true
+
+  # Don't validate presence of data since an empty hash is valid
+  # validates :data, presence: true
+
+  # Note: We're not using serialize :data, JSON because it's causing errors
+  # Instead we'll handle serialization/deserialization manually
+
+  # Accessors for working with data as a hash
+  def data
+    return {} if self[:data].blank?
+
+    if self[:data].is_a?(Hash)
+      self[:data]
+    else
+      begin
+        JSON.parse(self[:data].to_s)
+      rescue
+        {}
+      end
+    end
+  end
+
+  # Override the setter to store hashes as JSON strings
+  def data=(value)
+    value = {} if value.nil?
+
+    if value.is_a?(Hash)
+      self[:data] = value.to_json
+    else
+      self[:data] = value
+    end
+  end
+
+  # Convert the data hash to a string before saving
+  before_save :ensure_json_data
+
+  def ensure_json_data
+    if self[:data].blank?
+      # Set an empty hash as default
+      self[:data] = {}.to_json
+    elsif self[:data].is_a?(Hash)
+      # Convert hash to properly formatted JSON string
+      self[:data] = self[:data].to_json
+    elsif self[:data].is_a?(String) && !self[:data].start_with?("{")
+      # If it's a string but not JSON formatted, try to parse it and re-serialize it
+      begin
+        parsed = JSON.parse(self[:data])
+        self[:data] = parsed.to_json
+      rescue
+        # If it can't be parsed, set to empty hash
+        self[:data] = {}.to_json
+      end
+    end
+  end
+
+  # Callback to publish the event when created
+  after_create :publish_to_event_bus
+
+  # Scopes for querying events
+  scope :unprocessed, -> { where(processed_at: nil) }
+  scope :processed, -> { where.not(processed_at: nil) }
+  scope :recent, -> { order(created_at: :desc) }
+  scope :by_type, ->(type) { where(event_type: type) }
+  scope :system_events, -> { where(agent_activity_id: nil) }
+
+  # Event priority levels
+  LOW_PRIORITY = 0
+  NORMAL_PRIORITY = 10
+  HIGH_PRIORITY = 20
+  CRITICAL_PRIORITY = 30
+
+  # Create and publish an event in one step
+  def self.publish(event_type, data = {}, options = {})
+    event = create!(
+      event_type: event_type,
+      data: data,
+      agent_activity_id: options[:agent_activity_id],
+      priority: options[:priority] || NORMAL_PRIORITY
+    )
+
+    # Event is published through the after_create callback
+    event
+  end
+
+  # Process this event through the EventBus
+  # This is used for testing and for reprocessing events
+  def process
+    EventBus.instance.dispatch_event(self)
+    mark_processed!
+    self
+  end
+
+  # Mark the event as processed
+  def mark_processed!
+    update(processed_at: Time.current)
+  end
+
+  # Alias for compatibility with older tests
+  def mark_processed
+    mark_processed!
+  end
+
+  # Record a processing attempt, with optional error
+  def record_processing_attempt!(error = nil)
+    updates = {
+      processing_attempts: processing_attempts + 1
+    }
+
+    updates[:processing_error] = error.to_s if error.present?
+
+    update(updates)
+  end
+
+  # Check if the event has been processed
+  def processed?
+    processed_at.present?
+  end
+
+  # Check if this is a system-wide event (not tied to an agent activity)
+  def system_event?
+    agent_activity_id.nil?
+  end
+
+  # String representation for better debugging
+  def to_s
+    "Event[#{id}] #{event_type}"
+  end
+
+  # Helper method to spawn an agent in response to an event
+  def spawn_agent(agent_class, purpose: nil, options: {})
+    # Merge event data into options
+    agent_options = {
+      event_id: id,
+      event_data: data,
+      purpose: purpose || "Processing #{event_type} event"
+    }.merge(options)
+
+    # Queue the agent job
+    agent_class.enqueue("Process event: #{event_type}", agent_options)
+  end
+
+  private
+
+  def publish_to_event_bus
+    EventBus.publish(self)
+  end
+end
+
+```
+
+`/Users/estiens/code/ai/DoubleAgent/app/models/concerns/solid_queue_management.rb`:
+
+```rb
+# Manages queue configuration and concurrency for SolidQueue
+# To be included in agent classes
+module SolidQueueManagement
+  extend ActiveSupport::Concern
+
+  included do
+    # Limit per-queue agent concurrency using SolidQueue's semaphore
+    def self.with_concurrency_control(key = nil)
+      semaphore_key = key || "#{queue_name}_concurrency"
+      concurrency_limit = self.concurrency_limit
+
+      # Attempt to acquire the semaphore
+      SolidQueue::Semaphore.new(
+        semaphore_key,
+        concurrency_limit,
+        expires_at: 30.minutes.from_now
+      ).acquire do
+        # Will only execute if successfully acquired the semaphore
+        yield
+      end
+    end
+
+    # Configure a recurring job for this agent type
+    # Example: OrchestratorAgent.configure_recurring(key: "hourly_orchestration",
+    #                                              schedule: "every hour",
+    #                                              prompt: "Check tasks")
+    def self.configure_recurring(key:, schedule:, prompt:, options: {})
+      SolidQueue::RecurringTask.create_or_update(
+        key: key,
+        schedule: schedule,
+        class_name: "Agents::AgentJob",
+        queue_name: queue_name.to_s,
+        arguments: [ self.name, prompt, options ]
+      )
+    end
+
+    # Find all agent jobs by type (both pending and running)
+    def self.pending_jobs
+      SolidQueue::Job.where(class_name: "Agents::AgentJob",
+                           queue_name: queue_name.to_s,
+                           finished_at: nil)
+    end
+
+    # Number of currently executing jobs for this agent type
+    def self.running_count
+      pending_jobs.joins(:claimed_execution).count
+    end
+
+    # Number of jobs waiting to be executed
+    def self.queued_count
+      pending_jobs.joins(:ready_execution).count
+    end
+
+    # Cancel all pending jobs for this agent type (useful for emergency stops)
+    def self.cancel_all_pending
+      pending_jobs.joins(:ready_execution).destroy_all
+    end
+  end
+end
+
+```
+
+`/Users/estiens/code/ai/DoubleAgent/app/models/concerns/event_subscriber.rb`:
+
+```rb
+# Adds event subscription capabilities to a class
+# To be included in agents and other event-aware components
+module EventSubscriber
+  extend ActiveSupport::Concern
+
+  included do
+    # Class-level subscriptions
+    class_attribute :subscriptions, default: {}
+
+    # Subscribe to an event with a callback
+    def self.subscribe_to(event_name, method_name = nil, &block)
+      # Use either a method name or a block as the callback
+      callback = block_given? ? block : method_name
+
+      # Validate we have a proper callback
+      unless callback.is_a?(Symbol) || callback.is_a?(Proc)
+        raise ArgumentError, "Must provide either a method name or a block"
+      end
+
+      # Store the subscription
+      self.subscriptions[event_name.to_s] = callback
+
+      # Register with EventBus
+      EventBus.register_handler(event_name.to_s, self)
+    end
+
+    # Class-level method to process an event directly
+    # This allows for both class-level and instance-level handling
+    def self.process(event)
+      # Get the callback for this event type
+      callback = self.subscriptions[event.event_type]
+
+      return unless callback
+
+      if callback.is_a?(Symbol)
+        # If the callback is a symbol, call the method on the class
+        self.send(callback, event)
+      elsif callback.is_a?(Proc)
+        # If the callback is a proc, execute it in the class context
+        self.class_exec(event, &callback)
+      end
+    end
+  end
+
+  # Instance method to process an event
+  def handle_event(event)
+    event_name = event.event_type
+    callback = self.class.subscriptions[event_name]
+
+    return unless callback
+
+    if callback.is_a?(Symbol)
+      # Call the method on this instance
+      send(callback, event)
+    elsif callback.is_a?(Proc)
+      # Execute the block in the context of this instance
+      instance_exec(event, &callback)
+    end
+  end
+end
+
+```
+
+`/Users/estiens/code/ai/DoubleAgent/app/models/task.rb`:
+
+```rb
+class Task < ApplicationRecord
+  validates :title, presence: true
+
+  has_many :agent_activities, dependent: :destroy
+  has_many :events, dependent: :destroy
+
+  # Project association
+  belongs_to :project, optional: true
+
+  # Parent-child relationship
+  belongs_to :parent, class_name: "Task", optional: true
+  has_many :subtasks, class_name: "Task", foreign_key: "parent_id", dependent: :destroy
+
+  # Task types
+  TASK_TYPES = %w[general research code analysis review orchestration].freeze
+
+  # Store metadata as JSON
+  # serialize :metadata, JSON
+
+  # Scopes
+  scope :root_tasks, -> { where(parent_id: nil) }
+  scope :by_type, ->(type) { where(task_type: type) }
+  scope :research_tasks, -> { where(task_type: "research") }
+  scope :recent, -> { order(created_at: :desc) }
+
+  # State machine for Task
+  # Requires 'aasm' gem. If not installed, add 'gem "aasm"' to your Gemfile and run bundle install.
+  include AASM
+
+  aasm column: "state" do
+    state :pending, initial: true
+    state :active
+    state :waiting_on_human
+    state :completed
+    state :failed
+
+    event :activate do
+      transitions from: :pending, to: :active
+    end
+
+    event :wait_on_human do
+      transitions from: :active, to: :waiting_on_human
+    end
+
+    event :complete do
+      transitions from: [ :active, :waiting_on_human ], to: :completed
+    end
+
+    event :fail do
+      transitions from: [ :pending, :active, :waiting_on_human ], to: :failed
+    end
+  end
+
+  # Mark this task as failed with an optional error message
+  def mark_failed(error_message = nil)
+    # Use the AASM fail! event to change state
+    fail! if may_fail?
+
+    # Record error message in metadata if provided
+    if error_message.present?
+      self.metadata ||= {}
+      self.metadata["error_message"] = error_message
+      save
+    end
+
+    true
+  end
+
+  # Callbacks
+  before_create :propagate_project_from_parent
+  after_create :ensure_metadata_exists
+
+  # Get the path of tasks from root to this task
+  def task_path
+    path = []
+    current = self
+
+    while current
+      path.unshift(current)
+      current = current.parent
+    end
+
+    path
+  end
+
+  # Check if this task has any pending human input requests
+  def waiting_for_human_input?
+    HumanInputRequest.where(task_id: id, status: "pending").exists?
+  end
+
+  # Default task type if not specified
+  def task_type
+    self[:task_type] || "general"
+  end
+
+  # Find the root task (topmost ancestor)
+  def root_task
+    parent_id.present? ? parent.root_task : self
+  end
+
+  # Search the project's knowledge base related to this task
+  def search_knowledge(query, limit = 5)
+    return [] unless project.present?
+
+    project.search_knowledge(query, limit)
+  end
+
+  # Store knowledge in the project's semantic memory
+  def store_knowledge(content, content_type: "text", collection: "default", metadata: {})
+    return nil unless project.present?
+
+    project.store_knowledge(
+      content,
+      content_type: content_type,
+      collection: collection,
+      metadata: metadata.merge(task_id: id, task_title: title)
+    )
+  end
+
+  private
+
+  # Ensure a subtask belongs to the same project as its parent
+  def propagate_project_from_parent
+    if parent_id.present? && project_id.nil?
+      self.project_id = parent.project_id
+    end
+  end
+
+  # Ensure metadata exists
+  def ensure_metadata_exists
+    self.metadata ||= {}
+    save if metadata_changed?
+  end
+end
+
+```
