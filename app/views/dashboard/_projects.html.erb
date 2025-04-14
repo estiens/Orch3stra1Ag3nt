@@ -2,7 +2,7 @@
   <div id="<%= dom_id(project) %>" class="dashboard-card project-card <%= project.status %>">
     <h3><%= project.name %></h3>
     <div class="card-details">
-      <p><strong>Status:</strong> <%= status_badge(project.status) if defined?(status_badge) %><%= project.status unless defined?(status_badge) %></p>
+      <p><strong>Status:</strong> <%= status_badge(project.status) %></p>
       <p><strong>Tasks:</strong> <%= project.tasks.count %></p>
       <p><strong>Created:</strong> <%= time_ago_in_words(project.created_at) %> ago</p>
     </div>

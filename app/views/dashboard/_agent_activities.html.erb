@@ -2,7 +2,7 @@
   <div id="<%= dom_id(activity) %>" class="dashboard-card activity-card <%= activity.status %>">
     <h3><%= activity.agent_type %></h3>
     <div class="card-details">
-      <p><strong>Status:</strong> <%= status_badge(activity.status) if defined?(status_badge) %><%= activity.status unless defined?(status_badge) %></p>
+      <p><strong>Status:</strong> <%= status_badge(activity.status) %></p>
       <p><strong>Task:</strong> <%= activity.task&.title || "N/A" %></p>
       <p><strong>Started:</strong> <%= time_ago_in_words(activity.created_at) %> ago</p>
       <% if activity.completed_at %>

@@ -161,6 +161,36 @@
   gap: 10px;
 }
 
+/* Badge Styles */
+.badge {
+  display: inline-block;
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: white;
+}
+
+.badge-success {
+  background-color: #4caf50;
+}
+
+.badge-primary {
+  background-color: #2196f3;
+}
+
+.badge-warning {
+  background-color: #ff9800;
+}
+
+.badge-danger {
+  background-color: #f44336;
+}
+
+.badge-secondary {
+  background-color: #9e9e9e;
+}
+
 /* Animation for new items */
 @keyframes highlight {
   0% { background-color: rgba(255, 251, 130, 0.8); }

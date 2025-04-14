@@ -66,9 +66,7 @@ class ProjectsController < ApplicationController
       redirect_to @project, alert: "Project can only be kicked off when in pending status."
     end
   end
-
-  private
-
+  
   # POST /projects/1/pause
   def pause
     if @project.status == "active"
@@ -100,6 +98,8 @@ class ProjectsController < ApplicationController
       end
     end
   end
+
+  private
 
   def set_project
     @project = Project.find(params[:id])
