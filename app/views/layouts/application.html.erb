@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html class="h-full bg-gray-100">
   <head>
-    <title><%= content_for(:title) || "Double Agent" %></title>
+    <title><%= content_for(:title) || "AI Agent System" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
@@ -20,37 +20,47 @@
     <%# Includes all stylesheet files in app/assets/stylesheets %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
+    
+    <!-- Include Tailwind CDN for development -->
+    <script src="https://cdn.tailwindcss.com"></script>
   </head>
 
-  <body>
-    <header class="main-header">
-      <div class="header-container">
-        <div class="logo">
-          <%= link_to "AI Agent System", root_path %>
+  <body class="h-full">
+    <div class="min-h-full">
+      <header class="main-header">
+        <div class="header-container">
+          <div class="logo">
+            <%= link_to root_path, class: "flex items-center" do %>
+              <svg class="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span>AI Agent System</span>
+            <% end %>
+          </div>
+          <nav class="main-nav">
+            <%= link_to "Dashboard", dashboard_path, class: current_page?(dashboard_path) ? "active" : "" %>
+            <%= link_to "Projects", projects_path, class: current_page?(projects_path) ? "active" : "" %>
+            <% if defined?(admin_path) %>
+              <%= link_to "Admin", admin_path, class: current_page?(admin_path) ? "active" : "" %>
+            <% end %>
+          </nav>
         </div>
-        <nav class="main-nav">
-          <%= link_to "Dashboard", dashboard_path %>
-          <%= link_to "Projects", projects_path %>
-          <% if defined?(admin_path) %>
-            <%= link_to "Admin", admin_path %>
-          <% end %>
-        </nav>
+      </header>
+
+      <% if notice %>
+        <div class="flash flash-notice"><%= notice %></div>
+      <% end %>
+      <% if alert %>
+        <div class="flash flash-alert"><%= alert %></div>
+      <% end %>
+
+      <main>
+        <%= yield %>
+      </main>
+
+      <div id="modal" class="modal" data-controller="modal" data-action="click->modal#closeBackground">
+        <%= yield :modal %>
       </div>
-    </header>
-
-    <% if notice %>
-      <div class="flash flash-notice"><%= notice %></div>
-    <% end %>
-    <% if alert %>
-      <div class="flash flash-alert"><%= alert %></div>
-    <% end %>
-
-    <main class="container mx-auto mt-28 px-5 flex">
-      <%= yield %>
-    </main>
-
-    <div id="modal" class="modal" data-controller="modal" data-action="click->modal#closeBackground">
-      <%= yield :modal %>
     </div>
   </body>
 </html>

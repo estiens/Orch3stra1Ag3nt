@@ -1,32 +1,98 @@
-<% agent_activities.each do |activity| %>
-  <div id="<%= dom_id(activity) %>" class="dashboard-card activity-card <%= activity.status %>">
-    <div class="flex justify-between items-start">
-      <h3 class="text-lg font-medium">
-        <%= link_to activity.agent_type, agent_activity_path(activity), class: "hover:text-blue-600 hover:underline" %>
-      </h3>
-      <%= status_badge(activity.status) %>
-    </div>
-    <div class="card-details mt-2">
-      <p><strong>Task:</strong> <%= activity.task&.title || "N/A" %></p>
-      <p><strong>Started:</strong> <%= time_ago_in_words(activity.created_at) %> ago</p>
-      <% if activity.completed_at %>
-        <p><strong>Duration:</strong> <%= distance_of_time_in_words(activity.created_at, activity.completed_at) %></p>
-      <% end %>
-      <% if activity.llm_calls.any? %>
-        <p><strong>LLM Calls:</strong> <%= activity.llm_calls.count %></p>
-      <% end %>
-    </div>
-    <div class="card-actions mt-3 flex justify-between items-center">
-      <div>
-        <%= link_to "Details", agent_activity_path(activity), class: "text-blue-600 text-sm hover:underline" %>
+<% if agent_activities.any? %>
+  <% agent_activities.each do |activity| %>
+    <div id="<%= dom_id(activity) %>" class="hover:bg-gray-50 transition-colors duration-150">
+      <div class="p-4 sm:px-6">
+        <div class="flex items-center justify-between">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center">
+              <div class="h-8 w-8 rounded-full flex items-center justify-center
+                <%= activity.status == 'running' ? 'bg-green-100 text-green-700' : 
+                   activity.status == 'completed' ? 'bg-blue-100 text-blue-700' : 
+                   activity.status == 'failed' ? 'bg-red-100 text-red-700' : 
+                   activity.status == 'paused' ? 'bg-yellow-100 text-yellow-700' : 
+                   'bg-gray-100 text-gray-700' %>">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div class="ml-3">
+                <h3 class="text-base font-medium text-gray-900 truncate">
+                  <%= link_to activity.agent_type, agent_activity_path(activity), class: "hover:text-indigo-600 focus:outline-none" %>
+                </h3>
+                <div class="flex items-center text-xs text-gray-500">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                    <%= activity.status == 'running' ? 'bg-green-100 text-green-800' : 
+                       activity.status == 'completed' ? 'bg-blue-100 text-blue-800' : 
+                       activity.status == 'failed' ? 'bg-red-100 text-red-800' : 
+                       activity.status == 'paused' ? 'bg-yellow-100 text-yellow-800' : 
+                       'bg-gray-100 text-gray-800' %>">
+                    <%= activity.status.capitalize %>
+                  </span>
+                  
+                  <% if activity.task %>
+                    <span class="ml-2">
+                      Task: <%= link_to activity.task.title, activity.task, class: "hover:text-indigo-600" %>
+                    </span>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="ml-4 flex-shrink-0 flex">
+            <% if activity.status == "running" %>
+              <%= button_to pause_agent_activity_path(activity), method: :post, class: "inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500" do %>
+                Pause
+              <% end %>
+            <% elsif activity.status == "paused" %>
+              <%= button_to resume_agent_activity_path(activity), method: :post, class: "inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" do %>
+                Resume
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+        
+        <div class="mt-2 grid grid-cols-2 gap-x-4 text-xs text-gray-500">
+          <div>
+            <span class="inline-flex items-center">
+              <svg class="mr-1 h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Started <%= time_ago_in_words(activity.created_at) %> ago
+            </span>
+          </div>
+          
+          <% if activity.completed_at %>
+            <div>
+              <span class="inline-flex items-center">
+                <svg class="mr-1 h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                Duration: <%= distance_of_time_in_words(activity.created_at, activity.completed_at) %>
+              </span>
+            </div>
+          <% end %>
+          
+          <% if activity.llm_calls.any? %>
+            <div>
+              <span class="inline-flex items-center">
+                <svg class="mr-1 h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <%= pluralize(activity.llm_calls.count, 'LLM call') %>
+              </span>
+            </div>
+          <% end %>
+        </div>
       </div>
-      <div>
-        <% if activity.status == "running" %>
-          <%= button_to "Pause", pause_agent_activity_path(activity), method: :post, class: "button button-warning" %>
-        <% elsif activity.status == "paused" %>
-          <%= button_to "Resume", resume_agent_activity_path(activity), method: :post, class: "button button-success" %>
-        <% end %>
-      </div>
     </div>
+  <% end %>
+<% else %>
+  <div class="p-6 text-center">
+    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+    <h3 class="mt-2 text-sm font-medium text-gray-900">No agent activities</h3>
+    <p class="mt-1 text-sm text-gray-500">Agent activities will appear here when tasks are running.</p>
   </div>
 <% end %>

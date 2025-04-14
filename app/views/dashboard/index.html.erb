@@ -1,57 +1,184 @@
-<div class="dashboard-container">
-  <h1>Agent System Dashboard</h1>
-  
-  <div class="dashboard-actions">
-    <%= link_to "New Project", new_project_path, class: "button button-primary" %>
-    <%= link_to "Projects", projects_path, class: "button" %>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="flex justify-between items-center mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">AI Agent Dashboard</h1>
+    
+    <div class="flex space-x-3">
+      <%= link_to new_project_path, class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
+        <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+        New Project
+      <% end %>
+      
+      <%= link_to projects_path, class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
+        <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+        </svg>
+        All Projects
+      <% end %>
+    </div>
   </div>
   
-  <div class="dashboard-grid">
-    <!-- Projects Section -->
-    <div class="dashboard-section">
-      <h2>Active Projects</h2>
-      <div id="projects-container" class="card-container">
-        <%= render partial: "projects", locals: { projects: @projects } %>
+  <!-- Dashboard Overview Stats -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center">
+          <div class="flex-shrink-0 bg-indigo-500 rounded-md p-3">
+            <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">Active Projects</dt>
+              <dd class="flex items-baseline">
+                <div class="text-2xl font-semibold text-gray-900"><%= @projects.count %></div>
+              </dd>
+            </dl>
+          </div>
+        </div>
       </div>
     </div>
     
-    <!-- Agent Activities Section -->
-    <div class="dashboard-section">
-      <h2>Recent Agent Activities</h2>
-      <div id="agent-activities-container" class="card-container">
-        <%= render partial: "agent_activities", locals: { agent_activities: @agent_activities } %>
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center">
+          <div class="flex-shrink-0 bg-green-500 rounded-md p-3">
+            <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">Active Tasks</dt>
+              <dd class="flex items-baseline">
+                <div class="text-2xl font-semibold text-gray-900"><%= @tasks.count %></div>
+              </dd>
+            </dl>
+          </div>
+        </div>
       </div>
     </div>
     
-    <!-- LLM Calls Section -->
-    <div class="dashboard-section">
-      <h2>Recent LLM Calls</h2>
-      <div id="llm-calls-container" class="card-container">
-        <%= render partial: "llm_calls", locals: { llm_calls: @llm_calls } %>
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center">
+          <div class="flex-shrink-0 bg-yellow-500 rounded-md p-3">
+            <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">Pending Input</dt>
+              <dd class="flex items-baseline">
+                <div class="text-2xl font-semibold text-gray-900"><%= @human_input_requests.count %></div>
+              </dd>
+            </dl>
+          </div>
+        </div>
       </div>
     </div>
     
-    <!-- Events Section -->
-    <div class="dashboard-section">
-      <h2>Latest Events</h2>
-      <div id="events-container" class="card-container">
-        <%= render partial: "events", locals: { events: @events } %>
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center">
+          <div class="flex-shrink-0 bg-purple-500 rounded-md p-3">
+            <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">Agent Activities</dt>
+              <dd class="flex items-baseline">
+                <div class="text-2xl font-semibold text-gray-900"><%= @agent_activities.count %></div>
+              </dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Main Dashboard Content -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+    <!-- Left Column -->
+    <div class="space-y-6 col-span-1">
+      <!-- Projects Section -->
+      <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="px-4 py-5 border-b border-gray-200 sm:px-6 flex justify-between items-center">
+          <h2 class="text-lg font-medium text-gray-900">Active Projects</h2>
+          <%= link_to "View All", projects_path, class: "text-sm text-indigo-600 hover:text-indigo-900" %>
+        </div>
+        <div id="projects-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+          <%= render partial: "projects", locals: { projects: @projects } %>
+        </div>
+      </div>
+      
+      <!-- Human Input Requests Section -->
+      <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="px-4 py-5 border-b border-gray-200 sm:px-6 flex justify-between items-center">
+          <div class="flex items-center">
+            <h2 class="text-lg font-medium text-gray-900">Pending Human Input</h2>
+            <% if @human_input_requests.any? %>
+              <span class="ml-2 px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                <%= @human_input_requests.count %>
+              </span>
+            <% end %>
+          </div>
+        </div>
+        <div id="human-input-requests-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+          <%= render partial: "human_input_requests", locals: { human_input_requests: @human_input_requests } %>
+        </div>
       </div>
     </div>
     
-    <!-- Human Input Requests Section -->
-    <div class="dashboard-section">
-      <h2>Pending Human Input</h2>
-      <div id="human-input-requests-container" class="card-container">
-        <%= render partial: "human_input_requests", locals: { human_input_requests: @human_input_requests } %>
+    <!-- Middle Column -->
+    <div class="space-y-6 col-span-1">
+      <!-- Tasks Section -->
+      <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="px-4 py-5 border-b border-gray-200 sm:px-6 flex justify-between items-center">
+          <h2 class="text-lg font-medium text-gray-900">Active Tasks</h2>
+          <%= link_to "View All", tasks_path, class: "text-sm text-indigo-600 hover:text-indigo-900" %>
+        </div>
+        <div id="tasks-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+          <%= render partial: "tasks", locals: { tasks: @tasks } %>
+        </div>
+      </div>
+      
+      <!-- Agent Activities Section -->
+      <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+          <h2 class="text-lg font-medium text-gray-900">Recent Agent Activities</h2>
+        </div>
+        <div id="agent-activities-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+          <%= render partial: "agent_activities", locals: { agent_activities: @agent_activities } %>
+        </div>
       </div>
     </div>
     
-    <!-- Tasks Section -->
-    <div class="dashboard-section">
-      <h2>Active Tasks</h2>
-      <div id="tasks-container" class="card-container">
-        <%= render partial: "tasks", locals: { tasks: @tasks } %>
+    <!-- Right Column -->
+    <div class="space-y-6 col-span-1">
+      <!-- LLM Calls Section -->
+      <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+          <h2 class="text-lg font-medium text-gray-900">Recent LLM Calls</h2>
+        </div>
+        <div id="llm-calls-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+          <%= render partial: "llm_calls", locals: { llm_calls: @llm_calls } %>
+        </div>
+      </div>
+      
+      <!-- Events Section -->
+      <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+          <h2 class="text-lg font-medium text-gray-900">Latest Events</h2>
+        </div>
+        <div id="events-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+          <%= render partial: "events", locals: { events: @events } %>
+        </div>
       </div>
     </div>
   </div>
