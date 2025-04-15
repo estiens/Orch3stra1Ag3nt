@@ -38,10 +38,19 @@ RSpec.describe Agents::AgentJob, type: :job do
       # First clear any existing activities to ensure clean test state
       AgentActivity.where(task_id: task.id).destroy_all
       
-      expect {
-        described_class.new.perform(agent_class, agent_prompt, options)
-      }.to change(AgentActivity, :count).by(1)
-
+      # Count activities before the test
+      before_count = AgentActivity.count
+      
+      # Perform the action
+      described_class.new.perform(agent_class, agent_prompt, options)
+      
+      # Count activities after the test
+      after_count = AgentActivity.count
+      
+      # Verify exactly one activity was created
+      expect(after_count - before_count).to eq(1)
+      
+      # Verify the activity properties
       activity = AgentActivity.last
       expect(activity.agent_type).to eq("BaseAgent")
       expect(activity.task_id).to eq(task.id)
