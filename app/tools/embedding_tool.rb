@@ -55,7 +55,7 @@ class EmbeddingTool
   # Add files to the vector database
   def add_files(
     files:,
-    content_type: DEFAULT_CONTENT_TYPE,
+    content_type: nil, # Allow auto-detection from file extension
     collection: DEFAULT_COLLECTION,
     chunk_size: DEFAULT_CHUNK_SIZE,
     chunk_overlap: DEFAULT_CHUNK_OVERLAP,
@@ -75,23 +75,68 @@ class EmbeddingTool
     added = []
     files_array.each do |file|
       file_obj = validate_and_open_file(file)
+      file_path = file_obj.respond_to?(:path) ? file_obj.path : "unknown"
+      
+      # Determine content type if not provided
+      detected_content_type = content_type
+      if detected_content_type.nil? && file_obj.respond_to?(:path)
+        ext = File.extname(file_obj.path).downcase
+        detected_content_type = case ext
+                               when '.md', '.txt', '.text' then 'text'
+                               when '.html', '.htm' then 'html'
+                               when '.pdf' then 'pdf'
+                               when '.doc', '.docx' then 'document'
+                               when '.rb', '.py', '.js', '.java', '.c', '.cpp' then 'code'
+                               when '.json', '.xml', '.yaml', '.yml' then 'data'
+                               else DEFAULT_CONTENT_TYPE
+                               end
+      end
 
       # Prepare file-specific metadata
-      file_metadata = build_file_metadata(file_obj, merge: metadata, content_type: content_type, source_url: source_url, source_title: source_title)
+      file_metadata = build_file_metadata(
+        file_obj, 
+        merge: metadata, 
+        content_type: detected_content_type, 
+        source_url: source_url, 
+        source_title: source_title
+      )
+      
+      # Log file processing
+      Rails.logger.tagged("EmbeddingTool") do
+        Rails.logger.info("Processing file: #{file_path} (#{file_obj.size} bytes, type: #{detected_content_type})")
+      end
+      
+      # Read file content
+      begin
+        file_content = file_obj.read
+      rescue => e
+        Rails.logger.error("Error reading file #{file_path}: #{e.message}")
+        added << {
+          path: file_path,
+          error: "Failed to read file: #{e.message}",
+          status: "error"
+        }
+        next
+      end
+      
       # Add document to embedding service
       result = service.add_document(
-        file_obj.read,
+        file_content,
         chunk_size: chunk_size,
         chunk_overlap: chunk_overlap,
-        content_type: content_type,
+        content_type: detected_content_type,
+        source_url: source_url || file_path,
+        source_title: source_title || File.basename(file_path),
         metadata: file_metadata
       )
 
       added << {
-        path: file_obj.path,
+        path: file_path,
         size: file_obj.size,
+        content_type: detected_content_type,
         chunk_preview: result.first&.content&.first(40),
-        chunks: result.count
+        chunks: result.count,
+        status: "success"
       }
     end
 
@@ -99,7 +144,8 @@ class EmbeddingTool
       status: "success",
       message: "Files added successfully",
       added: added,
-      total_count: added.count
+      total_count: added.count,
+      successful_count: added.count { |item| item[:status] == "success" }
     }
   end
 
@@ -241,14 +287,23 @@ class EmbeddingTool
   # Validate and open a file
   def validate_and_open_file(file)
     if file.is_a?(String)
-      raise ArgumentError, "File not found: #{file}" unless File.exist?(file)
-      raise ArgumentError, "File is not readable: #{file}" unless File.readable?(file)
-      File.open(file)
+      # Handle string file paths
+      expanded_path = File.expand_path(file)
+      raise ArgumentError, "File not found: #{file}" unless File.exist?(expanded_path)
+      raise ArgumentError, "File is not readable: #{file}" unless File.readable?(expanded_path)
+      raise ArgumentError, "File is empty or too small: #{file}" if File.size(expanded_path) < 10
+      File.open(expanded_path)
     elsif file.respond_to?(:read)
-      path = file.respond_to?(:path) ? file.path : nil
-      if path
+      # Handle file-like objects
+      if file.respond_to?(:path) && file.path
+        path = file.path
         raise ArgumentError, "File not found: #{path}" unless File.exist?(path)
         raise ArgumentError, "File is not readable: #{path}" unless File.readable?(path)
+        
+        # Check if file is at beginning
+        if file.respond_to?(:pos) && file.pos > 0
+          file.rewind rescue nil
+        end
       end
       file
     else
@@ -272,15 +327,38 @@ def build_file_metadata(file_obj, merge: {}, content_type: nil, source_url: nil,
   metadata = {}
   metadata[:source_title]   = source_title if source_title
   metadata[:source_url]     = source_url if source_url
+  
+  # Extract file path information
   if file_obj.respond_to?(:path)
-    metadata[:source_title] ||= file_obj.path
-    metadata[:file_name]      = File.basename(file_obj.path) rescue nil
-    metadata[:file_ext]       = File.extname(file_obj.path) rescue nil
+    file_path = file_obj.path
+    metadata[:source_title] ||= file_path
+    metadata[:file_path]      = file_path
+    metadata[:file_name]      = File.basename(file_path) rescue nil
+    metadata[:file_ext]       = File.extname(file_path).downcase rescue nil
+    metadata[:file_dir]       = File.dirname(file_path) rescue nil
+    
+    # Try to determine content type from extension if not provided
+    if content_type.nil? && metadata[:file_ext]
+      ext = metadata[:file_ext].downcase
+      content_type = case ext
+                     when '.md', '.txt', '.text' then 'text'
+                     when '.html', '.htm' then 'html'
+                     when '.pdf' then 'pdf'
+                     when '.doc', '.docx' then 'document'
+                     when '.rb', '.py', '.js', '.java', '.c', '.cpp' then 'code'
+                     when '.json', '.xml', '.yaml', '.yml' then 'data'
+                     else 'unknown'
+                     end
+    end
   end
+  
   metadata[:file_size]        = file_obj.size if file_obj.respond_to?(:size)
   metadata[:content_type]     = content_type ||
     (file_obj.respond_to?(:content_type) && file_obj.content_type) ||
     DEFAULT_CONTENT_TYPE
+  metadata[:timestamp]        = Time.now.iso8601
+  
+  # Merge any additional metadata
   metadata.merge!(file_obj.metadata) if file_obj.respond_to?(:metadata)
   metadata.merge!(merge || {})
   metadata.compact

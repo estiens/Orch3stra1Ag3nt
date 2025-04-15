@@ -36,6 +36,95 @@ RSpec.describe EmbeddingTool do
     end
   end
   
+  describe "#add_files" do
+    let(:test_file_path) { "spec/fixtures/test_file.txt" }
+    let(:test_file_content) { "This is test file content" }
+    
+    before do
+      # Create a test file
+      FileUtils.mkdir_p(File.dirname(test_file_path))
+      File.write(test_file_path, test_file_content)
+    end
+    
+    after do
+      # Clean up test file
+      FileUtils.rm_f(test_file_path)
+    end
+    
+    it "processes a file and includes file path in metadata" do
+      embedding_service = instance_double(EmbeddingService)
+      allow(EmbeddingService).to receive(:new).and_return(embedding_service)
+      
+      # Expect the service to be called with file path in metadata
+      expect(embedding_service).to receive(:add_document) do |content, options|
+        expect(content).to eq(test_file_content)
+        expect(options[:metadata][:file_path]).to eq(test_file_path)
+        expect(options[:metadata][:file_name]).to eq(File.basename(test_file_path))
+        [build(:vector_embedding)]
+      end
+      
+      result = tool.add_files(files: test_file_path)
+      expect(result[:status]).to eq("success")
+      expect(result[:added].first[:path]).to eq(test_file_path)
+    end
+    
+    it "handles file objects" do
+      file = File.open(test_file_path)
+      
+      embedding_service = instance_double(EmbeddingService)
+      allow(EmbeddingService).to receive(:new).and_return(embedding_service)
+      
+      expect(embedding_service).to receive(:add_document) do |content, options|
+        expect(content).to eq(test_file_content)
+        expect(options[:metadata][:file_path]).to eq(test_file_path)
+        [build(:vector_embedding)]
+      end
+      
+      result = tool.add_files(files: file)
+      expect(result[:status]).to eq("success")
+      
+      file.close
+    end
+    
+    it "detects content type from file extension" do
+      # Create test files with different extensions
+      extensions = {
+        ".txt" => "text",
+        ".md" => "text",
+        ".html" => "html",
+        ".rb" => "code",
+        ".json" => "data"
+      }
+      
+      test_files = []
+      
+      extensions.each do |ext, expected_type|
+        path = "spec/fixtures/test_file#{ext}"
+        File.write(path, "Test content for #{ext}")
+        test_files << path
+      end
+      
+      begin
+        embedding_service = instance_double(EmbeddingService)
+        allow(EmbeddingService).to receive(:new).and_return(embedding_service)
+        
+        extensions.each_with_index do |(ext, expected_type), index|
+          expect(embedding_service).to receive(:add_document).with(
+            anything,
+            hash_including(content_type: expected_type)
+          ).and_return([build(:vector_embedding)])
+        end
+        
+        result = tool.add_files(files: test_files)
+        expect(result[:status]).to eq("success")
+        expect(result[:added].size).to eq(extensions.size)
+      ensure
+        # Clean up test files
+        test_files.each { |f| FileUtils.rm_f(f) }
+      end
+    end
+  end
+  
   describe "#similarity_search" do
     before do
       allow_any_instance_of(EmbeddingService).to receive(:similarity_search).and_return([

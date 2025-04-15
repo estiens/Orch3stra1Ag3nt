@@ -29,6 +29,16 @@ class EmbeddingService
     end.compact
   end
 
+  # Process a document by chunking it and storing the chunks with embeddings
+  # @param text [String] The document text to process
+  # @param chunk_size [Integer] Size of each chunk
+  # @param chunk_overlap [Integer] Overlap between chunks
+  # @param content_type [String] Type of content
+  # @param source_url [String] Source URL
+  # @param source_title [String] Source title
+  # @param metadata [Hash] Additional metadata
+  # @param force [Boolean] Whether to force processing even if chunks exist
+  # @return [Array<VectorEmbedding>] The created embedding records
   def add_document(text, chunk_size: 512, chunk_overlap: 25, content_type: "document", source_url: nil, source_title: nil, metadata: {}, force: false)
     if text.blank?
       Rails.logger.info("Empty document received - nothing to process")
@@ -39,6 +49,11 @@ class EmbeddingService
     text_size = text.bytesize
     Rails.logger.tagged("EmbeddingService", "add_document") do
       Rails.logger.info("Starting document processing: #{text_size} bytes, chunk_size=#{chunk_size}, overlap=#{chunk_overlap}")
+      
+      # Log file information if available
+      if metadata[:file_path].present?
+        Rails.logger.info("Processing file: #{metadata[:file_path]}")
+      end
 
       # STAGE 1: Chunking
       chunking_start = Time.now
@@ -118,16 +133,36 @@ class EmbeddingService
               content_type: content_type,
               source_url: source_url,
               source_title: source_title,
-              embedding_model: "gte-large-buc"
+              embedding_model: "gte-large-buc",
+              timestamp: Time.now.iso8601,
+              chunk_size: chunk_size,
+              chunk_overlap: chunk_overlap,
+              document_size: text_size
             }
+            
+            # Add task and project info
             base_metadata[:task_id] = @task.id if @task
             base_metadata[:project_id] = @project.id if @project
-            base_metadata.merge!(metadata) if metadata.present?
+            
+            # Preserve file path information from metadata
+            if metadata.present?
+              %i[file_path file_name file_ext file_dir].each do |key|
+                base_metadata[key] = metadata[key] if metadata[key].present?
+              end
+              
+              # Merge remaining metadata
+              base_metadata.merge!(metadata)
+            end
 
             # Build records for bulk insert
             records = []
-            pending_chunks.zip(pending_embeddings).each do |chunk, embedding|
+            pending_chunks.zip(pending_embeddings).each_with_index do |(chunk, embedding), chunk_idx|
               next if embedding.nil?
+              
+              # Add chunk-specific metadata
+              chunk_metadata = base_metadata.dup
+              chunk_metadata[:chunk_index] = chunk_idx
+              chunk_metadata[:chunk_count] = chunks.size
 
               records << {
                 task_id: @task&.id,
@@ -137,7 +172,7 @@ class EmbeddingService
                 content: chunk,
                 source_url: source_url,
                 source_title: source_title,
-                metadata: base_metadata,
+                metadata: chunk_metadata,
                 embedding: embedding,
                 created_at: Time.current,
                 updated_at: Time.current
@@ -406,23 +441,53 @@ class EmbeddingService
     end
   end
 
-  # Actually store (bypassing skip check)
+  # Store content with its embedding in the database
+  # @param content [String] The content to store
+  # @param content_type [String] The type of content
+  # @param source_url [String] Optional source URL
+  # @param source_title [String] Optional source title
+  # @param metadata [Hash] Additional metadata
+  # @return [VectorEmbedding] The created embedding record
   def store(content:, content_type: "text", source_url: nil, source_title: nil, metadata: {})
     return if content.blank?
+    
     # Prepare metadata
     full_metadata = {
       content_type: content_type,
       source_url: source_url,
       source_title: source_title,
-      embedding_model: "huggingface"
+      embedding_model: "huggingface",
+      timestamp: Time.now.iso8601
     }
+    
+    # Add task and project info
     full_metadata[:task_id] = @task.id if @task
     full_metadata[:project_id] = @project.id if @project
+    
+    # Merge additional metadata, preserving file path information
+    if metadata.present?
+      # Ensure file path information is preserved
+      %i[file_path file_name file_ext file_dir].each do |key|
+        full_metadata[key] = metadata[key] if metadata[key].present?
+      end
+      
+      # Merge the rest
+      full_metadata.merge!(metadata)
+    end
 
-
+    # Generate embedding
+    start_time = Time.now
     embedding = generate_embedding(content).flatten
-    raise "Embedding generation failed" if embedding.nil? || embedding.empty?
+    generation_time = Time.now - start_time
+    
+    if embedding.nil? || embedding.empty?
+      Rails.logger.error("Embedding generation failed for content: #{content.truncate(100)}")
+      raise "Embedding generation failed"
+    end
+    
+    Rails.logger.info("Generated embedding in #{generation_time.round(2)}s (#{embedding.size} dimensions)")
 
+    # Create record
     VectorEmbedding.create!(
       task_id: @task&.id,
       project_id: @project&.id,

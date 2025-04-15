@@ -52,6 +52,63 @@ RSpec.describe EmbeddingService do
     end
   end
   
+  describe "#store" do
+    let(:test_content) { "Test content for embedding" }
+    let(:test_embedding) { Array.new(384) { rand } }
+    
+    before do
+      allow(service).to receive(:generate_embedding).and_return(test_embedding)
+    end
+    
+    it "creates a vector embedding with proper metadata" do
+      metadata = {
+        file_path: "/path/to/file.txt",
+        file_name: "file.txt",
+        custom_field: "custom value"
+      }
+      
+      embedding = service.send(:store, 
+        content: test_content, 
+        content_type: "text", 
+        source_url: "http://example.com", 
+        source_title: "Example Document",
+        metadata: metadata
+      )
+      
+      expect(embedding).to be_persisted
+      expect(embedding.content).to eq(test_content)
+      expect(embedding.content_type).to eq("text")
+      expect(embedding.source_url).to eq("http://example.com")
+      expect(embedding.source_title).to eq("Example Document")
+      
+      # Check that metadata was properly stored
+      expect(embedding.metadata["file_path"]).to eq("/path/to/file.txt")
+      expect(embedding.metadata["file_name"]).to eq("file.txt")
+      expect(embedding.metadata["custom_field"]).to eq("custom value")
+      expect(embedding.metadata["embedding_model"]).to eq("huggingface")
+      expect(embedding.metadata["timestamp"]).to be_present
+    end
+    
+    it "includes task and project IDs in metadata when available" do
+      project = create(:project)
+      task = create(:task, project: project)
+      service_with_context = described_class.new(task: task)
+      
+      allow(service_with_context).to receive(:generate_embedding).and_return(test_embedding)
+      
+      embedding = service_with_context.send(:store, content: test_content)
+      
+      expect(embedding.task_id).to eq(task.id)
+      expect(embedding.project_id).to eq(project.id)
+      expect(embedding.metadata["task_id"]).to eq(task.id)
+      expect(embedding.metadata["project_id"]).to eq(project.id)
+    end
+    
+    it "returns nil for blank content" do
+      expect(service.send(:store, content: "")).to be_nil
+    end
+  end
+  
   describe "#generate_embedding", vcr: { cassette_name: "embedding_service/generate_embedding" } do
     it "raises error when API key is missing" do
       allow(ENV).to receive(:[]).with("HUGGINGFACE_API_TOKEN").and_return(nil)
