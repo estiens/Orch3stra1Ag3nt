@@ -129,18 +129,41 @@ class CodeResearcherAgent < BaseAgent
           if iterations > MAX_ITERATIONS
             Rails.logger.warn "[CodeResearcherAgent-#{task&.id}] Reached maximum iterations (#{MAX_ITERATIONS}). Research stopped. Consider refining the question or increasing MAX_ITERATIONS."
             final_result_message = "Research stopped after reaching maximum iterations (#{MAX_ITERATIONS}). Review logs (Activity ID: #{agent_activity&.id}) and compiled notes."
-            agent_activity&.events&.create(event_type: "max_iterations_reached", data: { max: MAX_ITERATIONS })
-            task&.mark_failed(final_result_message) # Mark task failed with informative message
-            agent_activity&.mark_failed(final_result_message)
+
+            # Safely create events and handle failures
+            begin
+              if agent_activity.present?
+                agent_activity.events.create(event_type: "max_iterations_reached", data: { max: MAX_ITERATIONS })
+                agent_activity.mark_failed(final_result_message)
+              else
+                Rails.logger.warn "[CodeResearcherAgent-#{task&.id}] Cannot create event or mark failed: No agent_activity associated"
+              end
+
+              task&.mark_failed(final_result_message) # Mark task failed with informative message
+            rescue => e
+              Rails.logger.error "[CodeResearcherAgent-#{task&.id}] Error during failure handling: #{e.message}"
+            end
             break # Exit Loop
           end
 
           if consecutive_tool_errors >= MAX_CONSECUTIVE_TOOL_ERRORS
             Rails.logger.error "[CodeResearcherAgent-#{task&.id}] Reached maximum consecutive tool errors (#{MAX_CONSECUTIVE_TOOL_ERRORS}). Research stopped. Check tool implementation or LLM ability to use tools correctly."
             final_result_message = "Research stopped after #{MAX_CONSECUTIVE_TOOL_ERRORS} consecutive tool errors. Review logs (Activity ID: #{agent_activity&.id}) and compiled notes."
-            agent_activity&.events&.create(event_type: "max_consecutive_tool_errors_reached", data: { max: MAX_CONSECUTIVE_TOOL_ERRORS })
-            task&.mark_failed(final_result_message) # Mark task failed with informative message
-            agent_activity&.mark_failed(final_result_message)
+
+            # Safely create events and handle failures
+            begin
+              if agent_activity.present?
+                agent_activity.events.create(event_type: "max_consecutive_tool_errors_reached", data: { max: MAX_CONSECUTIVE_TOOL_ERRORS })
+                agent_activity.mark_failed(final_result_message)
+              else
+                Rails.logger.warn "[CodeResearcherAgent-#{task&.id}] Cannot create event or mark failed: No agent_activity associated"
+              end
+
+              task&.mark_failed(final_result_message) # Mark task failed with informative message
+            rescue => e
+              Rails.logger.error "[CodeResearcherAgent-#{task&.id}] Error during failure handling: #{e.message}"
+            end
+
             break # Exit Loop
           end
 

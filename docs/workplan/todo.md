@@ -8,31 +8,13 @@
 
 ## TODO
 
+REVIEW OUR PRELIMINARY DASHBOARD IMPLEMENTATION IN APP/VIEW
+
+add daisyui and make the styling better
+review information architecture and make sure it works
+allow starting and pausing tasks from the project show page
+
 NEXT TASKS:
-
-1) Make sure all our agents are well tested with their event handlers and flow, we can use real LLM calls and make sure they work as they will be recorded with VCR
-
-Consider these high level feature specs
-
-2) Build our dashboard for visibility and allow to kick off projects
-    - Dashboard controller (dashboard_controller.rb) and views not implemented yet
-    - TODO:
-        - Scaffold DashboardController and routes
-        - Create app/views/dashboard/ with initial metrics views
-        - Integrate Turbo Streams for real-time updates
-        - Add UI for agent/job stats and status
-        - Display HitL (Human-in-the-Loop) events and allow human responses
-        - Provide project/task kickoff capability from dashboard UI
-        - Integrate cost tracking/visualization
-        - Add system health monitoring
-
-Then we'll focus on improvements in the overview below
-
-3) Integrate dry-schema/dry-types/dry-validation for agent/tool input/output validation
-    - Define schemas for agent and tool interfaces
-    - Update agent/tool base classes to enforce input/output validation
-    - Add validation tests for agents and tools
-    - Document interfaces and provide examples in code/docs
 
 ## 1. Overview
 

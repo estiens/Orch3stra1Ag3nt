@@ -11,22 +11,8 @@ class WebResearcherAgent < BaseAgent
     3
   end
 
-  # --- Tools ---
-  # Consider registering external tool objects (PerplexitySearchTool, etc.) via custom_tool_objects
-  # or passing them during initialization instead of creating them inside methods.
-
-  tool :search_with_perplexity, "Search the web using Perplexity for AI-enhanced results" do |query, focus = "web"|
-    # Ensure parameters are properly passed as named arguments
-    search_with_perplexity(query, focus)
-  end
-
-  tool :browse_url, "Browse a specific URL to gather text content" do |url|
-    browse_url(url)
-  end
-
-  tool :scrape_webpage, "Scrape and extract specific content (text, links) from a webpage" do |url, selector = nil, extract_type = "text"|
-    scrape_webpage(url, selector, extract_type)
-  end
+  def self.custom_tool_objects
+    [PerplexitySearchTool, WebScraperTool]
 
   # Placeholder for Vector DB tool
   tool :semantic_memory, "Store and retrieve information using vector embeddings (Not Implemented)" do |query|

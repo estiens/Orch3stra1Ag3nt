@@ -88,59 +88,54 @@
         <% end %>
       <% end %>
     </div>
-    
     <% if @tasks.any? %>
       <div class="divide-y divide-gray-200">
-        <% @tasks.each do |task| %>
-          <div class="py-4">
-            <div class="flex justify-between items-center">
-              <div>
-                <h3 class="font-medium"><%= link_to task.title, task, class: "link link-hover" %></h3>
-                <div class="flex items-center mt-1 gap-2">
-                  <span class="badge <%= task.state == 'active' ? 'badge-success' :
-                                      task.state == 'completed' ? 'badge-info' :
-                                      task.state == 'failed' ? 'badge-error' :
-                                      task.state == 'paused' ? 'badge-warning' :
-                                      task.state == 'waiting_on_human' ? 'badge-secondary' :
-                                      'badge-ghost' %>">
-                    <%= task.state.capitalize %>
-                  </span>
-                  <span class="text-sm opacity-70">Type: <%= task.task_type.capitalize %></span>
-                </div>
-              </div>
-              <div class="flex-shrink-0">
-                <% if task.state == "pending" %>
-                  <%= button_to activate_task_path(task), method: :post, form: { data: { turbo: true } }, class: "btn btn-sm btn-success" do %>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                    </svg>
-                    Start
-                  <% end %>
-                <% elsif task.state == "active" %>
-                  <%= button_to pause_task_path(task), method: :post, form: { data: { turbo: true } }, class: "btn btn-sm btn-warning" do %>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Pause
-                  <% end %>
-                <% elsif task.state == "paused" %>
-                  <%= button_to resume_task_path(task), method: :post, form: { data: { turbo: true } }, class: "btn btn-sm btn-info" do %>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                    </svg>
-                    Resume
-                  <% end %>
-                <% end %>
-              </div>
-            </div>
-            <% if task.description.present? %>
-              <p class="opacity-70 mt-1"><%= task.description %></p>
-            <% end %>
-            <div class="mt-2 text-xs opacity-60">
-              Created <%= time_ago_in_words(task.created_at) %> ago
+        <!-- Independent Tasks (no dependencies) -->
+        <% if @tasks_by_dependency[:independent].any? %>
+          <div class="mb-4">
+            <h3 class="text-lg font-medium mb-2">Independent Tasks</h3>
+            <div class="space-y-4">
+              <% @tasks_by_dependency[:independent].each do |task| %>
+                <%= render 'task_item', task: task, dependency_map: @tasks_by_dependency[:dependency_map] %>
+              <% end %>
             </div>
           </div>
         <% end %>
+        
+        <!-- Tasks with Dependencies -->
+        <% if @tasks_by_dependency[:dependent].any? %>
+          <div class="pt-4">
+            <h3 class="text-lg font-medium mb-2">Dependent Tasks</h3>
+            
+            <% @tasks_by_dependency[:dependent].each do |dependency_id, dependent_tasks| %>
+              <% dependency_task = @tasks.find { |t| t.id == dependency_id } %>
+              <% if dependency_task %>
+                <div class="mb-6 border-l-2 border-primary pl-4">
+                  <div class="mb-2">
+                    <h4 class="font-medium">Depends on: <%= link_to dependency_task.title, dependency_task, class: "link link-hover text-primary" %></h4>
+                    <div class="flex items-center mt-1">
+                      <span class="badge <%= dependency_task.state == 'completed' ? 'badge-success' : 'badge-outline' %> mr-2">
+                        <%= dependency_task.state.capitalize %>
+                      </span>
+                      <% if dependency_task.state == 'completed' %>
+                        <span class="text-xs text-success">✓ Dependency satisfied</span>
+                      <% else %>
+                        <span class="text-xs text-warning">⚠ Waiting for this task to complete</span>
+                      <% end %>
+                    </div>
+                  </div>
+                  
+                  <div class="pl-4 space-y-4 mt-4">
+                    <% dependent_tasks.each do |task| %>
+                      <%= render 'task_item', task: task, dependency_map: @tasks_by_dependency[:dependency_map] %>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
       </div>
     <% else %>
       <div class="text-center py-8 text-gray-500">

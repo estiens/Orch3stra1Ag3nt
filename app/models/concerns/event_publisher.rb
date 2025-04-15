@@ -13,16 +13,22 @@ module EventPublisher
   def publish_event(event_type, data = {}, options = {})
     # Merge agent_activity_id if it's defined on this model or provided
     activity_id = if respond_to?(:agent_activity_id) && agent_activity_id.present?
-                    agent_activity_id
-                  elsif respond_to?(:agent_activity) && agent_activity&.id.present?
-                    agent_activity.id
-                  else
-                    options[:agent_activity_id]
-                  end
+                     agent_activity_id
+    elsif respond_to?(:agent_activity) && agent_activity&.id.present?
+                     agent_activity.id
+    else
+                     options[:agent_activity_id]
+    end
 
     # Create merged options with activity_id and priority if provided
     merged_options = { agent_activity_id: activity_id }
     merged_options[:priority] = options[:priority] if options[:priority].present?
+
+    # Validate that we have an agent_activity_id before attempting to publish
+    if merged_options[:agent_activity_id].blank?
+      Rails.logger.warn("#{self.class.name}#publish_event: Cannot publish event '#{event_type}' without agent_activity_id")
+      return nil
+    end
 
     # Publish event through the EventBus
     Event.publish(event_type, data, merged_options)
@@ -35,4 +41,4 @@ module EventPublisher
       Event.publish(event_type, data, options)
     end
   end
-end 
+end

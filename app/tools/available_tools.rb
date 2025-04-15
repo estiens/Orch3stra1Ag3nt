@@ -2,7 +2,8 @@ class AvailableTools
     def self.list
       tools = [
         PerplexitySearchTool,
-        ResearchTool
+        ResearchTool,
+        LangchainEmbeddingTool
       ]
 
       # Add Langchain built-in tools

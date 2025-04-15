@@ -11,7 +11,8 @@ Rails.application.routes.draw do
 
   # Dashboard for monitoring agent activities
   get "dashboard" => "dashboard#index", as: :dashboard
-  
+  mount MissionControl::Jobs::Engine, at: "/jobs"
+
   # Project management
   resources :projects do
     member do
@@ -60,10 +61,6 @@ Rails.application.routes.draw do
     end
   end
 
-  # Defines the root path route ("/")
-  namespace :admin do
-    mount MissionControl::Jobs::Engine, at: "/jobs"
-  end
 
   # Root route goes to projects index
   root "projects#index"

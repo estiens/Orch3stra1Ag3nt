@@ -65,10 +65,7 @@ RSpec.describe Langchain::LLM::OpenRouter do
             "Content-Type" => "application/json",
             "Authorization" => "Bearer test_api_key"
           ),
-          body: hash_including(
-            "model" => "openrouter/auto",
-            "messages" => messages
-          ).to_json
+          body: /"model":"openrouter\/auto".*"messages":\[.*"role":"user".*"content":"Hello"/
         )
       )
 
