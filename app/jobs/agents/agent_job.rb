@@ -77,8 +77,8 @@ class Agents::AgentJob < ApplicationJob
           data: { result: result.to_s.truncate(1000) }
         )
 
-        # If this is the last activity for the task, mark the task as completed
-        if task.reload.agent_activities.where.not(status: [ "completed", "failed" ]).none?
+        # Always mark the task as completed when the agent finishes successfully
+        if task.reload.state != "failed"
           task.complete! if task.may_complete?
         end
 

@@ -14,6 +14,11 @@ class PerplexitySearchTool
     @api_key = ENV.fetch("PERPLEXITY_API_KEY", nil)
     raise "PERPLEXITY_API_KEY is not set cannot use PerplexitySearchTool" unless @api_key
   end
+  
+  # Add call method for compatibility with tests
+  def call(query:, focus: "web")
+    search(query: query, focus: focus)
+  end
 
   def search(query:, focus: "web")
     @query = query

@@ -120,9 +120,13 @@ module Langchain
         # Extract provider from model string if available (e.g., "openai/gpt-4" -> "openai")
         model_str = raw_response["model"].to_s
         if model_str.include?("/")
-          model_str.split("/").first
+          provider_name = model_str.split("/").first
+          return "OpenAI" if provider_name.downcase == "openai"
+          return provider_name
         else
-          raw_response["provider"] || "openrouter"
+          provider_name = raw_response["provider"] || "openrouter"
+          return "OpenAI" if provider_name.downcase == "openai"
+          return provider_name
         end
       end
 

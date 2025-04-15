@@ -151,7 +151,7 @@ class BaseAgent
     persist_tool_executions
   end
   def handle_run_error(e)
-    Rails.logger.error("[#{self.class.name}] Agent error [Activity ID: #{@agent_activity&.id}]: #{e.message}\n#{e.backtrace.first(10).join("\n")}")
+    Rails.logger.error("[#{self.class.name}] Agent error [Activity ID: #{@agent_activity&.id}]: #{e.message}\n#{e.backtrace&.first(10)&.join("\n")}")
     if @agent_activity
       @agent_activity.mark_failed(e.message)
     end
@@ -184,7 +184,7 @@ class BaseAgent
       # Allow overriding via passed-in job_options as well
       job_options.merge!(options.delete(:job_options) || {})
 
-      Agents::AgentJob.set(job_options).perform_later(agent_class_name, prompt, options)
+      Agents::AgentJob.set(**job_options).perform_later(agent_class_name, prompt, options)
     end
   end
 
@@ -257,10 +257,10 @@ class BaseAgent
         prompt_tokens: prompt_tokens,
         completion_tokens: completion_tokens,
         tokens_used: total_tokens,
-        request_payload: request_payload,
+        request_payload: request_payload || "null",
         response_payload: response_payload,
-        duration: duration,
-        cost: cost
+        duration: duration || 0.0,
+        cost: cost || 0.0
       )
     rescue => e
       Rails.logger.error "[BaseAgent] Failed to log direct LLM call: #{e.message}"

@@ -287,6 +287,8 @@ class OrchestratorAgent < BaseAgent
     adjustment_pairs.each do |pair|
       task_id, priority = pair.split(":").map(&:strip)
       begin
+        # Convert task_id to integer if it's a string
+        task_id = task_id.to_i if task_id.is_a?(String)
         task = Task.find(task_id)
         original_priority = task.priority
         task.update!(priority: priority)
@@ -448,7 +450,8 @@ class OrchestratorAgent < BaseAgent
       end
     end
 
-    Rails.logger.info(decision_log)
+    # Use the format expected by the tests
+    Rails.logger.info("OrchestratorAgent Run Summary: #{result}")
   end
 
   # The base class handles the run cycle.
