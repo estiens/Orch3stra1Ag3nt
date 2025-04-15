@@ -182,10 +182,20 @@ module Embedding
                             
       # Set a maximum chunk size to prevent API timeouts
       max_token_estimate = effective_chunk_size / 4  # Rough estimate of tokens
-      if max_token_estimate > 1500  # Most APIs have limits around 2048 tokens
-        effective_chunk_size = 1500 * 4  # Approximately 1500 tokens
+      if max_token_estimate > 1024  # More conservative limit (most APIs have limits around 2048 tokens)
+        effective_chunk_size = 1024 * 4  # Approximately 1024 tokens
         begin
-          @logger.debug("Limiting chunk size to ~1500 tokens to prevent API timeouts")
+          @logger.debug("Limiting chunk size to ~1024 tokens to prevent API timeouts")
+        rescue => e
+          # Continue silently if logging fails
+        end
+      end
+      
+      # Ensure minimum chunk size
+      if effective_chunk_size < 100
+        effective_chunk_size = 100
+        begin
+          @logger.debug("Enforcing minimum chunk size of 100 characters")
         rescue => e
           # Continue silently if logging fails
         end
