@@ -68,7 +68,11 @@ class Project < ApplicationRecord
               task_id: orchestration_task.id,
               priority: priority
             },
-            { priority: Event::HIGH_PRIORITY }
+            { 
+              priority: Event::HIGH_PRIORITY,
+              project_id: id,
+              task_id: orchestration_task.id
+            }
           )
         rescue => e
           # Log but continue if event publishing fails

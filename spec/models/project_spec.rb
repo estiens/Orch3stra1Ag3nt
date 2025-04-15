@@ -74,7 +74,7 @@ RSpec.describe Project, type: :model do
       expect(project.kickoff!).to be_falsey
     end
 
-    xit "creates an orchestration task, updates status and publishes event" do
+    it "creates an orchestration task, updates status and publishes event" do
       # The implementation now uses a dummy agent activity to publish the event
       # We need to mock the agent_activities association and the publish_event method
       dummy_activity = double("AgentActivity")

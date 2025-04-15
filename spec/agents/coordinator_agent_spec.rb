@@ -114,7 +114,7 @@ RSpec.describe CoordinatorAgent do
         allow(task).to receive(:activate!)
       end
 
-      xit "activates the task and spawns a new coordinator" do
+      it "activates the task and spawns a new coordinator" do
         # Since the implementation now directly calls task.activate! after checking conditions,
         # we need to ensure those conditions are met and the method will actually be called
         allow(task).to receive(:waiting_on_human?).and_return(true)
@@ -224,7 +224,7 @@ RSpec.describe CoordinatorAgent do
     describe "#assign_subtask" do
       let(:subtask) { create(:task, parent: task, title: "Research task") }
 
-      xit "assigns a subtask to the specified agent type" do
+      it "assigns a subtask to the specified agent type" do
         expect(WebResearcherAgent).to receive(:enqueue).with(
           "Research task\n\nThis is a test task",
           {

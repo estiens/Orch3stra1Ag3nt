@@ -34,7 +34,7 @@ RSpec.describe Agents::AgentJob, type: :job do
       expect(task.reload.state).to eq("completed")
     end
 
-    xit "creates an agent_activity record" do
+    it "creates an agent_activity record" do
       expect {
         described_class.new.perform(agent_class, agent_prompt, options)
       }.to change(AgentActivity, :count).by(1)
@@ -45,7 +45,7 @@ RSpec.describe Agents::AgentJob, type: :job do
       expect(activity.status).to eq("completed")
     end
 
-    xit "runs the agent with the provided prompt" do
+    it "runs the agent with the provided prompt" do
       described_class.new.perform(agent_class, agent_prompt, options)
       expect(agent_instance).to have_received(:run).with(agent_prompt)
     end

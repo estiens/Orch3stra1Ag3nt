@@ -229,7 +229,7 @@ class CoordinatorAgent < BaseAgent
     begin
       # Extract data from the event
       request_id = event.data["request_id"]
-      input_task_id = event.data["task_id"]
+      input_task_id = event.data["task_id"] || event.task_id
       response = event.data["response"]
 
       # Skip if no task ID
@@ -425,6 +425,7 @@ class CoordinatorAgent < BaseAgent
         parent_activity_id: agent_activity&.id,
         purpose: meaningful_purpose,
         task_priority: subtask.priority,
+        project_id: subtask.project_id,
         metadata: {
           coordinator_id: agent_activity&.id,
           parent_task_id: task.id
