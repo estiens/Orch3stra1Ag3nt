@@ -297,17 +297,18 @@ class CoordinatorAgent < BaseAgent
     prompt_content = <<~PROMPT
       # STRATEGIC TASK ANALYSIS
 
-      As an expert project manager, analyze and decompose the following task into a strategic plan of subtasks:
+      As an expert project manager, analyze and decompose the following task into atomic, highly focused subtasks:
 
       #{project_context}
       ## TASK DESCRIPTION
       #{task_description}
 
-      ## REQUIREMENTS
-      1. Break this down into 3-7 DISTINCT subtasks (no overlap)
-      2. Each subtask should have a SINGLE clear focus and objective
-      3. Arrange subtasks in logical execution order (dependencies first)
-      4. Consider what specialized agent types are needed for each subtask
+      ## DECOMPOSITION STRATEGY
+      1. Break this down into ATOMIC subtasks - each with a SINGLE clear focus and objective
+      2. Prefer MORE GRANULAR subtasks over fewer complex ones
+      3. For complex subtasks that require further decomposition, assign to CoordinatorAgent
+      4. Arrange subtasks in logical execution order (dependencies first)
+      5. Match specialized agent types to each subtask's specific requirements
 
       ## OUTPUT FORMAT
       For each subtask, provide:
@@ -315,17 +316,22 @@ class CoordinatorAgent < BaseAgent
       Subtask #{rand(1..100)}: {CLEAR, SPECIFIC TITLE}
       Description: {DETAILED instructions with success criteria}
       Priority: {high|normal|low}
-      Agent: {ResearcherAgent|WebResearcherAgent|CodeResearcherAgent|WriterAgent|etc.}
+      Agent: {ResearcherAgent|WebResearcherAgent|CodeResearcherAgent|WriterAgent|CoordinatorAgent|etc.}
       Dependencies: {List subtask numbers this depends on, or "None"}
+      Complexity: {simple|moderate|complex} - Use "complex" to indicate subtasks that should be further decomposed
 
       ## SPECIALIZED AGENT TYPES
       - ResearcherAgent: General information gathering and analysis
       - WebResearcherAgent: Internet searches and web information retrieval
-      - CodeResearcherAgent: Code analysis, generation, and explanation, can run multiple in parallel analyzing different parts of a codebase
+      - CodeResearcherAgent: Code analysis, generation, and explanation
       - WriterAgent: Content creation, editing, and formatting
       - AnalyzerAgent: Data analysis and insight generation
+      - CoordinatorAgent: For complex subtasks that need further decomposition into smaller tasks
 
-      Create a comprehensive plan that when executed will FULLY accomplish the original task.
+      ## IMPORTANT
+      - Assign CoordinatorAgent to any subtask that could benefit from further decomposition
+      - Ensure each subtask has a clear, measurable outcome
+      - Create a comprehensive plan that when executed will FULLY accomplish the original task
     PROMPT
 
     begin
@@ -478,6 +484,9 @@ class CoordinatorAgent < BaseAgent
     # Create a meaningful purpose for the sub-coordinator
     meaningful_purpose = purpose.presence || "Sub-coordinator for complex subtask: #{subtask.title}"
 
+    # Get complexity from metadata if available
+    complexity = subtask.metadata&.dig("complexity") || "complex"
+    
     # Prepare options for the sub-coordinator
     coordinator_options = {
       task_id: subtask.id,
@@ -488,15 +497,36 @@ class CoordinatorAgent < BaseAgent
         parent_coordinator_id: agent_activity&.id,
         parent_task_id: task.id,
         is_sub_coordinator: true,
-        original_subtask_id: subtask_id
+        original_subtask_id: subtask_id,
+        complexity: complexity,
+        nesting_level: (task.metadata&.dig("nesting_level") || 0) + 1
       }
     }
 
+    # Create more detailed instructions based on the subtask complexity
+    instructions = <<~INSTRUCTIONS
+      # COMPLEX SUBTASK DECOMPOSITION
+      
+      This is a complex subtask that requires further decomposition into smaller, more atomic subtasks.
+      
+      ## Subtask: #{subtask.title}
+      
+      #{subtask.description}
+      
+      ## Decomposition Instructions
+      1. Break this subtask down into highly atomic, focused sub-subtasks
+      2. Make each sub-subtask as specific and focused as possible
+      3. Ensure each sub-subtask has clear success criteria
+      4. Assign specialized agents to each sub-subtask based on requirements
+      
+      ## Important Notes
+      - This is a level #{coordinator_options[:metadata][:nesting_level]} nested coordinator
+      - Focus on creating ATOMIC units of work that can be completed independently
+      - Complexity assessment: #{complexity}
+    INSTRUCTIONS
+
     # Enqueue the sub-coordinator
-    job = CoordinatorAgent.enqueue(
-      "This is a complex subtask that requires further decomposition into smaller subtasks.\n\n#{subtask.title}\n\n#{subtask.description}",
-      coordinator_options
-    )
+    job = CoordinatorAgent.enqueue(instructions, coordinator_options)
 
     if job
       # Update subtask state
@@ -982,6 +1012,14 @@ class CoordinatorAgent < BaseAgent
     context = input.is_a?(Hash) ? input[:context] : nil
     event_type = context&.dig(:event_type)
 
+    # Check if this is a sub-coordinator and get nesting level
+    is_sub_coordinator = task.metadata&.dig("is_sub_coordinator") == true
+    nesting_level = task.metadata&.dig("nesting_level") || 0
+    
+    # Log the coordinator start with context
+    coordinator_type = is_sub_coordinator ? "Sub-Coordinator (Level #{nesting_level})" : "Root Coordinator"
+    Rails.logger.info "[#{coordinator_type}-#{task.id}] Starting run with event_type: #{event_type || 'none'}"
+
     result_message = nil
 
     begin
@@ -1000,8 +1038,17 @@ class CoordinatorAgent < BaseAgent
         # Handle human input requirement
         question = context[:question]
         result_message = handle_human_input_requirement(question)
+      elsif event_type == "task_resumed"
+        # Handle task resumption after being paused
+        result_message = "Task resumed. Evaluating current progress and next steps."
+        result_message = evaluate_current_progress
       elsif task.reload.subtasks.empty? # Check if subtasks are *actually* empty
         # Initial decomposition for new tasks
+        if is_sub_coordinator
+          # For sub-coordinators, log the nesting level
+          Rails.logger.info "[Sub-Coordinator-#{task.id}] Performing decomposition at nesting level #{nesting_level}"
+          update_task_status("Starting decomposition as a level #{nesting_level} sub-coordinator")
+        end
         result_message = perform_initial_task_decomposition
       else
         # General progress check and next steps
@@ -1014,6 +1061,10 @@ class CoordinatorAgent < BaseAgent
     end
 
     @session_data[:output] = result_message
+    
+    # Log completion with context
+    Rails.logger.info "[#{coordinator_type}-#{task.id}] Completed run with result: #{result_message.truncate(100)}"
+    
     after_run(result_message) # This run finishes, event handlers will trigger next run if needed
     result_message
   end
@@ -1108,14 +1159,14 @@ class CoordinatorAgent < BaseAgent
     return "Error: Completed subtask #{subtask_id} not found" unless subtask
 
     # Check if this was a subtask handled by a sub-coordinator
-    was_sub_coordinated = subtask.metadata&.dig("assigned_agent") == "CoordinatorAgent" &&
-                          subtask.metadata&.dig("requires_decomposition") == true
+    was_sub_coordinated = subtask.metadata&.dig("assigned_agent") == "CoordinatorAgent"
+    nesting_level = subtask.metadata&.dig("nesting_level") || 0
 
     # Log completion with appropriate context
     if was_sub_coordinated
-      update_task_status("Subtask #{subtask_id} (#{subtask.title}) completed by sub-coordinator with further decomposition.")
+      update_task_status("Subtask #{subtask_id} (#{subtask.title}) completed by sub-coordinator (level #{nesting_level}).")
     else
-      update_task_status("Subtask #{subtask_id} completed successfully.")
+      update_task_status("Subtask #{subtask_id} (#{subtask.title}) completed successfully.")
     end
 
     # Check overall task progress
@@ -1129,25 +1180,59 @@ class CoordinatorAgent < BaseAgent
     # Find and assign the next *eligible* subtask
     eligible_subtasks = find_eligible_pending_subtasks
     if eligible_subtasks.any?
-      # Assign the highest priority eligible subtask
-      next_subtask = select_next_subtask_to_assign(eligible_subtasks)
+      # Assign multiple eligible subtasks in parallel if possible
+      # This is a key improvement - we'll try to assign up to 3 subtasks at once
+      assigned_count = 0
+      assignment_results = []
+      
+      # Sort eligible subtasks by priority and then by complexity (simpler first)
+      sorted_subtasks = sort_subtasks_by_priority_and_complexity(eligible_subtasks)
+      
+      # Try to assign up to 3 subtasks (or fewer if there aren't that many)
+      sorted_subtasks.first(3).each do |next_subtask|
+        # Skip if we've already assigned 3 subtasks
+        break if assigned_count >= 3
+        
+        # Determine if this subtask needs a sub-coordinator or a regular agent
+        agent_type = next_subtask.metadata&.dig("suggested_agent") || determine_best_agent_for_subtask(next_subtask)
+        complexity = next_subtask.metadata&.dig("complexity") || "simple"
 
-      # Determine if this subtask needs a sub-coordinator or a regular agent
-      agent_type = next_subtask.metadata&.dig("suggested_agent") || determine_best_agent_for_subtask(next_subtask)
-
-      # If the LLM suggested a CoordinatorAgent, use create_sub_coordinator instead of assign_subtask
-      if agent_type == "CoordinatorAgent"
-        assign_result = create_sub_coordinator(next_subtask.id, "Complex subtask requiring further decomposition")
-      else
-        assign_result = assign_subtask(next_subtask.id, agent_type, "Assigning next eligible subtask")
+        # If complex or explicitly a CoordinatorAgent, use create_sub_coordinator
+        if agent_type == "CoordinatorAgent" || complexity == "complex"
+          assign_result = create_sub_coordinator(next_subtask.id, "Complex subtask requiring further decomposition")
+        else
+          assign_result = assign_subtask(next_subtask.id, agent_type, "Assigning eligible subtask in parallel")
+        end
+        
+        assignment_results << assign_result
+        assigned_count += 1
       end
-
-      return "#{status_report}\\n\\n#{assign_result}"
+      
+      if assigned_count > 0
+        return "#{status_report}\n\nAssigned #{assigned_count} eligible subtasks in parallel:\n\n#{assignment_results.join("\n\n")}"
+      end
     end
 
     # Return comprehensive status if no immediate action needed
     active_count = task.subtasks.where(state: "active").count
-    "#{status_report}\\n\\nContinuing to monitor #{active_count} active subtasks. No new subtasks are eligible for assignment yet."
+    "#{status_report}\n\nContinuing to monitor #{active_count} active subtasks. No new subtasks are eligible for assignment yet."
+  end
+  
+  # Helper method to sort subtasks by priority and complexity
+  def sort_subtasks_by_priority_and_complexity(subtasks)
+    # Priority order: high > normal > low
+    priority_order = { "high" => 0, "normal" => 1, "low" => 2 }
+    
+    # Complexity order: simple > moderate > complex
+    complexity_order = { "simple" => 0, "moderate" => 1, "complex" => 2 }
+    
+    subtasks.sort_by do |subtask|
+      priority = subtask.priority || "normal"
+      complexity = subtask.metadata&.dig("complexity") || "simple"
+      
+      # Sort first by priority, then by complexity (simpler first)
+      [priority_order[priority] || 99, complexity_order[complexity] || 99]
+    end
   end
 
   # Handle human input requirement
@@ -1205,9 +1290,10 @@ class CoordinatorAgent < BaseAgent
       subtask_id = create_result.match(/ID: (\d+)/)&.[](1)&.to_i
       if subtask_id
         subtask = Task.find(subtask_id)
-        # Store suggested agent type and original index in metadata for later use
+        # Store suggested agent type, complexity, and original index in metadata for later use
         subtask.update!(metadata: subtask.metadata.merge({
           suggested_agent: subtask_info[:agent_type],
+          complexity: subtask_info[:complexity] || "simple",
           original_index: index + 1
         }))
         created_subtasks_map[index + 1] = subtask # Map original index to subtask
@@ -1304,7 +1390,7 @@ class CoordinatorAgent < BaseAgent
   private
 
   # Parses LLM output to extract structured subtask information
-  # MODIFIED to return dependency indices
+  # MODIFIED to return dependency indices and complexity
   def parse_subtasks_from_llm(llm_output)
     subtasks = []
 
@@ -1321,10 +1407,11 @@ class CoordinatorAgent < BaseAgent
     sections.each do |section|
       # Extract basic components with less complex patterns
       title_match = section.match(/(?:Subtask\s+\d+:)?\s*(.*?)(?:\r?\n|\n|$)/)
-      description_match = section.match(/Description:?\s*(.*?)(?:Priority:|Agent:|Dependencies:|$)/m)
+      description_match = section.match(/Description:?\s*(.*?)(?:Priority:|Agent:|Dependencies:|Complexity:|$)/m)
       priority_match = section.match(/Priority:?\s*([Hh]igh|[Nn]ormal|[Ll]ow)/)
       agent_match = section.match(/Agent:?\s*([A-Za-z]+Agent)/)
       deps_match = section.match(/Dependencies:?\s*(None|(?:\d+(?:,\s*\d+)*))/)
+      complexity_match = section.match(/Complexity:?\s*([Ss]imple|[Mm]oderate|[Cc]omplex)/)
 
       # Skip if we can't extract the minimum required information
       next unless title_match && description_match && priority_match
@@ -1333,6 +1420,12 @@ class CoordinatorAgent < BaseAgent
       description = description_match[1].strip
       priority = priority_match[1].downcase.strip
       agent_type = agent_match ? agent_match[1].strip : "ResearcherAgent"
+      
+      # If complexity is "complex", suggest CoordinatorAgent
+      complexity = complexity_match ? complexity_match[1].downcase.strip : "simple"
+      if complexity == "complex" && agent_type != "CoordinatorAgent"
+        agent_type = "CoordinatorAgent"
+      end
 
       # Parse dependencies
       deps_str = deps_match ? deps_match[1].strip : "None"
@@ -1346,7 +1439,8 @@ class CoordinatorAgent < BaseAgent
         description: description,
         priority: priority,
         agent_type: agent_type,
-        dependencies: dependency_indices
+        dependencies: dependency_indices,
+        complexity: complexity
       }
     end
 
@@ -1416,7 +1510,14 @@ class CoordinatorAgent < BaseAgent
     end
 
     # Use stored agent recommendation from task decomposition if available
-    # This requires storing the recommendation during parse_subtasks_from_llm
+    if subtask.metadata&.dig("suggested_agent")
+      return subtask.metadata["suggested_agent"]
+    end
+
+    # Check if complexity is stored in metadata and is "complex"
+    if subtask.metadata&.dig("complexity") == "complex"
+      return "CoordinatorAgent"
+    end
 
     # Otherwise, analyze the subtask description to suggest an appropriate agent
     prompt = <<~PROMPT
@@ -1437,8 +1538,9 @@ class CoordinatorAgent < BaseAgent
       - CoordinatorAgent: For complex subtasks that need further decomposition into smaller tasks
 
       ## ASSESSMENT CRITERIA
-      - Choose CoordinatorAgent ONLY if the subtask is complex and would benefit from being broken down into multiple smaller subtasks
-      - For most straightforward tasks, choose one of the specialized agents
+      - Choose CoordinatorAgent if the subtask is complex and would benefit from being broken down into multiple smaller subtasks
+      - Prefer CoordinatorAgent for any task that involves multiple distinct steps or requires different skills
+      - For simple, focused tasks, choose one of the specialized agents
 
       ## REQUIRED OUTPUT FORMAT
       RECOMMENDED AGENT: [Single agent type from the list above]
