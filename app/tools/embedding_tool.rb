@@ -197,15 +197,15 @@ class EmbeddingTool
 
       begin
         service = EmbeddingService.new(collection: collection)
-        
+
         # Generate embedding for the query
         embedding = service.generate_embedding(query)
-        
+
         # Use the Neighbor gem's nearest_neighbors method directly with our scope
         results = VectorEmbedding.in_collection(collection)
                                 .nearest_neighbors(:embedding, embedding, distance: distance)
                                 .limit(limit)
-        
+
         Rails.logger.info("Found #{results.count} similar documents")
 
         {
