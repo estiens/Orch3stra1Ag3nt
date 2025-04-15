@@ -223,7 +223,9 @@ class Task < ApplicationRecord
   end
 
   # Enqueue this task for processing based on its type
-  def enqueue_for_processing
+  # @param options [Hash] additional options for the agent
+  # @return [AgentActivity] the created agent activity
+  def enqueue_for_processing(options = {})
     return unless active?
 
     # Don't enqueue if the project is paused
@@ -232,23 +234,8 @@ class Task < ApplicationRecord
       return false
     end
 
-    case task_type
-    when "research"
-      ResearchCoordinatorAgent.enqueue("Process research task", { task_id: id })
-    when "code"
-      CodeResearcherAgent.enqueue("Process code task", { task_id: id })
-    when "orchestration"
-      OrchestratorAgent.enqueue("Process orchestration task", { task_id: id })
-    when "analysis"
-      WebResearcherAgent.enqueue("Process analysis task", { task_id: id })
-    when "search"
-      WebResearcherAgent.enqueue("Process search task", { task_id: id })
-    when "review"
-      SummarizerAgent.enqueue("Process review task", { task_id: id })
-    else
-      # Default to coordinator for general tasks
-      CoordinatorAgent.enqueue("Process general task", { task_id: id })
-    end
+    # Use the centralized agent spawning service
+    AgentSpawningService.spawn_for_task(self, options)
   end
 
   private
