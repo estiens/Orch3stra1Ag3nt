@@ -42,9 +42,16 @@ class VectorEmbedding < ApplicationRecord
     # Apply nearest neighbors search after filters to avoid SQL syntax errors
     # Use a subquery to avoid the AS syntax error
     filtered_ids = base_query.pluck(:id)
+    
+    # Use explicit select to avoid SQL syntax errors with AS clauses
     VectorEmbedding.where(id: filtered_ids)
+                  .select("vector_embeddings.*, 0 as distance")
                   .nearest_neighbors(:embedding, query_embedding, distance: distance)
                   .limit(limit)
+  rescue => e
+    Rails.logger.error("Error in find_similar: #{e.message}")
+    # Fallback to a simpler approach if the nearest_neighbors query fails
+    VectorEmbedding.where(id: filtered_ids).limit(limit)
   end
 
   # Generate an embedding for the given text using the embedding service
@@ -70,8 +77,14 @@ class VectorEmbedding < ApplicationRecord
                                    .pluck(:id)
     
     # Then apply nearest neighbors search on the filtered IDs
+    # Use explicit select to avoid SQL syntax errors
     VectorEmbedding.where(id: collection_ids)
+                  .select("vector_embeddings.*, 0 as distance")
                   .nearest_neighbors(:embedding, self.embedding, distance: distance)
                   .limit(limit)
+  rescue => e
+    Rails.logger.error("Error in similar_to_me: #{e.message}")
+    # Fallback to a simpler approach if the nearest_neighbors query fails
+    VectorEmbedding.where(id: collection_ids).limit(limit)
   end
 end

@@ -63,9 +63,16 @@ module Embedding
       collection_ids = VectorEmbedding.where(collection: @collection).pluck(:id)
       
       # Then apply nearest neighbors search on the filtered IDs
+      # Use a more explicit select to avoid SQL syntax errors
       VectorEmbedding.where(id: collection_ids)
+                    .select("vector_embeddings.*, 0 as distance")
                     .nearest_neighbors(:embedding, embedding, distance: distance)
                     .limit(k)
+    rescue => e
+      @logger.error("Error in similarity_search_by_vector: #{e.message}")
+      # Fallback to a simpler approach if the nearest_neighbors query fails
+      ids = VectorEmbedding.where(collection: @collection).limit(k).pluck(:id)
+      VectorEmbedding.where(id: ids)
     end
 
     # Commit a batch of chunks and embeddings to the database

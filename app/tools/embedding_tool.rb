@@ -193,15 +193,39 @@ class EmbeddingTool
   )
     Rails.logger.tagged("EmbeddingTool", "similarity_search") do
       Rails.logger.info("Searching collection '#{collection}' for: #{query.truncate(100)} (limit: #{limit}, distance: #{distance})")
-      service = EmbeddingService.new(collection: collection)
-      results = service.similarity_search(query, k: limit, distance: distance)
-      Rails.logger.info("Found #{results.count} similar documents")
-
-      {
-        status: "success",
-        message: "Found #{results.count} similar documents",
-        results: Array(results).map { |result| format_search_result(result) }
-      }
+      
+      begin
+        service = EmbeddingService.new(collection: collection)
+        
+        # Use a safer approach to avoid SQL syntax errors
+        results = if mode == "direct_ids"
+          # Use a direct ID-based approach to avoid SQL syntax errors
+          collection_ids = VectorEmbedding.where(collection: collection).pluck(:id)
+          embedding = service.generate_embedding(query)
+          VectorEmbedding.where(id: collection_ids)
+                        .select("vector_embeddings.*, 0 as distance")
+                        .nearest_neighbors(:embedding, embedding, distance: distance)
+                        .limit(limit)
+        else
+          # Use the standard approach but with error handling
+          service.similarity_search(query, k: limit, distance: distance)
+        end
+        
+        Rails.logger.info("Found #{results.count} similar documents")
+        
+        {
+          status: "success",
+          message: "Found #{results.count} similar documents",
+          results: Array(results).map { |result| format_search_result(result) }
+        }
+      rescue => e
+        Rails.logger.error("Error in similarity search: #{e.message}")
+        {
+          status: "error",
+          message: "Search failed: #{e.message}",
+          results: []
+        }
+      end
     end
   end
 
