@@ -91,6 +91,7 @@ class WebResearcherAgent < BaseAgent
 
   def search_with_perplexity(query, focus = "web")
     search_tool = PerplexitySearchTool.new # Consider dependency injection
+    # Use call method for test compatibility
     search_results = search_tool.call(query: query, focus: focus)
 
     # Handle error response from the API
@@ -116,6 +117,7 @@ class WebResearcherAgent < BaseAgent
 
   def browse_url(url)
     scraper = WebScraperTool.new # Consider dependency injection
+    # Use call method for test compatibility
     result = scraper.call(url: url, extract_type: "text")
 
     # Handle error response from the scraper
@@ -136,7 +138,8 @@ class WebResearcherAgent < BaseAgent
 
   def scrape_webpage(url, selector = nil, extract_type = "text")
     scraper = WebScraperTool.new # Consider dependency injection
-    result = scraper.scrape(url: url, selector: selector, extract_type: extract_type)
+    # Use call method for test compatibility
+    result = scraper.call(url: url, selector: selector, extract_type: extract_type)
 
     if result[:error]
       return "Error scraping webpage '#{url}': #{result[:error]}"
