@@ -58,21 +58,32 @@ module Embedding
 
     # Similarity search by vector
     def similarity_search_by_vector(embedding, k: 5, distance: "cosine")
-      # First filter by collection to avoid SQL syntax errors
-      # Use a subquery approach to avoid the AS syntax error
+      # First filter by collection
       collection_ids = VectorEmbedding.where(collection: @collection).pluck(:id)
+      return [] if collection_ids.empty?
       
-      # Then apply nearest neighbors search on the filtered IDs
-      # Use a more explicit select to avoid SQL syntax errors
-      VectorEmbedding.where(id: collection_ids)
-                    .select("vector_embeddings.*, 0 as distance")
-                    .nearest_neighbors(:embedding, embedding, distance: distance)
-                    .limit(k)
-    rescue => e
-      @logger.error("Error in similarity_search_by_vector: #{e.message}")
-      # Fallback to a simpler approach if the nearest_neighbors query fails
-      ids = VectorEmbedding.where(collection: @collection).limit(k).pluck(:id)
-      VectorEmbedding.where(id: ids)
+      # Use a simpler approach that avoids the SQL syntax error
+      begin
+        # Use the basic where clause approach which is more reliable
+        results = VectorEmbedding.where(id: collection_ids)
+        
+        # Apply the nearest neighbors search using raw SQL operators
+        case distance
+        when "cosine"
+          results = results.order(Arel.sql("embedding <=> ARRAY[#{embedding.join(',')}]::vector"))
+        when "inner_product"
+          results = results.order(Arel.sql("embedding <#> ARRAY[#{embedding.join(',')}]::vector"))
+        else # euclidean
+          results = results.order(Arel.sql("embedding <-> ARRAY[#{embedding.join(',')}]::vector"))
+        end
+        
+        results.limit(k)
+      rescue => e
+        @logger.error("Error in similarity_search_by_vector: #{e.message}")
+        # Fallback to a simpler approach if the query fails
+        ids = VectorEmbedding.where(collection: @collection).limit(k).pluck(:id)
+        VectorEmbedding.where(id: ids)
+      end
     end
 
     # Commit a batch of chunks and embeddings to the database

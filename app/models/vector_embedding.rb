@@ -27,31 +27,38 @@ class VectorEmbedding < ApplicationRecord
   # @param distance [String] The distance metric to use ("euclidean", "cosine", "inner_product")
   # @return [Array<VectorEmbedding>] Matching embeddings sorted by similarity
   def self.find_similar(query_embedding, limit: 5, collection: nil, task_id: nil, project_id: nil, distance: "cosine")
-    # Build the base query with filters first
-    base_query = self
+    # First get IDs that match our filters
+    query = self
+    query = query.in_collection(collection) if collection.present?
+    query = query.for_task(task_id) if task_id.present?
+    query = query.for_project(project_id) if project_id.present?
     
-    # Add collection filter if specified
-    base_query = base_query.in_collection(collection) if collection.present?
-
-    # Add task filter if specified
-    base_query = base_query.for_task(task_id) if task_id.present?
-
-    # Add project filter if specified
-    base_query = base_query.for_project(project_id) if project_id.present?
+    # Get the IDs that match our filters
+    filtered_ids = query.pluck(:id)
+    return [] if filtered_ids.empty?
     
-    # Apply nearest neighbors search after filters to avoid SQL syntax errors
-    # Use a subquery to avoid the AS syntax error
-    filtered_ids = base_query.pluck(:id)
-    
-    # Use explicit select to avoid SQL syntax errors with AS clauses
-    VectorEmbedding.where(id: filtered_ids)
-                  .select("vector_embeddings.*, 0 as distance")
-                  .nearest_neighbors(:embedding, query_embedding, distance: distance)
-                  .limit(limit)
-  rescue => e
-    Rails.logger.error("Error in find_similar: #{e.message}")
-    # Fallback to a simpler approach if the nearest_neighbors query fails
-    VectorEmbedding.where(id: filtered_ids).limit(limit)
+    # Use a simpler approach that avoids the SQL syntax error
+    # This uses the raw SQL approach from the Neighbor gem
+    begin
+      # Use the basic where clause approach which is more reliable
+      results = VectorEmbedding.where(id: filtered_ids)
+      
+      # Apply the nearest neighbors search
+      case distance
+      when "cosine"
+        results = results.order(Arel.sql("embedding <=> ARRAY[#{query_embedding.join(',')}]::vector"))
+      when "inner_product"
+        results = results.order(Arel.sql("embedding <#> ARRAY[#{query_embedding.join(',')}]::vector"))
+      else # euclidean
+        results = results.order(Arel.sql("embedding <-> ARRAY[#{query_embedding.join(',')}]::vector"))
+      end
+      
+      results.limit(limit)
+    rescue => e
+      Rails.logger.error("Error in find_similar: #{e.message}")
+      # Fallback to a simpler approach if the query fails
+      VectorEmbedding.where(id: filtered_ids).limit(limit)
+    end
   end
 
   # Generate an embedding for the given text using the embedding service
@@ -70,21 +77,32 @@ class VectorEmbedding < ApplicationRecord
   end
 
   def similar_to_me(limit: 5, distance: "cosine")
-    # Start with a base query for the same collection
-    # Use a subquery approach to avoid SQL syntax errors
+    # Get IDs in the same collection, excluding self
     collection_ids = VectorEmbedding.where(collection: self.collection)
                                    .where.not(id: self.id)
                                    .pluck(:id)
+    return [] if collection_ids.empty?
     
-    # Then apply nearest neighbors search on the filtered IDs
-    # Use explicit select to avoid SQL syntax errors
-    VectorEmbedding.where(id: collection_ids)
-                  .select("vector_embeddings.*, 0 as distance")
-                  .nearest_neighbors(:embedding, self.embedding, distance: distance)
-                  .limit(limit)
-  rescue => e
-    Rails.logger.error("Error in similar_to_me: #{e.message}")
-    # Fallback to a simpler approach if the nearest_neighbors query fails
-    VectorEmbedding.where(id: collection_ids).limit(limit)
+    # Use a simpler approach that avoids the SQL syntax error
+    begin
+      # Use the basic where clause approach which is more reliable
+      results = VectorEmbedding.where(id: collection_ids)
+      
+      # Apply the nearest neighbors search using raw SQL operators
+      case distance
+      when "cosine"
+        results = results.order(Arel.sql("embedding <=> ARRAY[#{self.embedding.join(',')}]::vector"))
+      when "inner_product"
+        results = results.order(Arel.sql("embedding <#> ARRAY[#{self.embedding.join(',')}]::vector"))
+      else # euclidean
+        results = results.order(Arel.sql("embedding <-> ARRAY[#{self.embedding.join(',')}]::vector"))
+      end
+      
+      results.limit(limit)
+    rescue => e
+      Rails.logger.error("Error in similar_to_me: #{e.message}")
+      # Fallback to a simpler approach if the query fails
+      VectorEmbedding.where(id: collection_ids).limit(limit)
+    end
   end
 end

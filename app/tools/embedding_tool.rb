@@ -197,21 +197,28 @@ class EmbeddingTool
 
       begin
         service = EmbeddingService.new(collection: collection)
-
-        # Use a safer approach to avoid SQL syntax errors
-        results = if mode == "direct_ids"
-          # Use a direct ID-based approach to avoid SQL syntax errors
-          collection_ids = VectorEmbedding.where(collection: collection).pluck(:id)
-          embedding = service.generate_embedding(query)
-          VectorEmbedding.where(id: collection_ids)
-                        .select("vector_embeddings.*, 0 as distance")
-                        .nearest_neighbors(:embedding, embedding, distance: distance)
-                        .limit(limit)
-        else
-          # Use the standard approach but with error handling
-          service.similarity_search(query, k: limit, distance: distance)
+        
+        # Generate embedding for the query
+        embedding = service.generate_embedding(query)
+        
+        # Get IDs for the collection
+        collection_ids = VectorEmbedding.where(collection: collection).pluck(:id)
+        
+        # Use a simpler approach that avoids the SQL syntax error
+        results = VectorEmbedding.where(id: collection_ids)
+        
+        # Apply the nearest neighbors search using raw SQL operators
+        case distance
+        when "cosine"
+          results = results.order(Arel.sql("embedding <=> ARRAY[#{embedding.join(',')}]::vector"))
+        when "inner_product"
+          results = results.order(Arel.sql("embedding <#> ARRAY[#{embedding.join(',')}]::vector"))
+        else # euclidean
+          results = results.order(Arel.sql("embedding <-> ARRAY[#{embedding.join(',')}]::vector"))
         end
-
+        
+        results = results.limit(limit)
+        
         Rails.logger.info("Found #{results.count} similar documents")
 
         {
