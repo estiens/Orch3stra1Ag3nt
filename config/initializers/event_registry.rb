@@ -24,6 +24,12 @@ Rails.application.config.after_initialize do
       description: "System shutdown event with reason"
     )
     
+    EventSchemaRegistry.register_schema(
+      "system_resources_critical",
+      { required: ["resource_type", "current_usage"], optional: ["threshold", "details"] },
+      description: "System resources have reached a critical level"
+    )
+    
     # Agent Events
     EventSchemaRegistry.register_schema(
       "agent_activity.created",
@@ -41,6 +47,13 @@ Rails.application.config.after_initialize do
       "agent_activity.failed",
       { required: ["error"], optional: ["stack_trace", "duration"] },
       description: "Agent activity failed with error"
+    )
+    
+    # Additional Agent Events
+    EventSchemaRegistry.register_schema(
+      "agent_completed",
+      { required: ["agent_id", "agent_type", "result"], optional: ["duration", "metrics"] },
+      description: "Agent completed its task"
     )
     
     # Task Events
@@ -78,6 +91,57 @@ Rails.application.config.after_initialize do
       "task.failed",
       { required: ["task_id", "error"], optional: ["stack_trace"] },
       description: "Task failed with error"
+    )
+    
+    # Additional Task Events
+    EventSchemaRegistry.register_schema(
+      "task_created",
+      { required: ["task_id", "title"], optional: ["description", "priority"] },
+      description: "Task created (legacy format)"
+    )
+    
+    EventSchemaRegistry.register_schema(
+      "task_stuck",
+      { required: ["task_id", "reason"], optional: ["duration", "details"] },
+      description: "Task is stuck and needs intervention"
+    )
+    
+    EventSchemaRegistry.register_schema(
+      "task_waiting_on_human",
+      { required: ["task_id", "prompt"], optional: ["timeout", "options"] },
+      description: "Task is waiting for human input"
+    )
+    
+    # Subtask Events
+    EventSchemaRegistry.register_schema(
+      "subtask_completed",
+      { required: ["subtask_id", "task_id", "result"], optional: ["metrics"] },
+      description: "Subtask completed successfully"
+    )
+    
+    EventSchemaRegistry.register_schema(
+      "subtask_failed",
+      { required: ["subtask_id", "task_id", "error"], optional: ["stack_trace"] },
+      description: "Subtask failed with error"
+    )
+    
+    # Research Task Events
+    EventSchemaRegistry.register_schema(
+      "research_task_created",
+      { required: ["task_id", "research_topic"], optional: ["scope", "depth"] },
+      description: "Research task created"
+    )
+    
+    EventSchemaRegistry.register_schema(
+      "research_subtask_completed",
+      { required: ["subtask_id", "task_id", "findings"], optional: ["sources"] },
+      description: "Research subtask completed with findings"
+    )
+    
+    EventSchemaRegistry.register_schema(
+      "research_subtask_failed",
+      { required: ["subtask_id", "task_id", "error"], optional: ["partial_findings"] },
+      description: "Research subtask failed"
     )
     
     # Project Events
@@ -268,19 +332,79 @@ Rails.application.config.after_initialize do
     # Orchestrator Agent - responds to various system events
     # -------------------------------------------------------------------------
     if defined?(OrchestratorAgent)
-      register_for_events(
-        OrchestratorAgent,
-        [
-          "task.created",
-          "task.completed",
-          "project.created"
-        ],
-        description: "Orchestrates workflow based on task and project events"
-      )
+      # Explicit registration of OrchestratorAgent event handlers
+      EventBus.register_handler("task_created", OrchestratorAgent, 
+                               description: "Handle new tasks", 
+                               priority: 20)
+      EventBus.register_handler("task_stuck", OrchestratorAgent, 
+                               description: "Handle stuck tasks", 
+                               priority: 30)
+      EventBus.register_handler("system_resources_critical", OrchestratorAgent, 
+                               description: "Handle resource critical situations", 
+                               priority: 50)
+      EventBus.register_handler("project_created", OrchestratorAgent, 
+                               description: "Handle new projects", 
+                               priority: 20)
+      EventBus.register_handler("project_activated", OrchestratorAgent, 
+                               description: "Handle project activation", 
+                               priority: 20)
+      EventBus.register_handler("project_stalled", OrchestratorAgent, 
+                               description: "Handle stalled projects", 
+                               priority: 30)
+      EventBus.register_handler("project_recoordination_requested", OrchestratorAgent, 
+                               description: "Handle project recoordination requests", 
+                               priority: 30)
+      EventBus.register_handler("project_paused", OrchestratorAgent, 
+                               description: "Handle paused projects", 
+                               priority: 20)
+      EventBus.register_handler("project_resumed", OrchestratorAgent, 
+                               description: "Handle resumed projects", 
+                               priority: 20)
     end
     
     # -------------------------------------------------------------------------
-    # EventSubscriber classes - automatically register all subscribers
+    # Coordinator Agent - handles task coordination
+    # -------------------------------------------------------------------------
+    if defined?(CoordinatorAgent)
+      # Explicit registration of CoordinatorAgent event handlers
+      EventBus.register_handler("subtask_completed", CoordinatorAgent, 
+                               description: "Handle completed subtasks", 
+                               priority: 20)
+      EventBus.register_handler("subtask_failed", CoordinatorAgent, 
+                               description: "Handle failed subtasks", 
+                               priority: 30)
+      EventBus.register_handler("task_waiting_on_human", CoordinatorAgent, 
+                               description: "Handle tasks waiting for human input", 
+                               priority: 20)
+      EventBus.register_handler("tool_execution_finished", CoordinatorAgent, 
+                               description: "Handle tool execution completion", 
+                               priority: 20)
+      EventBus.register_handler("agent_completed", CoordinatorAgent, 
+                               description: "Handle agent completion", 
+                               priority: 20)
+      EventBus.register_handler("human_input_provided", CoordinatorAgent, 
+                               description: "Handle human input provision", 
+                               priority: 20)
+    end
+    
+    # -------------------------------------------------------------------------
+    # Research Coordinator Agent - handles research tasks
+    # -------------------------------------------------------------------------
+    if defined?(ResearchCoordinatorAgent)
+      # Explicit registration of ResearchCoordinatorAgent event handlers
+      EventBus.register_handler("research_task_created", ResearchCoordinatorAgent, 
+                               description: "Handle new research tasks", 
+                               priority: 20)
+      EventBus.register_handler("research_subtask_completed", ResearchCoordinatorAgent, 
+                               description: "Handle completed research subtasks", 
+                               priority: 20)
+      EventBus.register_handler("research_subtask_failed", ResearchCoordinatorAgent, 
+                               description: "Handle failed research subtasks", 
+                               priority: 30)
+    end
+    
+    # -------------------------------------------------------------------------
+    # EventSubscriber classes - automatically register remaining subscribers
     # -------------------------------------------------------------------------
     
     # Find all classes that include EventSubscriber and register their subscriptions
@@ -301,15 +425,36 @@ Rails.application.config.after_initialize do
     end
     
     # Register all event subscriptions from these classes
+    # Skip the ones we've already explicitly registered
+    explicitly_registered = {
+      "OrchestratorAgent" => [
+        "task_created", "task_stuck", "system_resources_critical", 
+        "project_created", "project_activated", "project_stalled", 
+        "project_recoordination_requested", "project_paused", "project_resumed"
+      ],
+      "CoordinatorAgent" => [
+        "subtask_completed", "subtask_failed", "task_waiting_on_human",
+        "tool_execution_finished", "agent_completed", "human_input_provided"
+      ],
+      "ResearchCoordinatorAgent" => [
+        "research_task_created", "research_subtask_completed", "research_subtask_failed"
+      ]
+    }
+    
     event_subscriber_classes.each do |subscriber_class|
       if subscriber_class.respond_to?(:event_subscriptions)
+        class_name = subscriber_class.name
+        
         subscriber_class.event_subscriptions.each do |event_type, callback|
+          # Skip if we've already explicitly registered this handler
+          next if explicitly_registered[class_name]&.include?(event_type.to_s)
+          
           EventBus.register_handler(
             event_type,
             subscriber_class,
-            description: "Auto-registered from #{subscriber_class.name}"
+            description: "Auto-registered from #{class_name}"
           )
-          Rails.logger.debug("Auto-registered #{subscriber_class.name} for event: #{event_type}")
+          Rails.logger.debug("Auto-registered #{class_name} for event: #{event_type}")
         end
       end
     end
