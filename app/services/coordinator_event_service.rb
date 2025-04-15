@@ -230,6 +230,203 @@ class CoordinatorEventService < BaseEventService
     end
   end
 
+  # Handle a new project event
+  # @param event [Event] the project_created event
+  # @param agent [CoordinatorAgent] the agent instance
+  # @return [Object] the result of processing
+  def handle_project_created(event, agent)
+    process_event(event, "CoordinatorEventService#handle_project_created") do
+      validate_event_data(event, [ "project_id" ])
+
+      project_id = event.data["project_id"]
+      project = Project.find_by(id: project_id)
+
+      if project.nil?
+        logger.error("Project not found with ID: #{project_id}")
+        return nil
+      end
+
+      logger.info("Project created: #{project.name} [#{project.id}]")
+
+      # The project should already have a coordinator task created
+      # in the Project#kickoff! method, so we just ensure it's active
+      root_task = project.root_tasks.where(task_type: "coordination").first
+
+      if root_task && root_task.may_activate?
+        root_task.activate!
+        logger.info("Root coordination task activated: #{root_task.id}")
+      end
+
+      { project: project, root_task: root_task }
+    end
+  end
+
+  # Handle project activation event
+  # @param event [Event] the project_activated event
+  # @param agent [CoordinatorAgent] the agent instance
+  # @return [Object] the result of processing
+  def handle_project_activated(event, agent)
+    process_event(event, "CoordinatorEventService#handle_project_activated") do
+      validate_event_data(event, [ "project_id" ])
+
+      project_id = event.data["project_id"]
+      project = Project.find_by(id: project_id)
+
+      if project.nil?
+        logger.error("Project not found with ID: #{project_id}")
+        return nil
+      end
+
+      logger.info("Project activated: #{project.name} [#{project.id}]")
+
+      # Ensure coordination task is active, and decompose if needed
+      root_task = project.root_tasks.where(task_type: "coordination").first
+
+      if root_task && agent.task&.id == root_task.id
+        logger.info("Initiating project decomposition for #{project.name}")
+        # The agent handling this event should perform task decomposition
+        # This will happen in its run method
+      end
+
+      { project: project, root_task: root_task }
+    end
+  end
+
+  # Handle project stalled event
+  # @param event [Event] the project_stalled event
+  # @param agent [CoordinatorAgent] the agent instance
+  # @return [Object] the result of processing
+  def handle_project_stalled(event, agent)
+    process_event(event, "CoordinatorEventService#handle_project_stalled") do
+      validate_event_data(event, [ "project_id" ])
+
+      project_id = event.data["project_id"]
+      project = Project.find_by(id: project_id)
+
+      if project.nil?
+        logger.error("Project not found with ID: #{project_id}")
+        return nil
+      end
+
+      logger.info("Project stalled: #{project.name} [#{project.id}]")
+
+      # Check if this agent is responsible for this project
+      if agent.task&.project_id == project.id
+        logger.info("Coordinator will re-evaluate stalled project #{project.name}")
+        # The coordinator should re-evaluate the project in its run method
+      end
+
+      { project: project }
+    end
+  end
+
+  # Handle project recoordination request
+  # @param event [Event] the project_recoordination_requested event
+  # @param agent [CoordinatorAgent] the agent instance
+  # @return [Object] the result of processing
+  def handle_project_recoordination(event, agent)
+    process_event(event, "CoordinatorEventService#handle_project_recoordination") do
+      validate_event_data(event, [ "project_id" ])
+
+      project_id = event.data["project_id"]
+      project = Project.find_by(id: project_id)
+
+      if project.nil?
+        logger.error("Project not found with ID: #{project_id}")
+        return nil
+      end
+
+      logger.info("Project recoordination requested: #{project.name} [#{project.id}]")
+
+      # Check if this agent is responsible for the project's root task
+      root_task = project.root_tasks.where(task_type: "coordination").first
+
+      if root_task && agent.task&.id == root_task.id
+        logger.info("Coordinator will recoordinate project #{project.name}")
+        # The agent handling this event should perform recoordination
+        # This will happen in its run method
+      end
+
+      { project: project, root_task: root_task }
+    end
+  end
+
+  # Handle project paused event
+  # @param event [Event] the project_paused event
+  # @param agent [CoordinatorAgent] the agent instance
+  # @return [Object] the result of processing
+  def handle_project_paused(event, agent)
+    process_event(event, "CoordinatorEventService#handle_project_paused") do
+      validate_event_data(event, [ "project_id" ])
+
+      project_id = event.data["project_id"]
+      project = Project.find_by(id: project_id)
+
+      if project.nil?
+        logger.error("Project not found with ID: #{project_id}")
+        return nil
+      end
+
+      logger.info("Project paused: #{project.name} [#{project.id}]")
+
+      # If this agent is responsible for the project, it should pause its operations
+      if agent.task&.project_id == project.id
+        logger.info("Coordinator acknowledging project pause for #{project.name}")
+
+        # If the agent's task is active, pause it
+        if agent.task.state == "active" && agent.task.may_pause?
+          agent.task.pause!
+          logger.info("Paused coordination task: #{agent.task.id}")
+        end
+      end
+
+      { project: project }
+    end
+  end
+
+  # Handle project resumed event
+  # @param event [Event] the project_resumed event
+  # @param agent [CoordinatorAgent] the agent instance
+  # @return [Object] the result of processing
+  def handle_project_resumed(event, agent)
+    process_event(event, "CoordinatorEventService#handle_project_resumed") do
+      validate_event_data(event, [ "project_id" ])
+
+      project_id = event.data["project_id"]
+      project = Project.find_by(id: project_id)
+
+      if project.nil?
+        logger.error("Project not found with ID: #{project_id}")
+        return nil
+      end
+
+      logger.info("Project resumed: #{project.name} [#{project.id}]")
+
+      # If this agent is responsible for the project, it should resume its operations
+      if agent.task&.project_id == project.id
+        logger.info("Coordinator acknowledging project resume for #{project.name}")
+
+        # If the agent's task is paused, resume it
+        if agent.task.state == "paused" && agent.task.may_resume?
+          agent.task.resume!
+          logger.info("Resumed coordination task: #{agent.task.id}")
+        end
+
+        # Request recoordination to ensure progress continues
+        agent.task.publish_event(
+          "project_recoordination_requested",
+          {
+            project_id: project.id,
+            project_name: project.name,
+            reason: "Project resumed after being paused"
+          }
+        )
+      end
+
+      { project: project }
+    end
+  end
+
   private
 
   # Check if all subtasks for a task are complete

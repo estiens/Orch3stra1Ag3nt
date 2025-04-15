@@ -57,9 +57,11 @@ module Contextable
   # @return [Project, nil] the project or nil
   def project
     return @project if defined?(@project) && @project
-    return task.project if respond_to?(:task) && task.present?
-    return nil unless respond_to?(:project_id) && project_id.present?
-    @project = Project.find_by(id: project_id)
+    id = project_id if respond_to?(:project_id)
+    id ||= task&.project&.id if respond_to?(:task)
+    id ||= agent_activity&.task&.project&.id if respond_to?(:agent_activity)
+
+    @project = Project.find_by(id: id)
   end
 
   # Get the agent_activity from context

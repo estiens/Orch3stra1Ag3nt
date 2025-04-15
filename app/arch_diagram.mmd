@@ -1,0 +1,129 @@
+classDiagram
+  ApplicationRecord <|-- Project
+  ApplicationRecord <|-- Task
+  ApplicationRecord <|-- AgentActivity
+  ApplicationRecord <|-- HumanInputRequest
+  ApplicationRecord <|-- HumanIntervention
+  ApplicationRecord <|-- LlmCall
+  ApplicationRecord <|-- VectorEmbedding
+  ApplicationRecord <|-- Event
+
+  Project "1" -- "*" Task : has_many
+  Project "1" -- "*" VectorEmbedding : has_many
+
+  Task "1" -- "*" AgentActivity : has_many
+  Task "1" -- "*" Task : parent
+  Task -- Event : emits (via AgentActivity)
+
+  AgentActivity "1" -- "*" LlmCall : has_many
+  AgentActivity "1" -- "*" Event : has_many
+  AgentActivity -- HumanInputRequest : triggers
+  AgentActivity -- HumanIntervention : triggers
+
+  HumanInputRequest -- Task : belongs_to
+  HumanInputRequest -- AgentActivity : belongs_to (optional)
+
+  HumanIntervention -- AgentActivity : belongs_to (optional)
+  HumanIntervention -- Task : has_one (via AgentActivity)
+
+  LlmCall -- AgentActivity : belongs_to
+
+  VectorEmbedding -- Task : belongs_to (optional)
+  VectorEmbedding -- Project : belongs_to (optional)
+
+  Event -- AgentActivity : belongs_to (optional)
+
+  class ApplicationRecord {
+    <<abstract>>
+  }
+
+  class Project {
+    +String name
+    +Text description
+    +String status
+    +JSONB settings
+    +JSONB metadata
+    +Integer priority
+    +kickoff!()
+    +pause!()
+    +resume!()
+    +search_knowledge()
+    +store_knowledge()
+    +llm_call_stats()
+  }
+
+  class Task {
+    +String title
+    +Text description
+    +String state
+    +String task_type
+    +JSONB metadata
+    +activate!()
+    +pause!()
+    +complete!()
+    +fail!()
+    +resume!()
+    +search_knowledge()
+    +store_knowledge()
+    +llm_call_stats()
+  }
+
+  class AgentActivity {
+    +String agent_type
+    +String status
+    +Text error_message
+    +pause!()
+    +resume!()
+    +mark_failed()
+  }
+
+  class HumanInputRequest {
+    +Text question
+    +Text response
+    +String status
+    +Boolean required
+    +answer!()
+    +ignore!()
+  }
+
+  class HumanIntervention {
+    +Text description
+    +String urgency
+    +String status
+    +Text resolution
+    +acknowledge!()
+    +resolve!()
+    +dismiss!()
+  }
+
+  class LlmCall {
+    +String provider
+    +String model
+    +Text prompt
+    +Text response
+    +Float cost
+    +Integer prompt_tokens
+    +Integer completion_tokens
+    +request_payload
+    +response_payload
+  }
+
+  class VectorEmbedding {
+    +Text content
+    +Float[] embedding
+    +String content_type
+    +String collection
+    +find_similar()
+    +generate_embedding()
+  }
+
+  class Event {
+    +String event_type
+    +JSON data
+    +Timestamp processed_at
+    +Integer priority
+    +publish()
+    +process()
+    +mark_processed!()
+  }
+

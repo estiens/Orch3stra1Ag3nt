@@ -41,9 +41,9 @@ class Project < ApplicationRecord
 
         # Create the initial orchestration task
         orchestration_task = tasks.create!(
-          title: "Project Orchestration: #{name}",
+          title: "Project Coordination: #{name}",
           description: "Initial task to plan and coordinate project: #{description}",
-          task_type: "orchestration",
+          task_type: "coordination",
           priority: "high",
           metadata: {
             project_kickoff: true,
@@ -52,7 +52,46 @@ class Project < ApplicationRecord
           }
         )
 
-        # Publish event to trigger OrchestratorAgent with system_event flag
+        # Directly spawn a CoordinatorAgent instead of going through the OrchestratorAgent
+        coordinator_options = {
+          task_id: orchestration_task.id,
+          purpose: "Coordinate execution of project: #{name}",
+          priority: "high",
+          metadata: {
+            project_id: id,
+            project_name: name,
+            task_type: "root_task"
+          }
+        }
+
+        # Create instructions for the coordinator
+        instructions = <<~INSTRUCTIONS
+          # PROJECT COORDINATION TASK
+
+          ## Project: #{name} (ID: #{id})
+
+          #{description}
+
+          ## Instructions
+          1. Analyze the project requirements
+          2. Decompose into atomic subtasks
+          3. Assign appropriate agent types for each subtask
+          4. Monitor and coordinate subtask execution
+          5. Ensure all critical paths are addressed
+
+          ## Important
+          - Focus on creating highly atomic, focused subtasks
+          - Use nested coordinators for complex work
+          - Ensure all critical paths are being addressed
+        INSTRUCTIONS
+
+        # Enqueue the coordinator directly
+        CoordinatorAgent.enqueue(instructions, coordinator_options)
+
+        # Activate the task to start processing
+        orchestration_task.activate!
+
+        # Still publish the project_created event for other listeners
         begin
           # Find or create a dummy agent activity for the event
           dummy_activity = orchestration_task.agent_activities.first_or_create!(
@@ -78,9 +117,6 @@ class Project < ApplicationRecord
           # Log but continue if event publishing fails
           Rails.logger.error("Failed to publish project_created event: #{e.message}")
         end
-
-        # Activate the task to start processing
-        orchestration_task.activate!
 
         # Return the orchestration task
         orchestration_task

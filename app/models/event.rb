@@ -57,11 +57,11 @@ class Event < ApplicationRecord
     # Check if this is a system event (specified by a flag)
     is_system_event = options.delete(:system_event) || false
 
-    # Validate agent_activity_id early to provide better error messages
-    if options[:agent_activity_id].blank? && !is_system_event
-      Rails.logger.warn("Event.publish: Cannot publish event '#{event_type}' without agent_activity_id")
-      return nil
-    end
+    # # Validate agent_activity_id early to provide better error messages
+    # if options[:agent_activity_id].blank? && !is_system_event
+    #   Rails.logger.warn("Event.publish: Cannot publish event '#{event_type}' without agent_activity_id")
+    #   return nil
+    # end
 
     # Check if schema exists and validate data against it
     if EventSchemaRegistry.schema_exists?(event_type)

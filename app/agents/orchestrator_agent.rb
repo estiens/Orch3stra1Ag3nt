@@ -415,7 +415,7 @@ class OrchestratorAgent < BaseAgent
 
     # Get error metrics
     recent_errors = Event.where(event_type: "agent_error").recent.limit(5)
-    error_summary = recent_errors.map { |e| "#{e.data['error_type']}: #{e.data['error_message']&.truncate(50)}" }.join("\n")
+    error_summary = recent_errors.map { |e| "#{e.data['error_type']}: #{(e.data['error_message'] || 'No error message').truncate(50)}" }.join("\n")
 
     # Get project metrics
     active_projects = Project.where(status: "active").count

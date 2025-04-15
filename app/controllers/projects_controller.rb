@@ -74,6 +74,13 @@ class ProjectsController < ApplicationController
     if @project.status == "active"
       if @project.pause!
         notice = "Project paused successfully."
+        # Dispatch the project:paused event for JavaScript to listen to
+        Turbo::StreamsChannel.broadcast_append_to(
+          "events",
+          target: "events",
+          partial: "events/event",
+          locals: { event_type: "project:paused", project_id: @project.id }
+        )
       else
         notice = "Could not pause project."
       end
@@ -82,13 +89,21 @@ class ProjectsController < ApplicationController
         format.html { redirect_back(fallback_location: dashboard_path, notice: notice) }
         format.turbo_stream {
           flash.now[:notice] = notice
-          render turbo_stream: [
-            turbo_stream.replace("projects-container",
-              partial: "dashboard/projects",
-              locals: { projects: Project.order(created_at: :desc).limit(10) }),
-            turbo_stream.replace("flash",
-              partial: "layouts/flash")
-          ]
+
+          # If request is from dashboard, update the dashboard projects
+          if request.referer&.include?("/dashboard")
+            render turbo_stream: [
+              turbo_stream.replace("projects-container",
+                partial: "dashboard/projects",
+                locals: { projects: Project.order(created_at: :desc).limit(10) }),
+              turbo_stream.replace("flash",
+                partial: "layouts/flash")
+            ]
+          else
+            # If request is from projects index, update the projects list
+            @projects = Project.recent.all
+            render template: "projects/index.turbo_stream"
+          end
         }
       end
     else
@@ -107,6 +122,13 @@ class ProjectsController < ApplicationController
     if @project.status == "paused"
       if @project.resume!
         notice = "Project resumed successfully."
+        # Dispatch the project:resumed event for JavaScript to listen to
+        Turbo::StreamsChannel.broadcast_append_to(
+          "events",
+          target: "events",
+          partial: "events/event",
+          locals: { event_type: "project:resumed", project_id: @project.id }
+        )
       else
         notice = "Could not resume project."
       end
@@ -115,13 +137,21 @@ class ProjectsController < ApplicationController
         format.html { redirect_back(fallback_location: dashboard_path, notice: notice) }
         format.turbo_stream {
           flash.now[:notice] = notice
-          render turbo_stream: [
-            turbo_stream.replace("projects-container",
-              partial: "dashboard/projects",
-              locals: { projects: Project.order(created_at: :desc).limit(10) }),
-            turbo_stream.replace("flash",
-              partial: "layouts/flash")
-          ]
+
+          # If request is from dashboard, update the dashboard projects
+          if request.referer&.include?("/dashboard")
+            render turbo_stream: [
+              turbo_stream.replace("projects-container",
+                partial: "dashboard/projects",
+                locals: { projects: Project.order(created_at: :desc).limit(10) }),
+              turbo_stream.replace("flash",
+                partial: "layouts/flash")
+            ]
+          else
+            # If request is from projects index, update the projects list
+            @projects = Project.recent.all
+            render template: "projects/index.turbo_stream"
+          end
         }
       end
     else

@@ -28,7 +28,8 @@ class AgentActivity < ApplicationRecord
         {
           task_id: task_id,
           agent_type: agent_type,
-          error_message: error_message
+          error_message: error_message,
+          agent_activity_id: id
         }
       )
     rescue => e
@@ -49,7 +50,8 @@ class AgentActivity < ApplicationRecord
         "agent_paused",
         {
           task_id: task_id,
-          agent_type: agent_type
+          agent_type: agent_type,
+          agent_activity_id: id
         }
       )
     rescue => e
@@ -72,7 +74,8 @@ class AgentActivity < ApplicationRecord
         "agent_resumed",
         {
           task_id: task_id,
-          agent_type: agent_type
+          agent_type: agent_type,
+          agent_activity_id: id
         }
       )
     rescue => e

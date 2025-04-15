@@ -91,6 +91,25 @@
   
   <!-- Main Dashboard Content -->
   <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+    <!-- Priority Section - Human Interventions (Spans full width if there are active interventions) -->
+    <% if @human_interventions.any? %>
+      <div class="col-span-1 lg:col-span-2 xl:col-span-3">
+        <div class="card bg-base-100 shadow-xl h-full border-2 border-red-400">
+          <div class="card-body">
+            <div class="flex justify-between items-center mb-4">
+              <div class="flex items-center">
+                <h2 class="card-title text-red-600">Critical Human Interventions</h2>
+                <span class="badge badge-error ml-2"><%= @human_interventions.count %></span>
+              </div>
+            </div>
+            <div id="human-interventions-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+              <%= render partial: "human_interventions", locals: { human_interventions: @human_interventions } %>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+    
     <!-- Priority Section - Human Input Requests (Spans full width if there are pending requests) -->
     <% if @human_input_requests.any? %>
       <div class="col-span-1 lg:col-span-2 xl:col-span-3">

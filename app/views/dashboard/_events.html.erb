@@ -1,23 +1,29 @@
 <% if events.any? %>
   <% events.each do |event| %>
-    <div id="<%= dom_id(event) %>" class="hover:bg-gray-50 transition-colors duration-150">
+    <div id="<%= dom_id(event) %>" class="hover:bg-gray-50 transition-colors duration-150 <%= event.event_type.include?('escalated_to_human') ? 'border-l-4 border-red-500' : '' %>">
       <div class="p-4 sm:px-6">
         <div class="flex items-center justify-between">
           <div class="min-w-0 flex-1">
             <div class="flex items-center">
               <div class="h-8 w-8 rounded-full flex items-center justify-center
-                <%= event.event_type.include?('error') ? 'bg-red-100 text-red-700' : 
-                   event.event_type.include?('started') ? 'bg-blue-100 text-blue-700' : 
-                   event.event_type.include?('finished') ? 'bg-green-100 text-green-700' : 
-                   event.event_type.include?('paused') ? 'bg-yellow-100 text-yellow-700' : 
-                   event.event_type.include?('resumed') ? 'bg-green-100 text-green-700' : 
+                <%= event.event_type.include?('error') || event.event_type.include?('escalated_to_human') ? 'bg-red-100 text-red-700' :
+                   event.event_type.include?('started') ? 'bg-blue-100 text-blue-700' :
+                   event.event_type.include?('finished') ? 'bg-green-100 text-green-700' :
+                   event.event_type.include?('paused') ? 'bg-yellow-100 text-yellow-700' :
+                   event.event_type.include?('resumed') ? 'bg-green-100 text-green-700' :
                    'bg-purple-100 text-purple-700' %>">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <% if event.event_type.include?('escalated_to_human') %>
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                <% else %>
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                <% end %>
               </div>
               <div class="ml-3">
-                <h3 class="text-sm font-medium text-gray-900 truncate">
+                <h3 class="text-sm font-medium <%= event.event_type.include?('escalated_to_human') ? 'text-red-700' : 'text-gray-900' %> truncate">
                   <%= event.event_type %>
                 </h3>
                 <div class="flex items-center text-xs text-gray-500">
@@ -42,6 +48,19 @@
           </div>
         </div>
         
+        <% if event.event_type.include?('escalated_to_human') && event.data.present? && event.data.is_a?(Hash) && event.data["reason"].present? %>
+          <div class="mt-2 text-sm text-red-600 p-2 bg-red-50 rounded">
+            <strong>Requires human attention:</strong> <%= event.data["reason"] %>
+            <% if event.data["intervention_id"].present? %>
+              <div class="mt-2">
+                <% if HumanIntervention.find_by(id: event.data["intervention_id"]) %>
+                  <%= link_to "View Intervention Details", human_intervention_path(event.data["intervention_id"]), class: "text-xs inline-flex items-center px-2 py-1 border border-transparent shadow-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500" %>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+        
         <% if event.data.present? && event.data.is_a?(Hash) && event.data["duration"].present? %>
           <div class="mt-2 text-xs text-gray-500">
             <span class="inline-flex items-center">
@@ -55,9 +74,9 @@
         
         <% if event.data.present? && event.data.is_a?(Hash) && !event.data.empty? %>
           <div class="mt-2">
-            <button class="inline-flex items-center text-xs font-medium text-indigo-600 hover:text-indigo-900" 
+            <button class="inline-flex items-center text-xs font-medium text-indigo-600 hover:text-indigo-900"
                     data-controller="collapsible"
-                    data-action="click->collapsible#toggle" 
+                    data-action="click->collapsible#toggle"
                     data-collapsible-target="trigger"
                     data-collapsible-id-value="event-details-<%= event.id %>">
               <span>View Details</span>

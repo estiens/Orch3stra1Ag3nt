@@ -20,6 +20,14 @@ class CoordinatorAgent < BaseAgent
   subscribe_to "agent_completed", :handle_agent_completed
   subscribe_to "human_input_provided", :handle_human_input_provided
 
+  # Subscribe to project-related events
+  subscribe_to "project_created", :handle_project_created
+  subscribe_to "project_activated", :handle_project_activated
+  subscribe_to "project_stalled", :handle_project_stalled
+  subscribe_to "project_recoordination_requested", :handle_project_recoordination
+  subscribe_to "project_paused", :handle_project_paused
+  subscribe_to "project_resumed", :handle_project_resumed
+
   # --- Tools with Explicit Parameter Documentation ---
   tool :analyze_task, "Initial planning: Break down a complex task into logical subtasks with dependencies. Takes (task_description: <full task details>)" do |task_description:|
     analyze_task(task_description)
@@ -278,6 +286,66 @@ class CoordinatorAgent < BaseAgent
     rescue => e
       Rails.logger.error "[CoordinatorAgent] Error handling human input provided: #{e.message}"
     end
+  end
+
+  # Handle project created event
+  def handle_project_created(event)
+    project_id = event.data["project_id"]
+    return if project_id.blank?
+
+    # Create a CoordinatorEventService to handle this event
+    service = CoordinatorEventService.new
+    service.handle_project_created(event, self)
+  end
+
+  # Handle project activated event
+  def handle_project_activated(event)
+    project_id = event.data["project_id"]
+    return if project_id.blank?
+
+    # Create a CoordinatorEventService to handle this event
+    service = CoordinatorEventService.new
+    service.handle_project_activated(event, self)
+  end
+
+  # Handle project stalled event
+  def handle_project_stalled(event)
+    project_id = event.data["project_id"]
+    return if project_id.blank?
+
+    # Create a CoordinatorEventService to handle this event
+    service = CoordinatorEventService.new
+    service.handle_project_stalled(event, self)
+  end
+
+  # Handle project recoordination request event
+  def handle_project_recoordination(event)
+    project_id = event.data["project_id"]
+    return if project_id.blank?
+
+    # Create a CoordinatorEventService to handle this event
+    service = CoordinatorEventService.new
+    service.handle_project_recoordination(event, self)
+  end
+
+  # Handle project paused event
+  def handle_project_paused(event)
+    project_id = event.data["project_id"]
+    return if project_id.blank?
+
+    # Create a CoordinatorEventService to handle this event
+    service = CoordinatorEventService.new
+    service.handle_project_paused(event, self)
+  end
+
+  # Handle project resumed event
+  def handle_project_resumed(event)
+    project_id = event.data["project_id"]
+    return if project_id.blank?
+
+    # Create a CoordinatorEventService to handle this event
+    service = CoordinatorEventService.new
+    service.handle_project_resumed(event, self)
   end
   # --- End Event Handlers ---
 
@@ -1021,8 +1089,18 @@ class CoordinatorAgent < BaseAgent
     is_sub_coordinator = task.metadata&.dig("is_sub_coordinator") == true
     nesting_level = task.metadata&.dig("nesting_level") || 0
 
+    # Check if this is a project coordination task
+    is_project_coordination = (task.task_type == "coordination" && task.project_id.present?)
+
     # Log the coordinator start with context
-    coordinator_type = is_sub_coordinator ? "Sub-Coordinator (Level #{nesting_level})" : "Root Coordinator"
+    coordinator_type = if is_project_coordination
+                        "Project Coordinator"
+    elsif is_sub_coordinator
+                        "Sub-Coordinator (Level #{nesting_level})"
+    else
+                        "Root Coordinator"
+    end
+
     Rails.logger.info "[#{coordinator_type}-#{task.id}] Starting run with event_type: #{event_type || 'none'}"
 
     result_message = nil
@@ -1047,14 +1125,27 @@ class CoordinatorAgent < BaseAgent
         # Handle task resumption after being paused
         result_message = "Task resumed. Evaluating current progress and next steps."
         result_message = evaluate_current_progress
+      elsif event_type == "project_recoordination_requested" && is_project_coordination
+        # Handle project recoordination if this is a project coordinator
+        project_id = task.project_id
+        Rails.logger.info "[Project Coordinator-#{task.id}] Recoordinating project #{project_id}"
+        result_message = execute_tool(:recoordinate_project, project_id: project_id)
       elsif task.reload.subtasks.empty? # Check if subtasks are *actually* empty
         # Initial decomposition for new tasks
-        if is_sub_coordinator
+        if is_project_coordination
+          # For project coordinators
+          Rails.logger.info "[Project Coordinator-#{task.id}] Performing initial project decomposition"
+          update_task_status("Starting decomposition for project: #{task.project.name}")
+          result_message = perform_initial_task_decomposition
+        elsif is_sub_coordinator
           # For sub-coordinators, log the nesting level
           Rails.logger.info "[Sub-Coordinator-#{task.id}] Performing decomposition at nesting level #{nesting_level}"
           update_task_status("Starting decomposition as a level #{nesting_level} sub-coordinator")
+          result_message = perform_initial_task_decomposition
+        else
+          # Regular coordinator
+          result_message = perform_initial_task_decomposition
         end
-        result_message = perform_initial_task_decomposition
       else
         # General progress check and next steps
         result_message = evaluate_current_progress

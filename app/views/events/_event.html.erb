@@ -1,0 +1,21 @@
+<% 
+# This partial is used to broadcast events via Turbo Streams
+# It doesn't render any visible content, but dispatches a custom event
+# that can be caught by JavaScript controllers
+%>
+
+<script>
+  // Execute immediately rather than waiting for DOMContentLoaded
+  // since this is being inserted via Turbo Stream
+  (function() {
+    const event = new CustomEvent("<%= event_type %>", {
+      detail: {
+        projectId: <%= project_id %>,
+        timestamp: "<%= Time.current.iso8601 %>"
+      },
+      bubbles: true
+    });
+    document.dispatchEvent(event);
+    console.log("Dispatched event: <%= event_type %> for project <%= project_id %>");
+  })();
+</script>

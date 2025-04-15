@@ -6,6 +6,7 @@ class DashboardController < ApplicationController
     @events = Event.order(created_at: :desc).limit(30)
     @llm_calls = LlmCall.order(created_at: :desc).limit(15)
     @tasks = Task.where(state: [ "active", "pending", "waiting_on_human" ]).order(created_at: :desc).limit(10)
+    @human_interventions = HumanIntervention.active.order(urgency: :desc, created_at: :desc).limit(5)
 
     # Handle HumanInputRequest with or without status column
     if HumanInputRequest.column_names.include?("status")
