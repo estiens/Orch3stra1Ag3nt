@@ -36,9 +36,11 @@ jobs:
       - name: Setup DB
         env:
           RAILS_ENV: test
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432
-        run: bin/rails db:create db:migrate
-      
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/double_agent_test
+        run: |
+          bin/rails db:create db:migrate
+          psql -h localhost -U postgres -d double_agent_test -c 'CREATE EXTENSION IF NOT EXISTS vector'
+    
       - name: Specs
         run: bundle exec rspec --format documentation --color
 
