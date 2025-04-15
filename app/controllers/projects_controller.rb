@@ -71,48 +71,6 @@ class ProjectsController < ApplicationController
   def pause
     if @project.status == "active"
       if @project.pause!
-        notice = "Project was successfully paused."
-      else
-        notice = "Failed to pause project."
-      end
-      
-      respond_to do |format|
-        format.html { redirect_to @project, notice: notice }
-        format.turbo_stream { redirect_to @project, notice: notice }
-      end
-    else
-      respond_to do |format|
-        format.html { redirect_to @project, alert: "Project can only be paused when active." }
-        format.turbo_stream { redirect_to @project, alert: "Project can only be paused when active." }
-      end
-    end
-  end
-  
-  # POST /projects/1/resume
-  def resume
-    if @project.status == "paused"
-      if @project.resume!
-        notice = "Project was successfully resumed."
-      else
-        notice = "Failed to resume project."
-      end
-      
-      respond_to do |format|
-        format.html { redirect_to @project, notice: notice }
-        format.turbo_stream { redirect_to @project, notice: notice }
-      end
-    else
-      respond_to do |format|
-        format.html { redirect_to @project, alert: "Project can only be resumed when paused." }
-        format.turbo_stream { redirect_to @project, alert: "Project can only be resumed when paused." }
-      end
-    end
-  end
-  
-  # POST /projects/1/pause
-  def pause
-    if @project.status == "active"
-      if @project.pause!
         notice = "Project paused successfully."
       else
         notice = "Could not pause project."
@@ -125,14 +83,19 @@ class ProjectsController < ApplicationController
           render turbo_stream: [
             turbo_stream.replace("projects-container", 
               partial: "dashboard/projects", 
-              locals: { projects: Project.order(created_at: :desc).limit(10) })
+              locals: { projects: Project.order(created_at: :desc).limit(10) }),
+            turbo_stream.replace("flash", 
+              partial: "layouts/flash")
           ]
         }
       end
     else
       respond_to do |format|
         format.html { redirect_back(fallback_location: dashboard_path, alert: "Could not pause project.") }
-        format.turbo_stream { flash.now[:alert] = "Could not pause project." }
+        format.turbo_stream { 
+          flash.now[:alert] = "Could not pause project."
+          render turbo_stream: turbo_stream.replace("flash", partial: "layouts/flash")
+        }
       end
     end
   end
@@ -153,14 +116,19 @@ class ProjectsController < ApplicationController
           render turbo_stream: [
             turbo_stream.replace("projects-container", 
               partial: "dashboard/projects", 
-              locals: { projects: Project.order(created_at: :desc).limit(10) })
+              locals: { projects: Project.order(created_at: :desc).limit(10) }),
+            turbo_stream.replace("flash", 
+              partial: "layouts/flash")
           ]
         }
       end
     else
       respond_to do |format|
         format.html { redirect_back(fallback_location: dashboard_path, alert: "Could not resume project.") }
-        format.turbo_stream { flash.now[:alert] = "Could not resume project." }
+        format.turbo_stream { 
+          flash.now[:alert] = "Could not resume project."
+          render turbo_stream: turbo_stream.replace("flash", partial: "layouts/flash")
+        }
       end
     end
   end
