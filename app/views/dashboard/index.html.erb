@@ -87,51 +87,117 @@
     <!-- Priority Section - Human Input Requests (Spans full width if there are pending requests) -->
     <% if @human_input_requests.any? %>
       <div class="col-span-1 lg:col-span-2 xl:col-span-3">
-        <%= dashboard_section_card("Pending Human Input", "human-input-requests-container", nil, @human_input_requests.count) do %>
-          <%= render partial: "human_input_requests", locals: { human_input_requests: @human_input_requests } %>
-        <% end %>
+        <div class="card bg-base-100 shadow-xl h-full">
+          <div class="card-body">
+            <div class="flex justify-between items-center mb-4">
+              <div class="flex items-center">
+                <h2 class="card-title">Pending Human Input</h2>
+                <span class="badge badge-primary ml-2"><%= @human_input_requests.count %></span>
+              </div>
+            </div>
+            <div id="human-input-requests-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+              <%= render partial: "human_input_requests", locals: { human_input_requests: @human_input_requests } %>
+            </div>
+          </div>
+        </div>
       </div>
     <% end %>
     
     <!-- Left Column -->
     <div class="space-y-6 col-span-1">
       <!-- Projects Section -->
-      <%= dashboard_section_card("Active Projects", "projects-container", projects_path) do %>
-        <%= render partial: "projects", locals: { projects: @projects } %>
-      <% end %>
+      <div class="card bg-base-100 shadow-xl h-full">
+        <div class="card-body">
+          <div class="flex justify-between items-center mb-4">
+            <div class="flex items-center">
+              <h2 class="card-title">Active Projects</h2>
+            </div>
+            <%= link_to "View All", projects_path, class: "link link-primary text-sm" %>
+          </div>
+          <div id="projects-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+            <%= render partial: "projects", locals: { projects: @projects } %>
+          </div>
+        </div>
+      </div>
       
       <% if @human_input_requests.empty? %>
         <!-- Human Input Requests Section (only shown here if empty) -->
-        <%= dashboard_section_card("Pending Human Input", "human-input-requests-container") do %>
-          <%= render partial: "human_input_requests", locals: { human_input_requests: @human_input_requests } %>
-        <% end %>
+        <div class="card bg-base-100 shadow-xl h-full">
+          <div class="card-body">
+            <div class="flex justify-between items-center mb-4">
+              <div class="flex items-center">
+                <h2 class="card-title">Pending Human Input</h2>
+              </div>
+            </div>
+            <div id="human-input-requests-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+              <%= render partial: "human_input_requests", locals: { human_input_requests: @human_input_requests } %>
+            </div>
+          </div>
+        </div>
       <% end %>
     </div>
     
     <!-- Middle Column -->
     <div class="space-y-6 col-span-1">
       <!-- Tasks Section -->
-      <%= dashboard_section_card("Active Tasks", "tasks-container", tasks_path) do %>
-        <%= render partial: "tasks", locals: { tasks: @tasks } %>
-      <% end %>
+      <div class="card bg-base-100 shadow-xl h-full">
+        <div class="card-body">
+          <div class="flex justify-between items-center mb-4">
+            <div class="flex items-center">
+              <h2 class="card-title">Active Tasks</h2>
+            </div>
+            <%= link_to "View All", tasks_path, class: "link link-primary text-sm" %>
+          </div>
+          <div id="tasks-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+            <%= render partial: "tasks", locals: { tasks: @tasks } %>
+          </div>
+        </div>
+      </div>
       
       <!-- Agent Activities Section -->
-      <%= dashboard_section_card("Recent Agent Activities", "agent-activities-container") do %>
-        <%= render partial: "agent_activities", locals: { agent_activities: @agent_activities } %>
-      <% end %>
+      <div class="card bg-base-100 shadow-xl h-full">
+        <div class="card-body">
+          <div class="flex justify-between items-center mb-4">
+            <div class="flex items-center">
+              <h2 class="card-title">Recent Agent Activities</h2>
+            </div>
+          </div>
+          <div id="agent-activities-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+            <%= render partial: "agent_activities", locals: { agent_activities: @agent_activities } %>
+          </div>
+        </div>
+      </div>
     </div>
     
     <!-- Right Column -->
     <div class="space-y-6 col-span-1">
       <!-- LLM Calls Section -->
-      <%= dashboard_section_card("Recent LLM Calls", "llm-calls-container") do %>
-        <%= render partial: "llm_calls", locals: { llm_calls: @llm_calls } %>
-      <% end %>
+      <div class="card bg-base-100 shadow-xl h-full">
+        <div class="card-body">
+          <div class="flex justify-between items-center mb-4">
+            <div class="flex items-center">
+              <h2 class="card-title">Recent LLM Calls</h2>
+            </div>
+          </div>
+          <div id="llm-calls-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+            <%= render partial: "llm_calls", locals: { llm_calls: @llm_calls } %>
+          </div>
+        </div>
+      </div>
       
       <!-- Events Section -->
-      <%= dashboard_section_card("Latest Events", "events-container") do %>
-        <%= render partial: "events", locals: { events: @events } %>
-      <% end %>
+      <div class="card bg-base-100 shadow-xl h-full">
+        <div class="card-body">
+          <div class="flex justify-between items-center mb-4">
+            <div class="flex items-center">
+              <h2 class="card-title">Latest Events</h2>
+            </div>
+          </div>
+          <div id="events-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
+            <%= render partial: "events", locals: { events: @events } %>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
