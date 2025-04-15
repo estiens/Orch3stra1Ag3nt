@@ -2,7 +2,7 @@ require 'rails_helper'
 
 RSpec.describe BaseEventService do
   let(:service) { BaseEventService.new }
-  let(:event) { instance_double(Event, id: 1, event_type: 'test.event') }
+  let(:event) { instance_double(Event, id: 1, event_type: 'test.event', data: {}) }
   let(:handler_name) { 'TestHandler' }
   let(:logger) { instance_double(ActiveSupport::Logger) }
   
@@ -83,17 +83,17 @@ RSpec.describe BaseEventService do
   
   describe '#validate_event_data' do
     it 'validates event data with all required fields' do
-      event.data = { 'field1' => 'value1', 'field2' => 'value2' }
+      allow(event).to receive(:data).and_return({ 'field1' => 'value1', 'field2' => 'value2' })
       expect(service.validate_event_data(event, ['field1', 'field2'])).to be true
     end
     
     it 'validates event data with symbol keys' do
-      event.data = { field1: 'value1', field2: 'value2' }
+      allow(event).to receive(:data).and_return({ field1: 'value1', field2: 'value2' })
       expect(service.validate_event_data(event, ['field1', 'field2'])).to be true
     end
     
     it 'raises error for missing required fields' do
-      event.data = { 'field1' => 'value1' }
+      allow(event).to receive(:data).and_return({ 'field1' => 'value1' })
       expect {
         service.validate_event_data(event, ['field1', 'field2'])
       }.to raise_error(ArgumentError, /missing required fields/)

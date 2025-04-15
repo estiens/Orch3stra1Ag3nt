@@ -162,6 +162,9 @@ RSpec.describe EventBus do
       # Stub the EventDispatchJob to avoid actual enqueuing
       allow(EventDispatchJob).to receive(:perform_later)
       
+      # Stub the EventBus instance to avoid actual dispatch
+      allow_any_instance_of(EventBus).to receive(:dispatch_event)
+      
       # Set expectations
       expect(EventDispatchJob).to receive(:perform_later).with(event.id)
       
@@ -188,9 +191,11 @@ RSpec.describe EventBus do
       handler_instance = double('handler_instance')
       
       # Set up the handler class to respond appropriately to method checks
-      allow(handler_class).to receive(:is_a?).and_return(true)
+      allow(handler_class).to receive(:is_a?).with(Class).and_return(true)
+      allow(handler_class).to receive(:respond_to?).with(any_args).and_return(false)
       allow(handler_class).to receive(:respond_to?).with(:process).and_return(false)
-      allow(handler_class).to receive(:respond_to?).with(:handle_event).and_return(true)
+      allow(handler_class).to receive(:respond_to?).with(:handle_event).and_return(false)
+      allow(handler_class).to receive(:instance_methods).and_return([:handle_event])
       allow(handler_class).to receive(:new).and_return(handler_instance)
       
       # Expect the handler instance to receive handle_event
