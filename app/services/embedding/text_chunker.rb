@@ -274,6 +274,7 @@ module Embedding
     end
 
     # Detect content type based on text characteristics
+    # This needs to be public so it can be called from chunk_text
     def detect_content_type(text)
       # Simple heuristic to detect code vs natural language
       code_indicators = [
@@ -401,18 +402,33 @@ module Embedding
       begin
         text = File.read(file_path)
         chunker = new
-        content_type ||= chunker.detect_content_type(text)
-        puts "Content detected as: #{content_type}"
+        
+        # Don't try to auto-detect content type in the class method
+        # Let the instance methods handle it
+        if content_type.nil?
+          # Try to guess based on file extension
+          content_type = case File.extname(file_path).downcase
+                         when '.rb', '.js', '.py', '.java', '.c', '.cpp', '.cs', '.php', '.go', '.ts', '.swift'
+                           :code
+                         else
+                           nil # Let the instance method detect it
+                         end
+        end
+        
         puts "File size: #{text.length} characters"
         
         start_time = Time.now
         chunks = chunker.chunk_text(text, chunk_size, chunk_overlap, content_type)
         duration = Time.now - start_time
         
+        # Get the content type that was actually used (might have been auto-detected)
+        actual_content_type = content_type || (chunks.empty? ? :unknown : :auto_detected)
+        puts "Content processed as: #{actual_content_type}"
+        
         puts "Generated #{chunks.size} chunks in #{duration.round(2)}s"
         puts "Average chunk size: #{(chunks.sum { |c| c.length } / [1, chunks.size].max).round(2)} characters"
-        puts "Smallest chunk: #{chunks.map(&:length).min} characters"
-        puts "Largest chunk: #{chunks.map(&:length).max} characters"
+        puts "Smallest chunk: #{chunks.map(&:length).min || 0} characters"
+        puts "Largest chunk: #{chunks.map(&:length).max || 0} characters"
         
         # Return the chunks for further inspection
         chunks
