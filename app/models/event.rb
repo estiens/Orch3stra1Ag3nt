@@ -1,5 +1,6 @@
 class Event < ApplicationRecord
   include DashboardBroadcaster
+  include Contextable
 
   # Association with an agent activity - optional for system events
   belongs_to :agent_activity, optional: true
@@ -39,6 +40,8 @@ class Event < ApplicationRecord
   scope :recent, -> { order(created_at: :desc) }
   scope :by_type, ->(type) { where(event_type: type) }
   scope :system_events, -> { where(agent_activity_id: nil) }
+  scope :for_task, ->(task_id) { where(task_id: task_id) }
+  scope :for_project, ->(project_id) { where(project_id: project_id) }
 
   # Event priority levels
   LOW_PRIORITY = 0
@@ -65,8 +68,10 @@ class Event < ApplicationRecord
         priority: options[:priority] || NORMAL_PRIORITY
       }
 
-      # Only add agent_activity_id if this is not a system event
+      # Add context attributes
       event_attrs[:agent_activity_id] = options[:agent_activity_id] unless is_system_event
+      event_attrs[:task_id] = options[:task_id] if options[:task_id].present?
+      event_attrs[:project_id] = options[:project_id] if options[:project_id].present?
 
       # For system events, we need to bypass the agent_activity validation
       if is_system_event

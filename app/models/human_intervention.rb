@@ -1,6 +1,8 @@
 # HumanIntervention: Model for tracking human intervention requests
 # Used for critical issues that need human attention
 class HumanIntervention < ApplicationRecord
+  include Contextable
+  
   belongs_to :agent_activity, optional: true
   has_one :task, through: :agent_activity
 

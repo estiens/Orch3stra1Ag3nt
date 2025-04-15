@@ -3,6 +3,7 @@
 class HumanInputRequest < ApplicationRecord
   include EventPublisher
   include DashboardBroadcaster
+  include Contextable
 
   belongs_to :task
   belongs_to :agent_activity, optional: true

@@ -2,7 +2,7 @@ class BaseAgent
   include SolidQueueManagement
   # Optionally include EventSubscriber or pass to subclasses
 
-  attr_reader :llm, :tools, :purpose, :session_data, :task, :agent_activity
+  attr_reader :llm, :tools, :purpose, :session_data, :task, :agent_activity, :context
   # Removed :chain, :retriever
 
   def initialize(
@@ -11,11 +11,21 @@ class BaseAgent
     tools: nil,
     task: nil,
     agent_activity: nil,
+    context: nil,
     **options # Allow arbitrary options for subclasses
   )
     @purpose = purpose
-    @task = task
-    @agent_activity = agent_activity
+    
+    # Set up context
+    @context = context || {}
+    @task = task || (context && Task.find_by(id: context[:task_id]))
+    @agent_activity = agent_activity || (context && AgentActivity.find_by(id: context[:agent_activity_id]))
+    
+    # Update context with task and agent_activity if provided
+    @context[:task_id] = @task.id if @task && !@context[:task_id]
+    @context[:agent_activity_id] = @agent_activity.id if @agent_activity && !@context[:agent_activity_id]
+    @context[:project_id] = @task.project_id if @task&.project_id && !@context[:project_id]
+    
     # Tools are stored internally as an array of hashes (for blocks) or objects
     @tools = Array.wrap(tools || self.class.registered_tools)
     @llm = llm || self.class.default_llm
@@ -182,8 +192,15 @@ class BaseAgent
   end
 
   def self.enqueue(prompt, options = {})
+    # Extract context from options
+    context = {
+      task_id: options[:task_id],
+      agent_activity_id: options[:agent_activity_id],
+      project_id: options[:project_id]
+    }.compact
+    
     # Ensure task_id is present
-    unless options[:task_id].present?
+    unless context[:task_id].present?
       Rails.logger.error("[#{self.name}] Cannot enqueue agent job without task_id")
       return nil
     end
@@ -199,6 +216,9 @@ class BaseAgent
       # Allow overriding via passed-in job_options as well
       job_options.merge!(options.delete(:job_options) || {})
 
+      # Add context to options
+      options[:context] = context
+      
       Agents::AgentJob.set(**job_options).perform_later(agent_class_name, prompt, options)
     end
   end
@@ -217,6 +237,15 @@ class BaseAgent
 
   # --- Protected Logging Helpers ---
   protected
+
+  # Helper method to publish events with context
+  def publish_event(event_type, data = {}, options = {})
+    # Merge context with options
+    merged_options = @context.merge(options)
+    
+    # Publish event through the EventBus
+    Event.publish(event_type, data, merged_options)
+  end
 
   # Use this in subclasses when making direct LLM calls to log them
   def log_direct_llm_call(prompt, llm_response)
@@ -271,7 +300,7 @@ class BaseAgent
       cost = calculate_llm_cost(model_name, prompt_tokens, completion_tokens)
 
       # Create the LLM call record with all fields
-      @agent_activity.llm_calls.create!(
+      llm_call = LlmCall.new(
         provider: provider,
         model: model_name,
         prompt: prompt_text,
@@ -284,6 +313,10 @@ class BaseAgent
         duration: duration, # Use actual duration
         cost: cost # Use calculated cost
       )
+      
+      # Set context and save
+      llm_call.with_context(@context)
+      llm_call.save!
     rescue => e
       Rails.logger.error "[BaseAgent] Failed to log direct LLM call: #{e.message}"
     end
@@ -346,7 +379,8 @@ class BaseAgent
   end
 
   def log_tool_event(event_type, tool_data)
-    return unless @agent_activity
+    return unless @context[:agent_activity_id]
+    
     data = { tool: tool_data[:tool], args: tool_data[:args].inspect.truncate(500) }
     if tool_data[:error]
       data[:error] = tool_data[:error].message
@@ -355,7 +389,11 @@ class BaseAgent
     else
       data[:result_preview] = tool_data[:result].to_s.truncate(500)
     end
-    @agent_activity.events.create!(event_type: event_type, data: data)
+    
+    # Create event with context
+    event = Event.new(event_type: event_type, data: data)
+    event.with_context(@context)
+    event.save!
   rescue => e
     Rails.logger.error "[BaseAgent] Failed to log tool event '#{event_type}' for tool '#{tool_data[:tool]}': #{e.message}"
   end

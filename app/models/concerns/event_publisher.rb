@@ -1,28 +1,29 @@
 # frozen_string_literal: true
 
 # EventPublisher: A concern to standardize publishing events with proper context
-# Provides helpers for safely publishing events with agent_activity_id
+# Provides helpers for safely publishing events with context
 module EventPublisher
   extend ActiveSupport::Concern
 
-  # Publish an event with the current model's agent_activity_id automatically included
+  included do
+    include Contextable unless included_modules.include?(Contextable)
+  end
+
+  # Publish an event with the current model's context automatically included
   # @param event_type [String] type of event to publish
   # @param data [Hash] event data payload
   # @param options [Hash] additional options (priority, etc)
   # @return [Event] the created event
   def publish_event(event_type, data = {}, options = {})
-    # Merge agent_activity_id if it's defined on this model or provided
-    activity_id = if respond_to?(:agent_activity_id) && agent_activity_id.present?
-                     agent_activity_id
-    elsif respond_to?(:agent_activity) && agent_activity&.id.present?
-                     agent_activity.id
-    else
-                     options[:agent_activity_id]
-    end
+    # Get context from the current object
+    ctx = context
 
-    # Create merged options with activity_id and priority if provided
-    merged_options = { agent_activity_id: activity_id }
+    # Create merged options with context and priority if provided
+    merged_options = ctx
     merged_options[:priority] = options[:priority] if options[:priority].present?
+    
+    # Override with any explicitly provided options
+    merged_options.merge!(options.slice(:agent_activity_id, :task_id, :project_id))
 
     # Validate that we have an agent_activity_id before attempting to publish
     if merged_options[:agent_activity_id].blank?
