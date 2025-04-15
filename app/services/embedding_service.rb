@@ -40,185 +40,126 @@ class EmbeddingService
   # @param force [Boolean] Whether to force processing even if chunks exist
   # @return [Array<VectorEmbedding>] The created embedding records
   def add_document(text, chunk_size: 512, chunk_overlap: 25, content_type: "document", source_url: nil, source_title: nil, metadata: {}, force: false)
-    if text.blank?
-      Rails.logger.info("Empty document received - nothing to process")
-      return []
+    return [] if text.blank?
+
+    # STAGE 1: Chunking
+    chunks = chunk_text(text, chunk_size, chunk_overlap)
+    return [] if chunks.empty?
+
+    # STAGE 2: Duplicate checking
+    unless force
+      existing_chunks = VectorEmbedding.where(collection: @collection, content: chunks).pluck(:content)
+      chunks_to_process = chunks - existing_chunks
+    else
+      chunks_to_process = chunks
     end
 
-    start_time = Time.now
-    text_size = text.bytesize
-    Rails.logger.tagged("EmbeddingService", "add_document") do
-      Rails.logger.info("Starting document processing: #{text_size} bytes, chunk_size=#{chunk_size}, overlap=#{chunk_overlap}")
+    return [] if chunks_to_process.empty?
 
-      # Log file information if available
-      if metadata[:file_path].present?
-        Rails.logger.info("Processing file: #{metadata[:file_path]}")
-      end
+    # STAGE 3: Embedding generation and database commits
+    # Configuration
+    api_batch_size = 8  # Size for API calls
+    db_commit_frequency = 10  # Commit to DB every X API batches
 
-      # STAGE 1: Chunking
-      chunking_start = Time.now
-      Rails.logger.info("Stage 1: Chunking document...")
-      chunks = chunk_text(text, chunk_size, chunk_overlap)
-      chunking_time = Time.now - chunking_start
+    # Prepare for processing
+    all_results = []
+    total_saved = 0
 
-      Rails.logger.info("Chunking complete: created #{chunks.size} chunks in #{chunking_time.round(2)}s")
+    # Buffers for accumulating chunks before DB commit
+    pending_chunks = []
+    pending_embeddings = []
 
-      if chunks.empty?
-        Rails.logger.warn("No valid chunks extracted from document")
-        return []
-      end
+    # Process in small batches for API calls
+    chunks_to_process.each_slice(api_batch_size).with_index do |api_batch, api_batch_idx|
+      api_batch_num = api_batch_idx + 1
+      
+      begin
+        # Generate embeddings for this API batch
+        batch_embeddings = generate_tei_embeddings(api_batch)
 
-      # STAGE 2: Duplicate checking
-      dedupe_start = Time.now
-      Rails.logger.info("Stage 2: Checking for existing chunks...")
+        # Add to pending buffers
+        pending_chunks.concat(api_batch)
+        pending_embeddings.concat(batch_embeddings)
 
-      unless force
-        existing_chunks = VectorEmbedding.where(collection: @collection, content: chunks).pluck(:content)
-        chunks_to_process = chunks - existing_chunks
-        Rails.logger.info("Found #{existing_chunks.size} existing chunks, need to process #{chunks_to_process.size} new chunks")
-      else
-        chunks_to_process = chunks
-        Rails.logger.info("Force mode: processing all #{chunks.size} chunks")
-      end
+        # If we've reached commit frequency or this is the last batch, commit to database
+        if (api_batch_num % db_commit_frequency == 0) || (api_batch_idx == (chunks_to_process.size.to_f / api_batch_size).ceil - 1)
+          # Prepare metadata for all records
+          base_metadata = {
+            content_type: content_type,
+            source_url: source_url,
+            source_title: source_title,
+            embedding_model: "gte-large-buc",
+            timestamp: Time.now.iso8601,
+            chunk_size: chunk_size,
+            chunk_overlap: chunk_overlap,
+            document_size: text.bytesize
+          }
 
-      if chunks_to_process.empty?
-        Rails.logger.info("All chunks already exist - nothing to process")
-        return []
-      end
+          # Add task and project info
+          base_metadata[:task_id] = @task.id if @task
+          base_metadata[:project_id] = @project.id if @project
 
-      # STAGE 3: Embedding generation and periodic database commits
-      Rails.logger.info("Stage 3: Processing #{chunks_to_process.size} chunks with periodic database commits")
-
-      # Configuration
-      api_batch_size = 8  # Size for API calls
-      db_commit_frequency = 10  # Commit to DB every X API batches
-
-      # Prepare for processing
-      total_api_batches = (chunks_to_process.size.to_f / api_batch_size).ceil
-      all_results = []
-      total_saved = 0
-
-      # Buffers for accumulating chunks before DB commit
-      pending_chunks = []
-      pending_embeddings = []
-
-      # Process in small batches for API calls
-      chunks_to_process.each_slice(api_batch_size).with_index do |api_batch, api_batch_idx|
-        api_batch_num = api_batch_idx + 1
-        batch_start = Time.now
-
-        Rails.logger.info("Processing API batch #{api_batch_num}/#{total_api_batches} (#{api_batch.size} chunks)")
-
-        begin
-          # Generate embeddings for this API batch
-          batch_embeddings = generate_tei_embeddings(api_batch)
-
-          # Add to pending buffers
-          pending_chunks.concat(api_batch)
-          pending_embeddings.concat(batch_embeddings)
-
-          # Log API batch completion
-          batch_time = Time.now - batch_start
-          Rails.logger.info("API batch #{api_batch_num}/#{total_api_batches} complete in #{batch_time.round(2)}s " +
-                           "(#{pending_chunks.size} chunks pending DB commit)")
-
-          # If we've reached commit frequency or this is the last batch, commit to database
-          if (api_batch_num % db_commit_frequency == 0) || (api_batch_num == total_api_batches)
-            db_start = Time.now
-            commit_size = pending_chunks.size
-            Rails.logger.info("Committing #{commit_size} chunks to database...")
-
-            # Prepare metadata for all records
-            base_metadata = {
-              content_type: content_type,
-              source_url: source_url,
-              source_title: source_title,
-              embedding_model: "gte-large-buc",
-              timestamp: Time.now.iso8601,
-              chunk_size: chunk_size,
-              chunk_overlap: chunk_overlap,
-              document_size: text_size
-            }
-
-            # Add task and project info
-            base_metadata[:task_id] = @task.id if @task
-            base_metadata[:project_id] = @project.id if @project
-
-            # Preserve file path information from metadata
-            if metadata.present?
-              %i[file_path file_name file_ext file_dir].each do |key|
-                base_metadata[key] = metadata[key] if metadata[key].present?
-              end
-
-              # Merge remaining metadata
-              base_metadata.merge!(metadata)
+          # Preserve file path information from metadata
+          if metadata.present?
+            %i[file_path file_name file_ext file_dir].each do |key|
+              base_metadata[key] = metadata[key] if metadata[key].present?
             end
 
-            # Build records for bulk insert
-            records = []
-            pending_chunks.zip(pending_embeddings).each_with_index do |(chunk, embedding), chunk_idx|
-              next if embedding.nil?
-
-              # Add chunk-specific metadata
-              chunk_metadata = base_metadata.dup
-              chunk_metadata[:chunk_index] = chunk_idx
-              chunk_metadata[:chunk_count] = chunks.size
-
-              records << {
-                task_id: @task&.id,
-                project_id: @project&.id,
-                collection: @collection,
-                content_type: content_type,
-                content: chunk,
-                source_url: source_url,
-                source_title: source_title,
-                metadata: chunk_metadata,
-                embedding: embedding,
-                created_at: Time.current,
-                updated_at: Time.current
-              }
-            end
-
-            # Perform bulk insert
-            if records.any?
-              begin
-                inserted = VectorEmbedding.insert_all!(records)
-                saved_count = inserted.count
-                total_saved += saved_count
-
-                # Get the actual records for return value
-                new_records = VectorEmbedding.where(collection: @collection, content: pending_chunks)
-                all_results.concat(new_records)
-
-                # Log success
-                db_time = Time.now - db_start
-                Rails.logger.info("Database commit successful: #{saved_count} records saved in #{db_time.round(2)}s " +
-                                "(#{total_saved}/#{chunks_to_process.size} total, #{(total_saved.to_f/chunks_to_process.size*100).round}%)")
-              rescue => e
-                Rails.logger.error("Database commit failed: #{e.message}")
-                Rails.logger.error(e.backtrace.join("\n"))
-              end
-            end
-
-            # Clear buffers after commit
-            pending_chunks = []
-            pending_embeddings = []
+            # Merge remaining metadata
+            base_metadata.merge!(metadata)
           end
 
-        rescue => e
-          Rails.logger.error("Error in API batch #{api_batch_num}: #{e.message}")
-          Rails.logger.error(e.backtrace.join("\n"))
-          # Continue with next batch
+          # Build records for bulk insert
+          records = []
+          pending_chunks.zip(pending_embeddings).each_with_index do |(chunk, embedding), chunk_idx|
+            next if embedding.nil?
+
+            # Add chunk-specific metadata
+            chunk_metadata = base_metadata.dup
+            chunk_metadata[:chunk_index] = chunk_idx
+            chunk_metadata[:chunk_count] = chunks.size
+
+            records << {
+              task_id: @task&.id,
+              project_id: @project&.id,
+              collection: @collection,
+              content_type: content_type,
+              content: chunk,
+              source_url: source_url,
+              source_title: source_title,
+              metadata: chunk_metadata,
+              embedding: embedding,
+              created_at: Time.current,
+              updated_at: Time.current
+            }
+          end
+
+          # Perform bulk insert
+          if records.any?
+            begin
+              inserted = VectorEmbedding.insert_all!(records)
+              saved_count = inserted.count
+              total_saved += saved_count
+
+              # Get the actual records for return value
+              new_records = VectorEmbedding.where(collection: @collection, content: pending_chunks)
+              all_results.concat(new_records)
+            rescue => e
+              Rails.logger.error("Database commit failed: #{e.message}")
+            end
+          end
+
+          # Clear buffers after commit
+          pending_chunks = []
+          pending_embeddings = []
         end
+      rescue => e
+        Rails.logger.error("Error in API batch #{api_batch_num}: #{e.message}")
+        # Continue with next batch
       end
-
-      # Final stats
-      total_time = Time.now - start_time
-      Rails.logger.info("Document processing complete: #{total_saved}/#{chunks_to_process.size} chunks saved " +
-                       "in #{total_time.round(2)}s (#{(total_time/60).round(1)} minutes)")
-
-      all_results
     end
+
+    all_results
   end
 
 
@@ -467,108 +408,69 @@ class EmbeddingService
     endpoint = ENV["HUGGINGFACE_EMBEDDING_ENDPOINT"] || "https://piujqyd9p0cdbgx1.us-east4.gcp.endpoints.huggingface.cloud"
     uri = URI.parse(endpoint)
 
-    Rails.logger.tagged("TEIEmbedding") do
-      # Calculate batches
-      total_batches = (texts.size.to_f / batch_size).ceil
-      Rails.logger.info("Generating embeddings for #{texts.size} texts in #{total_batches} batches")
+    results = []
+    texts.each_slice(batch_size).with_index do |batch, batch_idx|
+      # Prepare request
+      request = Net::HTTP::Post.new(uri)
+      request["Authorization"] = "Bearer #{api_key}"
+      request.content_type = "application/json"
 
-      results = []
-      texts.each_slice(batch_size).with_index do |batch, batch_idx|
-        batch_start = Time.now
-        Rails.logger.info("Processing batch #{batch_idx+1}/#{total_batches} with #{batch.size} texts")
+      # Prepare payload
+      request_body = {
+        inputs: batch.map(&:to_s),
+        normalize: true
+      }
 
-        # Prepare request
-        request = Net::HTTP::Post.new(uri)
-        request["Authorization"] = "Bearer #{api_key}"
-        request.content_type = "application/json"
+      request.body = request_body.to_json
 
-        # Show text sizes for debugging
-        text_sizes = batch.map(&:bytesize)
-        Rails.logger.debug("Text sizes in batch: min=#{text_sizes.min}, max=#{text_sizes.max}, avg=#{text_sizes.sum / batch.size}")
+      # Set up connection with appropriate timeouts
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = (uri.scheme == "https")
+      http.read_timeout = 300  # 5 minutes
+      http.open_timeout = 30
 
-        # Log sample text for debugging
-        Rails.logger.debug("Sample text: #{batch.first.truncate(100)}") if batch.first
+      begin
+        response = http.request(request)
 
-        # Prepare payload
-        request_body = {
-          inputs: batch.map(&:to_s),
-          normalize: true
-        }
+        if response.code == "200"
+          batch_results = JSON.parse(response.body)
 
-        request.body = request_body.to_json
-        request_size = request.body.bytesize
-        Rails.logger.info("Request payload size: #{request_size} bytes")
-
-        # Set up connection with appropriate timeouts
-        http = Net::HTTP.new(uri.host, uri.port)
-        http.use_ssl = (uri.scheme == "https")
-        http.read_timeout = 300  # 5 minutes
-        http.open_timeout = 30
-
-        # Track API call time
-        api_start = Time.now
-        Rails.logger.info("Sending API request to #{endpoint}")
-
-        begin
-          response = http.request(request)
-          api_time = Time.now - api_start
-          Rails.logger.info("Received API response in #{api_time.round(2)}s, status: #{response.code}")
-
-          if response.code == "200"
-            batch_results = JSON.parse(response.body)
-
-            # Verify response
-            if batch_results.is_a?(Array)
-              if batch_results.length == batch.size
-                Rails.logger.info("Successfully received #{batch_results.length} embeddings")
-                results.concat(batch_results)
-              else
-                Rails.logger.error("Response count mismatch: expected #{batch.size}, got #{batch_results.length}")
-                raise "Embedding count mismatch in response"
-              end
-            else
-              Rails.logger.error("Unexpected response format: #{batch_results.class} instead of Array")
-              raise "Invalid response format"
-            end
+          # Verify response
+          if batch_results.is_a?(Array) && batch_results.length == batch.size
+            results.concat(batch_results)
           else
-            Rails.logger.error("API error: #{response.code} - #{response.body}")
-            raise "TEI API error: #{response.code} - #{response.body}"
+            Rails.logger.error("Response format error: expected array of #{batch.size} embeddings")
+            raise "Invalid response format"
           end
+        else
+          Rails.logger.error("API error: #{response.code} - #{response.body}")
+          raise "TEI API error: #{response.code} - #{response.body}"
+        end
 
-          batch_time = Time.now - batch_start
-          Rails.logger.info("Batch #{batch_idx+1} completed in #{batch_time.round(2)}s (#{(batch_time/batch.size).round(3)}s per text)")
-
-        rescue => e
-          retries ||= 0
-          if retries < 3
-            retries += 1
-            backoff = 15 * retries
-            Rails.logger.warn("Embedding failure, retry #{retries}/3 after #{backoff}s delay: #{e.message}")
-            sleep(backoff)
-            retry
-          else
-            Rails.logger.error("Failed to generate embeddings after 3 retries: #{e.message}")
-            Rails.logger.error(e.backtrace.join("\n"))
-            # Return nil placeholders to maintain array positions
-            batch.size.times { results << nil }
-          end
+      rescue => e
+        retries ||= 0
+        if retries < 3
+          retries += 1
+          backoff = 15 * retries
+          sleep(backoff)
+          retry
+        else
+          Rails.logger.error("Failed to generate embeddings after 3 retries: #{e.message}")
+          # Return nil placeholders to maintain array positions
+          batch.size.times { results << nil }
         end
       end
-
-      Rails.logger.info("Embedding generation complete - #{results.count} total embeddings")
-      results
     end
+
+    results
   end
 
 
 
   def chunk_text(text, chunk_size, chunk_overlap)
-    start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-
     # For very small texts, just return the whole thing
     if text.length <= chunk_size
-      Rails.logger.info("Text smaller than chunk size, returning as single chunk")
-      return [ text.strip ]
+      return [text.strip]
     end
 
     # Ultra-fast chunking approach
@@ -579,12 +481,12 @@ class EmbeddingService
     # Use a simple character-based chunking approach for speed
     while position < text_length
       # Find end position (simple math, no searching)
-      end_pos = [ position + chunk_size, text_length ].min
+      end_pos = [position + chunk_size, text_length].min
 
       # Only do breakpoint search within a limited window
       if end_pos < text_length
         # Quick search for a good breakpoint - limit search to last 100 chars only
-        search_start = [ position + chunk_size - 100, position ].max
+        search_start = [position + chunk_size - 100, position].max
         search_text = text[search_start...end_pos]
 
         # Try to find paragraph break (fastest to slowest)
@@ -617,11 +519,6 @@ class EmbeddingService
       position = end_pos - chunk_overlap
       position = position + 1 if position <= end_pos - chunk_size  # Ensure progress
     end
-
-    duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time
-    chunks_per_second = chunks.size / [ duration, 0.001 ].max  # Avoid division by zero
-
-    Rails.logger.info("Fast chunking completed: #{chunks.size} chunks in #{duration.round(3)}s (#{chunks_per_second.round(1)} chunks/sec)")
 
     chunks
   end

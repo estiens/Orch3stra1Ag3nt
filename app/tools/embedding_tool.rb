@@ -98,23 +98,10 @@ class EmbeddingTool
     files_array = to_array(files)
     raise ArgumentError, "You must supply at least one file." if files_array.empty?
 
-    start_time = Time.now
-    total_files = files_array.size
-    Rails.logger.tagged("EmbeddingTool", "add_files") do
-      Rails.logger.info("Starting batch processing of #{total_files} files with batch size #{batch_size}")
+    # Process files in batches
+    added = []
     
-      # Process files in batches
-      added = []
-      total_processed = 0
-      total_successful = 0
-      
-      files_array.each_slice(batch_size).with_index do |batch, batch_idx|
-        batch_start = Time.now
-        batch_num = batch_idx + 1
-        batch_size = batch.size
-        total_batches = (total_files.to_f / batch_size).ceil
-        
-        Rails.logger.info("Processing batch #{batch_num}/#{total_batches} with #{batch_size} files")
+    files_array.each_slice(batch_size).with_index do |batch, batch_idx|
         
         # Prepare file data for parallel processing
         file_data = batch.map do |file|
@@ -187,13 +174,8 @@ class EmbeddingTool
         # Process valid files in parallel using threads
         batch_results = []
         batch_results.concat(error_files) # Add error files to results
-        
-        if valid_files.any?
-          # Log the files we're about to process
-          valid_files.each do |file|
-            Rails.logger.info("Processing file: #{file[:path]} (#{file[:size]} bytes, type: #{file[:content_type]})")
-          end
           
+        if valid_files.any?
           # Process files (with or without threads based on environment)
           if Rails.env.test?
             # In test environment, process synchronously for easier testing
@@ -273,31 +255,15 @@ class EmbeddingTool
         
         # Add batch results to overall results
         added.concat(batch_results)
-        total_processed += batch_size
-        batch_successful = batch_results.count { |item| item[:status] == "success" }
-        total_successful += batch_successful
-        
-        # Log batch completion
-        batch_time = Time.now - batch_start
-        Rails.logger.info("Batch #{batch_num}/#{total_batches} completed in #{batch_time.round(2)}s " +
-                         "(#{batch_successful}/#{batch_size} successful, " +
-                         "#{total_processed}/#{total_files} total processed)")
       end
-      
-      # Log final stats
-      total_time = Time.now - start_time
-      Rails.logger.info("File processing complete: #{total_successful}/#{total_files} files processed successfully " +
-                       "in #{total_time.round(2)}s (#{(total_time/60).round(1)} minutes)")
       
       {
         status: "success",
         message: "Files processed successfully",
         added: added,
         total_count: added.count,
-        successful_count: added.count { |item| item[:status] == "success" },
-        processing_time: total_time.round(2)
+        successful_count: added.count { |item| item[:status] == "success" }
       }
-    end
   end
 
   # Add text(s) to the vector database
