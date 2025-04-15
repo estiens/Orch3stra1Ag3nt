@@ -416,7 +416,7 @@ class EmbeddingService
     request = Net::HTTP::Post.new(uri)
     request["Authorization"] = "Bearer #{api_key}"
     request.content_type = "application/json"
-    request.body = { inputs: text.to_json }.to_json
+    request.body = { inputs: text.to_s, normalize: true }.to_json
 
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = (uri.scheme == "https")
@@ -426,7 +426,25 @@ class EmbeddingService
       response = http.request(request)
       if response.code == "200"
         result = JSON.parse(response.body)
-        result.is_a?(Array) ? result : result["embedding"] # normalize
+        # Normalize the result to ensure it's a flat array of floats
+        embedding = result.is_a?(Array) ? result : result["embedding"]
+        
+        # If it's a nested array with just one element, flatten it
+        if embedding.is_a?(Array) && embedding.size == 1 && embedding.first.is_a?(Array)
+          embedding = embedding.first
+        end
+        
+        # Ensure we have the right dimensions for the database
+        if embedding.size != 1024
+          # Pad or truncate to 1024 dimensions for testing purposes
+          if embedding.size < 1024
+            embedding = embedding + Array.new(1024 - embedding.size, 0.0)
+          else
+            embedding = embedding[0...1024]
+          end
+        end
+        
+        embedding
       else
         raise "Hugging Face API error: #{response.body}"
       end

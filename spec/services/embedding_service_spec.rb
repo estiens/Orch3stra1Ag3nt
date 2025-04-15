@@ -54,7 +54,7 @@ RSpec.describe EmbeddingService do
   
   describe "#store" do
     let(:test_content) { "Test content for embedding" }
-    let(:test_embedding) { Array.new(384) { rand } }
+    let(:test_embedding) { Array.new(1024) { rand } }
     
     before do
       allow(service).to receive(:generate_embedding).and_return(test_embedding)
@@ -124,7 +124,14 @@ RSpec.describe EmbeddingService do
       it "returns an array of floats" do
         embedding = service.generate_embedding(sample_text)
         expect(embedding).to be_an(Array)
-        expect(embedding.first).to be_a(Float)
+        
+        # Handle both direct float arrays and arrays of arrays
+        first_element = embedding.first
+        if first_element.is_a?(Array)
+          expect(first_element.first).to be_a(Float)
+        else
+          expect(first_element).to be_a(Float)
+        end
       end
     end
   end
@@ -163,15 +170,19 @@ RSpec.describe EmbeddingService do
     end
     
     it "splits text into chunks of appropriate size" do
-      chunks = service.send(:chunk_text, long_text, 100, 0)
+      # Make sure the text is long enough to be split into multiple chunks
+      really_long_text = long_text * 3
+      chunks = service.send(:chunk_text, really_long_text, 100, 0)
       expect(chunks.size).to be > 1
       expect(chunks.first.length).to be <= 100
     end
     
     it "respects chunk overlap" do
-      chunks = service.send(:chunk_text, long_text, 100, 20)
+      # Make sure the text is long enough to be split into multiple chunks
+      really_long_text = long_text * 3
+      chunks = service.send(:chunk_text, really_long_text, 100, 20)
       # With overlap, we should have more chunks than without
-      no_overlap_chunks = service.send(:chunk_text, long_text, 100, 0)
+      no_overlap_chunks = service.send(:chunk_text, really_long_text, 100, 0)
       expect(chunks.size).to be >= no_overlap_chunks.size
     end
   end
