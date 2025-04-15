@@ -4,27 +4,27 @@ module Embedding
   # Handles database operations for vector embeddings
   class VectorStore
     attr_reader :collection, :task, :project
-    
+
     # Constants for batch processing
     DB_COMMIT_FREQUENCY = 10
-    
+
     def initialize(collection: nil, task: nil, project: nil)
       @task = task
       @project = project || task&.project
       @collection = collection || (@project ? "Project#{@project.id}" : "default")
     end
-    
+
     # Check if embedding exists
     def embedding_exists?(content, content_type: nil)
       conditions = { collection: @collection, content: content }
       conditions[:content_type] = content_type if content_type
       VectorEmbedding.exists?(conditions)
     end
-    
+
     # More efficient filtering of existing chunks
     def filter_existing_chunks(chunks)
       return chunks if chunks.empty?
-      
+
       # For large chunk sets, process in batches to avoid memory issues
       if chunks.size > 1000
         # Process in batches of 1000
@@ -35,26 +35,26 @@ module Embedding
                                     .pluck(:content)
           result.concat(batch - existing)
         end
-        return result
+        result
       else
         # For smaller sets, process all at once
         existing_chunks = VectorEmbedding.where(collection: @collection)
                                          .where(content: chunks)
                                          .pluck(:content)
-        return chunks - existing_chunks
+        chunks - existing_chunks
       end
     end
-    
+
     # Remove all embeddings in collection
     def delete_all_embeddings_in_collection
       VectorEmbedding.where(collection: @collection).delete_all
     end
-    
+
     # DANGEROUS: Truncate whole table!
     def truncate_embeddings
       ActiveRecord::Base.connection.execute("TRUNCATE TABLE vector_embeddings RESTART IDENTITY;")
     end
-    
+
     # Similarity search by vector
     def similarity_search_by_vector(embedding, k: 5, distance: "cosine")
       VectorEmbedding
@@ -62,20 +62,20 @@ module Embedding
         .nearest_neighbors(:embedding, embedding, distance: distance)
         .limit(k)
     end
-    
+
     # Commit a batch of chunks and embeddings to the database
-    def commit_batch_to_database(pending_chunks, pending_embeddings, original_text, chunk_size, 
+    def commit_batch_to_database(pending_chunks, pending_embeddings, original_text, chunk_size,
                                 chunk_overlap, content_type, source_url, source_title, metadata, total_chunks)
       return [] if pending_chunks.empty? || pending_embeddings.empty?
 
       # Prepare base metadata
       base_metadata = prepare_base_metadata(
-        original_text, 
-        chunk_size, 
-        chunk_overlap, 
-        content_type, 
-        source_url, 
-        source_title, 
+        original_text,
+        chunk_size,
+        chunk_overlap,
+        content_type,
+        source_url,
+        source_title,
         metadata
       )
 
@@ -118,7 +118,7 @@ module Embedding
         []
       end
     end
-    
+
     # Store a single embedding
     def store(content:, embedding:, content_type: "text", source_url: nil, source_title: nil, metadata: {})
       return if content.blank?
@@ -139,9 +139,9 @@ module Embedding
         embedding: embedding
       )
     end
-    
+
     private
-    
+
     # Prepare base metadata for embeddings
     def prepare_base_metadata(original_text, chunk_size, chunk_overlap, content_type, source_url, source_title, metadata)
       full_metadata = {
@@ -171,7 +171,7 @@ module Embedding
 
       full_metadata
     end
-    
+
     # Prepare metadata for embedding storage
     def prepare_metadata(content_type, source_url, source_title, metadata)
       full_metadata = {

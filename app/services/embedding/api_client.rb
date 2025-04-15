@@ -1,7 +1,8 @@
 # frozen_string_literal: true
-require 'net/http'
-require 'uri'
-require 'json'
+
+require "net/http"
+require "uri"
+require "json"
 
 module Embedding
   # Handles API communication for embedding generation
@@ -16,27 +17,27 @@ module Embedding
     def initialize(api_key: nil, endpoint: nil)
       @api_key = api_key || ENV["HUGGINGFACE_API_TOKEN"]
       @endpoint = endpoint || ENV["HUGGINGFACE_EMBEDDING_ENDPOINT"] || DEFAULT_API_ENDPOINT
-      
+
       raise "HUGGINGFACE_API_TOKEN environment variable not set" unless @api_key
     end
 
     # Generate embeddings for a batch of texts
     def generate_batch_embeddings(texts, batch_size: nil)
       return [] if texts.empty?
-      
+
       # Ensure we never exceed the API's maximum batch size
-      effective_batch_size = [batch_size || API_BATCH_SIZE, API_BATCH_SIZE].min
-      
+      effective_batch_size = [ batch_size || API_BATCH_SIZE, API_BATCH_SIZE ].min
+
       Rails.logger.debug("EmbeddingService: API key present? #{@api_key.present?}")
       Rails.logger.debug("EmbeddingService: Using embedding endpoint: #{@endpoint}")
-      
+
       # Process in smaller batches if needed
       results = []
       texts.each_slice(effective_batch_size) do |batch|
         batch_results = process_embedding_batch(batch)
         results.concat(batch_results)
       end
-      
+
       results
     end
 
@@ -64,7 +65,7 @@ module Embedding
 
       uri = URI.parse(@endpoint)
       Rails.logger.debug("EmbeddingService: Creating HTTP request to #{uri}")
-      
+
       request = Net::HTTP::Post.new(uri)
       request["Authorization"] = "Bearer #{@api_key}"
       request.content_type = "application/json"
@@ -74,24 +75,24 @@ module Embedding
         normalize: true
       }
       request.body = request_body.to_json
-      
+
       Rails.logger.debug("EmbeddingService: Payload size: #{request.body.bytesize} bytes, #{batch.size} texts")
 
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = (uri.scheme == "https")
       http.read_timeout = 300  # 5 minutes
       http.open_timeout = 30
-      
+
       Rails.logger.debug("EmbeddingService: Sending embedding request to API")
 
       retries = 0
       begin
         response = http.request(request)
-        
+
         if response.code == "200"
           Rails.logger.debug("EmbeddingService: Received successful response (#{response.body.bytesize} bytes)")
           batch_results = JSON.parse(response.body)
-          
+
           if batch_results.is_a?(Array) && batch_results.length == batch.size
             Rails.logger.debug("EmbeddingService: Successfully parsed response - received #{batch_results.length} embeddings")
             batch_results
@@ -130,7 +131,7 @@ module Embedding
       http.use_ssl = (uri.scheme == "https")
       http.read_timeout = 180  # 3 minutes
       http.open_timeout = 30
-      
+
       retries = 0
       begin
         response = http.request(request)
