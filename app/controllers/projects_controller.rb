@@ -112,10 +112,22 @@ class ProjectsController < ApplicationController
   # POST /projects/1/pause
   def pause
     if @project.status == "active"
-      @project.update(status: "paused")
+      if @project.pause!
+        notice = "Project paused successfully."
+      else
+        notice = "Could not pause project."
+      end
+      
       respond_to do |format|
-        format.html { redirect_back(fallback_location: dashboard_path, notice: "Project paused successfully.") }
-        format.turbo_stream { flash.now[:notice] = "Project paused successfully." }
+        format.html { redirect_back(fallback_location: dashboard_path, notice: notice) }
+        format.turbo_stream { 
+          flash.now[:notice] = notice
+          render turbo_stream: [
+            turbo_stream.replace("projects-container", 
+              partial: "dashboard/projects", 
+              locals: { projects: Project.order(created_at: :desc).limit(10) })
+          ]
+        }
       end
     else
       respond_to do |format|
@@ -128,10 +140,22 @@ class ProjectsController < ApplicationController
   # POST /projects/1/resume
   def resume
     if @project.status == "paused"
-      @project.update(status: "active")
+      if @project.resume!
+        notice = "Project resumed successfully."
+      else
+        notice = "Could not resume project."
+      end
+      
       respond_to do |format|
-        format.html { redirect_back(fallback_location: dashboard_path, notice: "Project resumed successfully.") }
-        format.turbo_stream { flash.now[:notice] = "Project resumed successfully." }
+        format.html { redirect_back(fallback_location: dashboard_path, notice: notice) }
+        format.turbo_stream { 
+          flash.now[:notice] = notice
+          render turbo_stream: [
+            turbo_stream.replace("projects-container", 
+              partial: "dashboard/projects", 
+              locals: { projects: Project.order(created_at: :desc).limit(10) })
+          ]
+        }
       end
     else
       respond_to do |format|

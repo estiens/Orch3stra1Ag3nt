@@ -51,7 +51,10 @@ class TasksController < ApplicationController
       format.turbo_stream { 
         flash.now[:notice] = notice
         @tasks = Task.where(state: ["active", "pending", "waiting_on_human", "paused"]).order(created_at: :desc).limit(10)
-        render turbo_stream: turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks })
+        render turbo_stream: [
+          turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks }),
+          turbo_stream.replace("flash", partial: "layouts/flash")
+        ]
       }
     end
   end
@@ -69,7 +72,10 @@ class TasksController < ApplicationController
       format.turbo_stream { 
         flash.now[:notice] = notice
         @tasks = Task.where(state: ["active", "pending", "waiting_on_human", "paused"]).order(created_at: :desc).limit(10)
-        render turbo_stream: turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks })
+        render turbo_stream: [
+          turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks }),
+          turbo_stream.replace("flash", partial: "layouts/flash")
+        ]
       }
     end
   end
@@ -87,7 +93,10 @@ class TasksController < ApplicationController
       format.turbo_stream { 
         flash.now[:notice] = notice
         @tasks = Task.where(state: ["active", "pending", "waiting_on_human", "paused"]).order(created_at: :desc).limit(10)
-        render turbo_stream: turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks })
+        render turbo_stream: [
+          turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks }),
+          turbo_stream.replace("flash", partial: "layouts/flash")
+        ]
       }
     end
   end
@@ -105,7 +114,10 @@ class TasksController < ApplicationController
       format.turbo_stream { 
         flash.now[:notice] = notice
         @tasks = Task.where(state: ["active", "pending", "waiting_on_human", "paused"]).order(created_at: :desc).limit(10)
-        render turbo_stream: turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks })
+        render turbo_stream: [
+          turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks }),
+          turbo_stream.replace("flash", partial: "layouts/flash")
+        ]
       }
     end
   end
@@ -123,7 +135,10 @@ class TasksController < ApplicationController
       format.turbo_stream { 
         flash.now[:notice] = notice
         @tasks = Task.where(state: ["active", "pending", "waiting_on_human", "paused"]).order(created_at: :desc).limit(10)
-        render turbo_stream: turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks })
+        render turbo_stream: [
+          turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks }),
+          turbo_stream.replace("flash", partial: "layouts/flash")
+        ]
       }
     end
   end

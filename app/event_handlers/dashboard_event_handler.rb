@@ -14,6 +14,9 @@ class DashboardEventHandler
     when "llm_call_completed"
       broadcast_llm_calls_update
     end
+    
+    # Log the event for debugging
+    Rails.logger.info "DashboardEventHandler processed event: #{event.event_type}"
   end
   
   private

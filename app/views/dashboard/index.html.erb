@@ -210,6 +210,9 @@
 </div>
 
 <%= turbo_stream_from "dashboard" %>
+<div id="flash">
+  <%= render "layouts/flash" %>
+</div>
 
 <!-- Turbo frame for modal dialogs -->
 <%= turbo_frame_tag "modal" %>
