@@ -59,23 +59,18 @@ module Embedding
     # Similarity search by vector
     def similarity_search_by_vector(embedding, k: 5, distance: "cosine")
       begin
-        # Use raw SQL approach to avoid syntax errors
-        case distance
-        when "cosine"
-          VectorEmbedding.in_collection(@collection)
-                        .order(Arel.sql("embedding <=> ARRAY[#{embedding.join(',')}]::vector"))
-                        .limit(k)
-        when "inner_product"
-          VectorEmbedding.in_collection(@collection)
-                        .order(Arel.sql("embedding <#> ARRAY[#{embedding.join(',')}]::vector"))
-                        .limit(k)
-        else # euclidean
-          VectorEmbedding.in_collection(@collection)
-                        .order(Arel.sql("embedding <-> ARRAY[#{embedding.join(',')}]::vector"))
-                        .limit(k)
-        end
+        # Log the embedding format to help with debugging
+        @logger.debug("Embedding format: #{embedding.class}, dimensions: #{embedding.size}")
+        
+        # Use the Neighbor gem's nearest_neighbors method directly
+        # First filter by collection to ensure we're only searching within the right collection
+        VectorEmbedding.in_collection(@collection)
+                      .nearest_neighbors(:embedding, embedding, distance: distance)
+                      .limit(k)
       rescue => e
         @logger.error("Error in similarity_search_by_vector: #{e.message}")
+        @logger.error("Embedding format that caused error: #{embedding.class}, #{embedding.inspect[0..100]}")
+        
         # Fallback to a simpler approach if the query fails
         ids = VectorEmbedding.in_collection(@collection).limit(k).pluck(:id)
         VectorEmbedding.where(id: ids)
