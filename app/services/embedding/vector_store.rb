@@ -62,21 +62,15 @@ module Embedding
         # Log the embedding format to help with debugging
         @logger.debug("Embedding format: #{embedding.class}, dimensions: #{embedding.size}")
 
-        # Use raw SQL operators directly to avoid AS clause conflicts
-        base_query = VectorEmbedding.in_collection(@collection)
-
-        # Apply the appropriate distance operator based on the distance metric
-        case distance
-        when "cosine"
-          base_query = base_query.order(Arel.sql("embedding <=> ARRAY[#{embedding.join(',')}]::vector"))
-        when "inner_product"
-          base_query = base_query.order(Arel.sql("embedding <#> ARRAY[#{embedding.join(',')}]::vector"))
-        else # euclidean
-          base_query = base_query.order(Arel.sql("embedding <-> ARRAY[#{embedding.join(',')}]::vector"))
-        end
-
-        # Apply limit and return results
-        base_query.limit(k)
+        # Use VectorEmbedding.find_similar to handle the vector search safely
+        VectorEmbedding.find_similar(
+          embedding,
+          limit: k,
+          collection: @collection,
+          task_id: @task&.id,
+          project_id: @project&.id,
+          distance: distance
+        )
       rescue => e
         @logger.error("Error in similarity_search_by_vector: #{e.message}")
         @logger.error("Embedding format that caused error: #{embedding.class}, #{embedding.inspect[0..100]}")

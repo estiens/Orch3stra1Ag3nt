@@ -136,16 +136,34 @@ RSpec.describe VectorEmbedding, type: :model do
 
   describe "#similarity" do
     it "calculates cosine similarity correctly" do
-      embedding = VectorEmbedding.new(embedding: [ 1.0, 0.0, 0.0 ])
+      # Create vectors with correct dimensions (1024)
+      # Start with base vector of zeros
+      base_vector = Array.new(1024, 0.0)
+
+      # X-axis unit vector [1,0,0,0,...]
+      x_vector = base_vector.dup
+      x_vector[0] = 1.0
+
+      # Y-axis unit vector [0,1,0,0,...]
+      y_vector = base_vector.dup
+      y_vector[1] = 1.0
+
+      # 45-degree vector [1,1,0,0,...]
+      diagonal_vector = base_vector.dup
+      diagonal_vector[0] = 1.0
+      diagonal_vector[1] = 1.0
+
+      # Create embedding with x-axis unit vector
+      embedding = VectorEmbedding.new(embedding: x_vector)
 
       # Same vector should have similarity 1.0
-      expect(embedding.similarity([ 1.0, 0.0, 0.0 ])).to be_within(0.001).of(1.0)
+      expect(embedding.similarity(x_vector)).to be_within(0.001).of(1.0)
 
       # Orthogonal vector should have similarity 0.0
-      expect(embedding.similarity([ 0.0, 1.0, 0.0 ])).to be_within(0.001).of(0.0)
+      expect(embedding.similarity(y_vector)).to be_within(0.001).of(0.0)
 
       # 45-degree vector should have similarity 0.707
-      expect(embedding.similarity([ 1.0, 1.0, 0.0 ])).to be_within(0.001).of(0.707)
+      expect(embedding.similarity(diagonal_vector)).to be_within(0.001).of(0.707)
     end
   end
 end
