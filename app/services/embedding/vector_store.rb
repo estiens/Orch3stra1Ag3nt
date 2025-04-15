@@ -3,15 +3,16 @@
 module Embedding
   # Handles database operations for vector embeddings
   class VectorStore
-    attr_reader :collection, :task, :project
-
+    attr_reader :collection, :task, :project, :logger
+    
     # Constants for batch processing
     DB_COMMIT_FREQUENCY = 10
-
+    
     def initialize(collection: nil, task: nil, project: nil)
       @task = task
       @project = project || task&.project
       @collection = collection || (@project ? "Project#{@project.id}" : "default")
+      @logger = Embedding::Logger.new("VectorStore")
     end
 
     # Check if embedding exists

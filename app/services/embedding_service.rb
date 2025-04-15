@@ -3,7 +3,7 @@ require 'concurrent'
 
 # Service for managing vector embeddings and RAG functionality
 class EmbeddingService
-  attr_reader :collection, :task, :project, :api_client, :text_chunker, :vector_store
+  attr_reader :collection, :task, :project, :api_client, :text_chunker, :vector_store, :logger
   
   # Constants for embedding configuration
   EMBEDDING_MODEL = "gte-large-buc"
@@ -13,6 +13,7 @@ class EmbeddingService
     @task = task
     @project = project || task&.project
     @collection = collection || (@project ? "Project#{@project.id}" : "default")
+    @logger = Embedding::Logger.new("Service")
     
     # Initialize component services
     @api_client = Embedding::ApiClient.new
@@ -28,16 +29,17 @@ class EmbeddingService
     return if !force && @vector_store.embedding_exists?(text, content_type: content_type)
     
     # Generate embedding
-    start_time = Time.now
-    embedding = generate_embedding(text)
-    generation_time = Time.now - start_time
+    embedding = nil
+    generation_time = @logger.time("Generating embedding", level: :info) do
+      embedding = generate_embedding(text)
+    end
     
     if embedding.nil? || embedding.empty?
-      Rails.logger.error("Embedding generation failed for content: #{text.truncate(100)}")
+      @logger.error("Embedding generation failed for content: #{text.truncate(100)}")
       raise "Embedding generation failed"
     end
     
-    Rails.logger.info("Generated embedding in #{generation_time.round(2)}s (#{embedding.size} dimensions)")
+    @logger.info("Generated embedding in #{generation_time.round(2)}s (#{embedding.size} dimensions)")
     
     # Store in database
     @vector_store.store(
@@ -60,36 +62,38 @@ class EmbeddingService
   # Process a document by chunking it and storing the chunks with embeddings
   def add_document(text, chunk_size: 512, chunk_overlap: 25, content_type: "document", 
                   source_url: nil, source_title: nil, metadata: {}, force: false)
-    Rails.logger.debug("EmbeddingService: Starting add_document (#{text.bytesize} bytes)")
+    @logger.debug("Starting add_document (#{text.bytesize} bytes)")
     return [] if text.blank?
 
     # Generate chunks using optimized parallel processing
-    chunk_start = Time.now
-    Rails.logger.debug("EmbeddingService: Starting chunking of text")
-    chunks = @text_chunker.chunk_text(text, chunk_size, chunk_overlap)
-    chunk_time = Time.now - chunk_start
-    Rails.logger.debug("EmbeddingService: Chunking completed in #{chunk_time.round(2)}s - created #{chunks.size} chunks")
+    chunks = nil
+    chunk_time = @logger.time("Chunking text") do
+      chunks = @text_chunker.chunk_text(text, chunk_size, chunk_overlap)
+    end
+    
+    @logger.info("Chunking completed in #{chunk_time.round(2)}s - created #{chunks.size} chunks")
     return [] if chunks.empty?
 
     # Filter out existing chunks if not forced - use a more efficient approach
-    filter_start = Time.now
-    chunks_to_process = if force
-      Rails.logger.debug("EmbeddingService: Forced processing - skipping duplicate check")
-      chunks
-    else
-      # Use a more efficient query approach with batching for large chunk sets
-      Rails.logger.debug("EmbeddingService: Checking for existing chunks")
-      remaining = @vector_store.filter_existing_chunks(chunks)
-      Rails.logger.debug("EmbeddingService: Will process #{remaining.size} new chunks")
-      remaining
+    chunks_to_process = nil
+    filter_time = @logger.time("Filtering duplicates") do
+      chunks_to_process = if force
+        @logger.debug("Forced processing - skipping duplicate check")
+        chunks
+      else
+        # Use a more efficient query approach with batching for large chunk sets
+        @logger.debug("Checking for existing chunks")
+        remaining = @vector_store.filter_existing_chunks(chunks)
+        @logger.debug("Will process #{remaining.size} new chunks")
+        remaining
+      end
     end
-    filter_time = Time.now - filter_start
-    Rails.logger.debug("EmbeddingService: Duplicate filtering completed in #{filter_time.round(2)}s")
-
+    
+    @logger.info("Duplicate filtering completed in #{filter_time.round(2)}s")
     return [] if chunks_to_process.empty?
 
     # Process chunks in batches
-    Rails.logger.debug("EmbeddingService: Starting batch processing of #{chunks_to_process.size} chunks")
+    @logger.debug("Starting batch processing of #{chunks_to_process.size} chunks")
     process_chunks_in_batches(
       chunks_to_process,
       text,
@@ -163,15 +167,16 @@ class EmbeddingService
       api_batch_num = api_batch_idx + 1
       api_batch_total = (chunks_to_process.size.to_f / api_batch_size).ceil
       
-      Rails.logger.debug("EmbeddingService: Processing API batch #{api_batch_num}/#{api_batch_total} (#{api_batch.size} chunks)")
+      @logger.debug("Processing API batch #{api_batch_num}/#{api_batch_total} (#{api_batch.size} chunks)")
       
       begin
         # Generate embeddings for this API batch
-        api_start = Time.now
-        Rails.logger.debug("EmbeddingService: Starting API call for batch #{api_batch_num}")
-        batch_embeddings = @api_client.generate_batch_embeddings(api_batch)
-        api_time = Time.now - api_start
-        Rails.logger.debug("EmbeddingService: API call completed in #{api_time.round(2)}s - received #{batch_embeddings.compact.size} embeddings")
+        batch_embeddings = nil
+        api_time = @logger.time("API call for batch #{api_batch_num}") do
+          batch_embeddings = @api_client.generate_batch_embeddings(api_batch)
+        end
+        
+        @logger.info("API call completed in #{api_time.round(2)}s - received #{batch_embeddings.compact.size} embeddings")
 
         # Add to pending buffers
         pending_chunks.concat(api_batch)
@@ -181,39 +186,38 @@ class EmbeddingService
         if (api_batch_num % db_commit_frequency == 0) || 
             (api_batch_idx == (chunks_to_process.size.to_f / api_batch_size).ceil - 1)
           
-          db_start = Time.now
-          Rails.logger.debug("EmbeddingService: Starting database commit for #{pending_chunks.size} chunks")
-          
-          @vector_store.commit_batch_to_database(
-            pending_chunks, 
-            pending_embeddings, 
-            original_text, 
-            chunk_size, 
-            chunk_overlap, 
-            content_type, 
-            source_url, 
-            source_title, 
-            metadata,
-            chunks_to_process.size
-          ).tap do |new_records|
+          new_records = nil
+          db_time = @logger.time("Database commit for #{pending_chunks.size} chunks") do
+            new_records = @vector_store.commit_batch_to_database(
+              pending_chunks, 
+              pending_embeddings, 
+              original_text, 
+              chunk_size, 
+              chunk_overlap, 
+              content_type, 
+              source_url, 
+              source_title, 
+              metadata,
+              chunks_to_process.size
+            )
+            
             all_results.concat(new_records)
             total_saved += new_records.count
           end
           
-          db_time = Time.now - db_start
-          Rails.logger.debug("EmbeddingService: Database commit completed in #{db_time.round(2)}s - saved #{total_saved} records")
+          @logger.info("Database commit completed in #{db_time.round(2)}s - saved #{new_records.count} records")
 
           # Clear buffers after commit
           pending_chunks = []
           pending_embeddings = []
         end
       rescue => e
-        Rails.logger.error("EmbeddingService: Error in API batch #{api_batch_num}: #{e.message}\n#{e.backtrace.join("\n")}")
+        @logger.error("Error in API batch #{api_batch_num}: #{e.message}\n#{e.backtrace.join("\n")}")
         # Continue with next batch
       end
     end
 
-    Rails.logger.debug("EmbeddingService: Batch processing completed - processed #{chunks_to_process.size} chunks, saved #{all_results.size} records")
+    @logger.info("Batch processing completed - processed #{chunks_to_process.size} chunks, saved #{all_results.size} records")
     all_results
   end
 
