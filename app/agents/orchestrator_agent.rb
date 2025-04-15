@@ -153,6 +153,39 @@ class OrchestratorAgent < BaseAgent
       }
     )
   end
+  
+  # Event handler for stalled projects
+  def handle_project_stalled(event)
+    project_id = event.data["project_id"]
+    return if project_id.blank?
+    
+    project = Project.find(project_id)
+    reason = event.data["reason"] || "No progress detected"
+    
+    Rails.logger.warn "[OrchestratorAgent] Received handle_project_stalled for #{project.name}. Reason: #{reason}"
+    
+    # Trigger re-coordination for the stalled project
+    recoordination_result = recoordinate_project(project_id)
+    
+    # Log the action
+    agent_activity&.events.create!(
+      event_type: "stalled_project_recoordination",
+      data: { 
+        project_id: project.id, 
+        project_name: project.name,
+        reason: reason,
+        recoordination_result: recoordination_result
+      }
+    )
+    
+    # If the reason suggests a critical issue, also escalate to human
+    if reason.include?("critical") || reason.include?("failed") || reason.include?("error")
+      escalate_to_human(
+        "STALLED PROJECT ALERT: #{project.name} (ID: #{project_id})\n\nReason: #{reason}\n\nAutomatic re-coordination has been initiated, but human review may be required.",
+        "high"
+      )
+    end
+  end
 
   # --- Core Logic ---
   # Override run to implement orchestrator logic
