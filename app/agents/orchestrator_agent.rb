@@ -20,6 +20,7 @@ class OrchestratorAgent < BaseAgent
   subscribe_to "system_resources_critical", :handle_resource_critical
   subscribe_to "project_created", :handle_new_project
   subscribe_to "project_activated", :handle_project_activated
+  subscribe_to "project_stalled", :handle_project_stalled
 
   # --- Tools ---
   # Use the new BaseAgent tool definition DSL
@@ -41,6 +42,10 @@ class OrchestratorAgent < BaseAgent
 
   tool :check_resource_usage, "Check current system resource usage" do
     check_resource_usage
+  end
+  
+  tool :recoordinate_project, "Trigger re-coordination of a project to evaluate progress and next steps" do |project_id|
+    recoordinate_project(project_id)
   end
   # --- End Tools ---
 
@@ -531,6 +536,73 @@ class OrchestratorAgent < BaseAgent
     rescue => e
       Rails.logger.error "[OrchestratorAgent] Error during LLM call in check_resource_usage: #{e.message}"
       "Error analyzing resource usage: #{e.message}"
+    end
+  end
+  
+  # Tool implementation: Trigger re-coordination of a project
+  def recoordinate_project(project_id)
+    begin
+      project = Project.find(project_id)
+      
+      Rails.logger.info "[OrchestratorAgent] Initiating re-coordination for project #{project.name} (ID: #{project_id})"
+      
+      # Find a suitable task to attach the coordinator to
+      # Prefer root tasks or active tasks
+      target_task = project.root_tasks.first
+      
+      if target_task.nil?
+        return "Error: Project #{project_id} has no root task to re-coordinate."
+      end
+      
+      # Create a coordinator agent specifically for re-coordination
+      coordinator_options = {
+        task_id: target_task.id,
+        parent_activity_id: agent_activity&.id,
+        purpose: "Re-coordinate project and evaluate progress",
+        priority: "high",
+        metadata: {
+          project_id: project.id,
+          project_name: project.name,
+          recoordination_type: "project_evaluation",
+          initiated_by: "OrchestratorAgent"
+        }
+      }
+      
+      # Enqueue the coordinator with specific instructions to use the recoordinate_project tool
+      job = CoordinatorAgent.enqueue(
+        "Re-coordinate and evaluate project: #{project.name}\n\nThis is a project re-coordination task. Please use the recoordinate_project tool with project_id: #{project_id} to analyze the current state of the project, evaluate completed tasks, and determine appropriate next steps.",
+        coordinator_options
+      )
+      
+      # Log the action
+      agent_activity&.events.create!(
+        event_type: "project_recoordination_initiated",
+        data: { 
+          project_id: project.id, 
+          project_name: project.name,
+          target_task_id: target_task.id,
+          coordinator_job: job.to_s
+        }
+      )
+      
+      # Publish an event for the system
+      Event.publish(
+        "project_recoordination_initiated",
+        { 
+          project_id: project.id, 
+          project_name: project.name,
+          target_task_id: target_task.id
+        },
+        { agent_activity_id: agent_activity&.id }
+      )
+      
+      "Initiated re-coordination for project '#{project.name}' (ID: #{project_id}). A CoordinatorAgent has been assigned to evaluate progress and determine next steps."
+      
+    rescue ActiveRecord::RecordNotFound
+      "Error: Project with ID #{project_id} not found."
+    rescue => e
+      Rails.logger.error "[OrchestratorAgent] Error in recoordinate_project: #{e.message}"
+      "Error initiating re-coordination for project #{project_id}: #{e.message}"
     end
   end
 
