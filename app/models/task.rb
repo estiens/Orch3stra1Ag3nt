@@ -225,7 +225,13 @@ class Task < ApplicationRecord
   # Enqueue this task for processing based on its type
   def enqueue_for_processing
     return unless active?
-
+    
+    # Don't enqueue if the project is paused
+    if project && project.status == "paused"
+      Rails.logger.info "[Task #{id}] Not enqueueing because project #{project.id} is paused"
+      return false
+    end
+    
     case task_type
     when "research"
       ResearchCoordinatorAgent.enqueue("Process research task", { task_id: id })

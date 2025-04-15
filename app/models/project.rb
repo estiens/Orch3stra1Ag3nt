@@ -186,7 +186,7 @@ class Project < ApplicationRecord
               project_name: name,
               paused_at: Time.current
             },
-            { system_event: true }
+            { priority: Event::HIGH_PRIORITY }
           ) if defined?(Event)
         end
       rescue => e
@@ -215,12 +215,10 @@ class Project < ApplicationRecord
       self.metadata["pause_duration"] = (Time.current - Time.parse(metadata["paused_at"].to_s)).to_i rescue nil
       save
 
-      # Resume paused tasks that were active before
+      # Resume root tasks first
       resume_errors = []
-      tasks.where(state: "paused").each do |task|
+      root_tasks.where(state: "paused").each do |task|
         begin
-          # Only resume tasks that should be resumed automatically
-          # Could add logic here to determine which tasks to resume
           task.resume! if task.may_resume?
         rescue => e
           resume_errors << "Task #{task.id} (#{task.title}): #{e.message}"
@@ -257,13 +255,24 @@ class Project < ApplicationRecord
               project_name: name,
               resumed_at: Time.current
             },
-            { system_event: true }
+            { priority: Event::HIGH_PRIORITY }
           ) if defined?(Event)
         end
       rescue => e
         # Log but don't fail if event publishing fails
         Rails.logger.error("Failed to publish project_resumed event: #{e.message}")
       end
+
+      # Trigger project re-coordination
+      Event.publish(
+        "project_recoordination_requested",
+        { 
+          project_id: id, 
+          project_name: name,
+          reason: "Project resumed after being paused"
+        },
+        { priority: Event::HIGH_PRIORITY }
+      )
 
       true
     rescue => e

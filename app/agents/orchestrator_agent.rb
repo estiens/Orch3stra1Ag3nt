@@ -21,6 +21,9 @@ class OrchestratorAgent < BaseAgent
   subscribe_to "project_created", :handle_new_project
   subscribe_to "project_activated", :handle_project_activated
   subscribe_to "project_stalled", :handle_project_stalled
+  subscribe_to "project_recoordination_requested", :handle_project_recoordination
+  subscribe_to "project_paused", :handle_project_paused
+  subscribe_to "project_resumed", :handle_project_resumed
 
   # --- Tools ---
   # Use the new BaseAgent tool definition DSL
@@ -185,6 +188,75 @@ class OrchestratorAgent < BaseAgent
         "high"
       )
     end
+  end
+  
+  # Event handler for project recoordination requests
+  def handle_project_recoordination(event)
+    project_id = event.data["project_id"]
+    return if project_id.blank?
+    
+    project = Project.find(project_id)
+    reason = event.data["reason"] || "Recoordination requested"
+    
+    Rails.logger.info "[OrchestratorAgent] Received handle_project_recoordination for #{project.name}. Reason: #{reason}"
+    
+    # Trigger re-coordination for the project
+    recoordination_result = recoordinate_project(project_id)
+    
+    # Log the action
+    agent_activity&.events.create!(
+      event_type: "project_recoordination_requested_handled",
+      data: { 
+        project_id: project.id, 
+        project_name: project.name,
+        reason: reason,
+        recoordination_result: recoordination_result
+      }
+    )
+  end
+  
+  # Event handler for paused projects
+  def handle_project_paused(event)
+    project_id = event.data["project_id"]
+    return if project_id.blank?
+    
+    project = Project.find(project_id)
+    
+    Rails.logger.info "[OrchestratorAgent] Received handle_project_paused for #{project.name}"
+    
+    # Log the action
+    agent_activity&.events.create!(
+      event_type: "project_pause_acknowledged",
+      data: { 
+        project_id: project.id, 
+        project_name: project.name,
+        message: "Project pause acknowledged. No new tasks will be started until resumed."
+      }
+    )
+  end
+  
+  # Event handler for resumed projects
+  def handle_project_resumed(event)
+    project_id = event.data["project_id"]
+    return if project_id.blank?
+    
+    project = Project.find(project_id)
+    
+    Rails.logger.info "[OrchestratorAgent] Received handle_project_resumed for #{project.name}"
+    
+    # Trigger re-coordination for the resumed project
+    recoordination_result = recoordinate_project(project_id)
+    
+    # Log the action
+    agent_activity&.events.create!(
+      event_type: "project_resume_handled",
+      data: { 
+        project_id: project.id, 
+        project_name: project.name,
+        recoordination_result: recoordination_result,
+        message: "Project resumed. Re-coordination initiated to continue progress."
+      }
+    )
   end
 
   # --- Core Logic ---

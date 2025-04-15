@@ -398,6 +398,11 @@ class CoordinatorAgent < BaseAgent
     rescue ActiveRecord::RecordNotFound
       return "Error: Subtask with ID #{subtask_id} not found or does not belong to task #{task.id}."
     end
+    
+    # Check if the project is paused
+    if task.project && task.project.status == "paused"
+      return "Cannot assign subtask #{subtask_id} - Project #{task.project.id} (#{task.project.name}) is currently paused."
+    end
 
     agent_class_name = agent_type.end_with?("Agent") ? agent_type : "#{agent_type.camelize}Agent"
 
@@ -463,6 +468,11 @@ class CoordinatorAgent < BaseAgent
       subtask = task.subtasks.find(subtask_id)
     rescue ActiveRecord::RecordNotFound
       return "Error: Subtask with ID #{subtask_id} not found or does not belong to task #{task.id}."
+    end
+    
+    # Check if the project is paused
+    if task.project && task.project.status == "paused"
+      return "Cannot create sub-coordinator for subtask #{subtask_id} - Project #{task.project.id} (#{task.project.name}) is currently paused."
     end
 
     # Create a meaningful purpose for the sub-coordinator
