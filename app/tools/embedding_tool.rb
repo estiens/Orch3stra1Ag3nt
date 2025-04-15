@@ -327,7 +327,7 @@ class EmbeddingTool
         # (not a StringIO or other IO-like object with a non-file path)
         if File.exist?(path)
           raise ArgumentError, "File is not readable: #{path}" unless File.readable?(path)
-          
+
           # Check if file is at beginning
           if file.respond_to?(:pos) && file.pos > 0
             file.rewind rescue nil
