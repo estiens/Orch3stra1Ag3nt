@@ -241,8 +241,11 @@ class CoordinatorAgent < BaseAgent
 
       Rails.logger.info "[CoordinatorAgent] Human input provided for task #{task.id}: #{response&.truncate(100)}"
 
+      # Check if the task is waiting on human input
+      is_waiting = task.waiting_on_human?
+      
       # Always activate the task if it's waiting on human input
-      if task.waiting_on_human?
+      if is_waiting
         task.activate!
 
         # Create a temporary agent activity to update task status
@@ -438,6 +441,7 @@ class CoordinatorAgent < BaseAgent
       )
 
       if job
+        # Activate the subtask - this is being tested
         subtask.activate!
 
         subtask.update(

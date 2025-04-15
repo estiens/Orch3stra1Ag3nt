@@ -38,19 +38,22 @@ RSpec.describe Agents::AgentJob, type: :job do
       # First clear any existing activities to ensure clean test state
       AgentActivity.where(task_id: task.id).destroy_all
       
-      # Create a test activity to return
-      test_activity = instance_double(AgentActivity, 
-                                     update!: true, 
-                                     events: double("events", create!: true),
-                                     id: 1)
-      
-      # Mock the agent_activities association
-      activities_association = double("activities_association")
-      expect(activities_association).to receive(:create!).once.and_return(test_activity)
-      allow(task).to receive(:agent_activities).and_return(activities_association)
+      # Count before
+      before_count = AgentActivity.count
       
       # Perform the action
       described_class.new.perform(agent_class, agent_prompt, options)
+      
+      # Count after
+      after_count = AgentActivity.count
+      
+      # Verify one activity was created
+      expect(after_count - before_count).to eq(1)
+      
+      # Verify the activity properties
+      activity = AgentActivity.last
+      expect(activity.agent_type).to eq("BaseAgent")
+      expect(activity.task_id).to eq(task.id)
     end
 
     it "runs the agent with the provided prompt" do
