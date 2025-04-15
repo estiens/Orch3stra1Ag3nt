@@ -61,8 +61,9 @@ module Embedding
       # First filter by collection to avoid SQL syntax errors
       base_query = VectorEmbedding.where(collection: @collection)
       
-      # Then apply nearest neighbors search
-      base_query.nearest_neighbors(:embedding, embedding, distance: distance)
+      # Then apply nearest neighbors search with explicit column selection
+      base_query.select("vector_embeddings.*")
+                .nearest_neighbors(:embedding, embedding, distance: distance)
                 .limit(k)
     end
 
