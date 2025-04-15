@@ -13,18 +13,31 @@ module Embedding
     
     # Efficiently chunk text using a simpler parallel approach
     def chunk_text(text, chunk_size, chunk_overlap, content_type = nil)
+      # Handle nil or empty text
+      return [] if text.nil? || text.empty?
+      
       # For small texts, just return the whole thing or process sequentially
       return [ text.strip ] if text.length <= chunk_size
 
       # For medium texts, use sequential processing - parallelism overhead isn't worth it
       if text.length < 1_000_000
-        @logger.debug("Text too small for parallel chunking, using sequential chunking")
-        return chunk_text_segment(text, chunk_size, chunk_overlap)
+        begin
+          @logger.debug("Text too small for parallel chunking, using sequential chunking")
+        rescue => e
+          # Fallback if logging fails
+          puts "Using sequential chunking for medium-sized text"
+        end
+        return chunk_text_segment(text, chunk_size, chunk_overlap, content_type)
       end
 
       # Detect content type if not provided
       content_type ||= detect_content_type(text)
-      @logger.debug("Detected content type: #{content_type}")
+      begin
+        @logger.debug("Detected content type: #{content_type}")
+      rescue => e
+        # Fallback if logging fails
+        puts "Detected content type: #{content_type}"
+      end
       
       # For larger texts, use a simpler and more efficient parallel approach
       processor_count = [ Concurrent.processor_count, 1 ].max
@@ -146,7 +159,9 @@ module Embedding
     end
 
     # Optimized chunking algorithm for a single text segment
-    def chunk_text_segment(text, chunk_size, chunk_overlap, content_type = detect_content_type(text))
+    def chunk_text_segment(text, chunk_size, chunk_overlap, content_type = nil)
+      # Ensure we have a content type
+      content_type ||= detect_content_type(text)
       # For very small texts, just return the whole thing
       return [ text.strip ] if text.length <= chunk_size
 
@@ -219,7 +234,11 @@ module Embedding
           # Use a larger step for code to avoid getting stuck on long lines
           min_step = content_type == :code ? 50 : 10
           position = position + min_step
-          @logger.debug("Forced position advance by #{min_step} characters to avoid stalling")
+          begin
+            @logger.debug("Forced position advance by #{min_step} characters to avoid stalling")
+          rescue => e
+            # Continue silently if logging fails
+          end
         else
           position = new_position
         end
@@ -233,14 +252,24 @@ module Embedding
           if last_positions.uniq.length <= 2
             jump_size = [chunk_size / 2, 100].max
             position += jump_size
-            @logger.warn("Detected potential infinite loop, jumping forward #{jump_size} characters")
+            begin
+              @logger.warn("Detected potential infinite loop, jumping forward #{jump_size} characters")
+            rescue => e
+              puts "Warning: Jumping forward #{jump_size} characters to avoid infinite loop"
+            end
             last_positions.clear
           end
         end
       end
 
       # Log chunking results
-      @logger.debug("Created #{chunks.size} chunks from #{text_length} characters of #{content_type} content")
+      begin
+        @logger.debug("Created #{chunks.size} chunks from #{text_length} characters of #{content_type} content")
+      rescue => e
+        # Fallback if logging fails
+        puts "Created #{chunks.size} chunks from #{text_length} characters of #{content_type} content"
+      end
+      
       chunks
     end
 
@@ -265,8 +294,8 @@ module Embedding
       
       sample = text[0...[5000, text.length].min]
       
-      # Check for code indicators
-      code_score = code_indicators.sum { |indicator| sample.scan(/#{Regexp.escape(indicator)}/).count }
+      # Check for code indicators - use simple count instead of regex for performance
+      code_score = code_indicators.sum { |indicator| sample.scan(indicator).count }
       
       # Check for code-like line structure (many lines starting with spaces/tabs)
       lines = sample.lines
@@ -287,9 +316,15 @@ module Embedding
       # Calculate final score
       final_score = code_score + (indentation_ratio * 10) + (code_char_ratio * 15) + (comment_ratio * 10)
       
-      @logger.debug("Content type detection: code_score=#{code_score}, indent_ratio=#{indentation_ratio.round(2)}, " +
-                   "code_char_ratio=#{code_char_ratio.round(2)}, comment_ratio=#{comment_ratio.round(2)}, " +
-                   "final_score=#{final_score.round(2)}")
+      # Log detection metrics
+      begin
+        @logger.debug("Content type detection: code_score=#{code_score}, indent_ratio=#{indentation_ratio.round(2)}, " +
+                     "code_char_ratio=#{code_char_ratio.round(2)}, comment_ratio=#{comment_ratio.round(2)}, " +
+                     "final_score=#{final_score.round(2)}")
+      rescue => e
+        # Fallback if logging fails
+        puts "Warning: Logger error in content detection: #{e.message}"
+      end
       
       # If enough indicators present, treat as code
       if final_score > 8 || indentation_ratio > 0.3 || code_char_ratio > 0.4
@@ -358,6 +393,33 @@ module Embedding
           [") ", 2],             # Closing parenthesis with space
           ["] ", 2],             # Closing bracket with space
         ]
+      end
+    end
+    
+    # Helper method for testing in console
+    def self.test_chunking(file_path, chunk_size = 512, chunk_overlap = 50, content_type = nil)
+      begin
+        text = File.read(file_path)
+        chunker = new
+        content_type ||= chunker.detect_content_type(text)
+        puts "Content detected as: #{content_type}"
+        puts "File size: #{text.length} characters"
+        
+        start_time = Time.now
+        chunks = chunker.chunk_text(text, chunk_size, chunk_overlap, content_type)
+        duration = Time.now - start_time
+        
+        puts "Generated #{chunks.size} chunks in #{duration.round(2)}s"
+        puts "Average chunk size: #{(chunks.sum { |c| c.length } / [1, chunks.size].max).round(2)} characters"
+        puts "Smallest chunk: #{chunks.map(&:length).min} characters"
+        puts "Largest chunk: #{chunks.map(&:length).max} characters"
+        
+        # Return the chunks for further inspection
+        chunks
+      rescue => e
+        puts "Error during chunking test: #{e.message}"
+        puts e.backtrace.join("\n")
+        []
       end
     end
   end
