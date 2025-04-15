@@ -1,7 +1,8 @@
 # frozen_string_literal: true
-require 'net/http'
-require 'uri'
-require 'json'
+
+require "net/http"
+require "uri"
+require "json"
 
 class EmbeddingTool
   extend Langchain::ToolDefinition
@@ -66,11 +67,11 @@ class EmbeddingTool
     # Validate directory
     Rails.logger.info("EmbeddingTool: Adding directory #{directory} with pattern #{pattern || 'none'} to collection '#{collection}'")
     validate_directory(directory)
-    
+
     files = fetch_directory_files(directory, pattern)
     Rails.logger.info("EmbeddingTool: Found #{files.count} files matching the pattern")
     raise ArgumentError, "No files found in directory: #{directory}" if files.empty?
-    
+
     add_files(files: files, content_type: content_type, collection: collection)
   end
 
@@ -97,15 +98,15 @@ class EmbeddingTool
 
     # Process files in batches to manage memory usage
     process_files_in_batches(
-      files_array, 
-      service, 
-      content_type, 
-      collection, 
-      chunk_size, 
-      chunk_overlap, 
-      source_url, 
-      source_title, 
-      metadata, 
+      files_array,
+      service,
+      content_type,
+      collection,
+      chunk_size,
+      chunk_overlap,
+      source_url,
+      source_title,
+      metadata,
       batch_size
     )
   end
@@ -193,10 +194,10 @@ class EmbeddingTool
   )
     Rails.logger.tagged("EmbeddingTool", "similarity_search") do
       Rails.logger.info("Searching collection '#{collection}' for: #{query.truncate(100)} (limit: #{limit}, distance: #{distance})")
-      
+
       begin
         service = EmbeddingService.new(collection: collection)
-        
+
         # Use a safer approach to avoid SQL syntax errors
         results = if mode == "direct_ids"
           # Use a direct ID-based approach to avoid SQL syntax errors
@@ -210,9 +211,9 @@ class EmbeddingTool
           # Use the standard approach but with error handling
           service.similarity_search(query, k: limit, distance: distance)
         end
-        
+
         Rails.logger.info("Found #{results.count} similar documents")
-        
+
         {
           status: "success",
           message: "Found #{results.count} similar documents",
@@ -241,7 +242,7 @@ class EmbeddingTool
 
       prompt = "Answer the question based on the following documents:\n\n#{contents}\n\nQuestion: #{question}"
       Rails.logger.debug("Sending prompt to LLM (#{prompt.bytesize} bytes)")
-      response = llm.chat(messages: [{ role: "user", content: prompt }])
+      response = llm.chat(messages: [ { role: "user", content: prompt } ])
       answer = response.chat_completion
       Rails.logger.info("Generated answer (#{answer.bytesize} bytes)")
 
@@ -265,75 +266,75 @@ class EmbeddingTool
   private
 
   # Process files in batches to manage memory usage
-  def process_files_in_batches(files_array, service, content_type, collection, chunk_size, 
+  def process_files_in_batches(files_array, service, content_type, collection, chunk_size,
                               chunk_overlap, source_url, source_title, metadata, batch_size)
     added = []
     total_files = files_array.size
     start_time = Time.now
     processed_count = 0
     success_count = 0
-    
+
     # Process files in batches to manage memory
     files_array.each_slice(batch_size).with_index do |batch, batch_idx|
       batch_num = batch_idx + 1
       batch_count = (total_files.to_f / batch_size).ceil
       batch_start = Time.now
-      
+
       Rails.logger.info("EmbeddingTool: Processing batch #{batch_num}/#{batch_count} (#{batch.size} files)")
-      
+
       # Prepare file data
       file_data = batch.map do |file|
         prepare_file_data(file, content_type, source_url, source_title, metadata)
       end
-      
+
       # Filter out files with errors
       valid_files = file_data.select { |f| !f[:error] }
       error_files = file_data.select { |f| f[:error] }
-      
+
       if error_files.any?
         Rails.logger.warn("EmbeddingTool: #{error_files.size}/#{batch.size} files had errors in batch #{batch_num}")
       end
-      
+
       # Process valid files
       batch_results = []
       batch_results.concat(error_files) # Add error files to results
-        
+
       # Process each file with the service
       if valid_files.any?
         Rails.logger.info("EmbeddingTool: Processing #{valid_files.size} valid files from batch #{batch_num}")
-        
+
         valid_results = valid_files.map do |file|
           result = process_single_file(file, service, chunk_size, chunk_overlap)
           processed_count += 1
           success_count += 1 if result[:status] == "success"
-          
+
           # Log progress periodically
           if processed_count % 5 == 0 || processed_count == total_files
             elapsed = Time.now - start_time
-            rate = processed_count / [elapsed, 0.1].max
+            rate = processed_count / [ elapsed, 0.1 ].max
             Rails.logger.info("EmbeddingTool: Progress - #{processed_count}/#{total_files} files processed (#{rate.round(2)} files/sec)")
           end
-          
+
           result
         end
-        
+
         batch_results.concat(valid_results)
         Rails.logger.info("EmbeddingTool: Successfully processed #{valid_results.count { |r| r[:status] == 'success' }}/#{valid_files.size} files in batch #{batch_num}")
       end
-      
+
       # Add batch results to overall results
       added.concat(batch_results)
-      
+
       batch_time = Time.now - batch_start
-      files_per_second = batch.size / [batch_time, 0.1].max
+      files_per_second = batch.size / [ batch_time, 0.1 ].max
       Rails.logger.info("EmbeddingTool: Batch #{batch_num} completed in #{batch_time.round(2)}s (#{files_per_second.round(2)} files/sec)")
     end
-    
+
     total_time = Time.now - start_time
-    overall_rate = total_files / [total_time, 0.1].max
-    
+    overall_rate = total_files / [ total_time, 0.1 ].max
+
     Rails.logger.info("EmbeddingTool: Completed processing all batches in #{total_time.round(2)}s. Success: #{success_count}/#{total_files} files (#{overall_rate.round(2)} files/sec)")
-      
+
     {
       status: "success",
       message: "Files processed successfully",
@@ -352,9 +353,9 @@ class EmbeddingTool
       start_time = Time.now
       file_path = file[:path] || "unknown"
       file_size = file[:size] || 0
-      
+
       Rails.logger.debug("EmbeddingTool: Started processing file #{file_path} (#{file_size} bytes)")
-      
+
       # Process the file with the embedding service
       # Wrap in Timeout to prevent infinite hangs
       result = Timeout.timeout(300) do  # 5 minute timeout
@@ -368,10 +369,10 @@ class EmbeddingTool
           metadata: file[:metadata]
         )
       end
-      
+
       process_time = Time.now - start_time
       Rails.logger.debug("EmbeddingTool: Completed processing file #{file_path} in #{process_time.round(2)}s - generated #{result.count} chunks")
-      
+
       # Return the result
       {
         path: file_path,
@@ -422,7 +423,7 @@ class EmbeddingTool
         # Make sure we're at the beginning of the file
         file_obj.rewind if file_obj.respond_to?(:rewind)
         file_content = file_obj.read
-        
+
         # Return a hash with all the data needed for processing
         {
           content: file_content,
@@ -454,7 +455,7 @@ class EmbeddingTool
   # Detect content type from file extension
   def detect_content_type(file_obj, content_type)
     return content_type if content_type
-    
+
     if file_obj.respond_to?(:path) && file_obj.path
       ext = File.extname(file_obj.path).downcase
       case ext
@@ -524,7 +525,7 @@ class EmbeddingTool
         raise ArgumentError, "File is not readable: #{path}" unless File.readable?(path)
       end
     end
-    
+
     # Ensure we're at the beginning of the file
     file.rewind if file.respond_to?(:rewind)
   end
