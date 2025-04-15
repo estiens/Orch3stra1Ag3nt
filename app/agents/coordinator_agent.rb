@@ -32,6 +32,10 @@ class CoordinatorAgent < BaseAgent
   tool :assign_subtask, "Delegate a subtask to the most suitable agent type. Takes (subtask_id: <ID number>, agent_type: <agent class name>, purpose: <optional context>)" do |subtask_id:, agent_type:, purpose: nil|
     assign_subtask(subtask_id, agent_type, purpose)
   end
+  
+  tool :create_sub_coordinator, "Create another coordinator agent to handle a complex subtask that needs further decomposition. Takes (subtask_id: <ID number>, purpose: <optional context>)" do |subtask_id:, purpose: nil|
+    create_sub_coordinator(subtask_id, purpose)
+  end
 
   tool :check_subtasks, "Monitor progress of all subtasks for the current task. Takes no parameters." do
     check_subtasks
@@ -416,6 +420,84 @@ class CoordinatorAgent < BaseAgent
       "Error assigning subtask #{subtask_id}: #{e.message}"
     end
   end
+  
+  # Create a sub-coordinator agent to handle a complex subtask that needs further decomposition
+  def create_sub_coordinator(subtask_id, purpose = nil)
+    unless task
+      return "Error: Cannot create sub-coordinator - Coordinator not associated with a main task."
+    end
+
+    begin
+      subtask = task.subtasks.find(subtask_id)
+    rescue ActiveRecord::RecordNotFound
+      return "Error: Subtask with ID #{subtask_id} not found or does not belong to task #{task.id}."
+    end
+
+    # Create a meaningful purpose for the sub-coordinator
+    meaningful_purpose = purpose.presence || "Sub-coordinator for complex subtask: #{subtask.title}"
+
+    # Prepare options for the sub-coordinator
+    coordinator_options = {
+      task_id: subtask.id,
+      parent_activity_id: agent_activity&.id,
+      purpose: meaningful_purpose,
+      task_priority: subtask.priority,
+      metadata: {
+        parent_coordinator_id: agent_activity&.id,
+        parent_task_id: task.id,
+        is_sub_coordinator: true,
+        original_subtask_id: subtask_id
+      }
+    }
+
+    # Enqueue the sub-coordinator
+    job = CoordinatorAgent.enqueue(
+      "This is a complex subtask that requires further decomposition into smaller subtasks.\n\n#{subtask.title}\n\n#{subtask.description}",
+      coordinator_options
+    )
+
+    if job
+      # Update subtask state
+      subtask.activate! if subtask.may_activate?
+
+      # Update subtask metadata
+      subtask.update(
+        metadata: (subtask.metadata || {}).merge({
+          assigned_agent: "CoordinatorAgent",
+          assigned_at: Time.current,
+          requires_decomposition: true
+        })
+      )
+
+      # Create event for tracking
+      agent_activity&.events.create!(
+        event_type: "sub_coordinator_created",
+        data: { 
+          subtask_id: subtask.id, 
+          purpose: meaningful_purpose,
+          parent_coordinator_id: agent_activity&.id
+        }
+      )
+
+      # Publish event for the system
+      Event.publish(
+        "sub_coordinator_created",
+        { 
+          subtask_id: subtask.id, 
+          parent_task_id: task.id,
+          parent_coordinator_id: agent_activity&.id
+        },
+        { agent_activity_id: agent_activity&.id }
+      )
+
+      "Created sub-coordinator for subtask #{subtask_id} ('#{subtask.title}'). This subtask will be further decomposed into smaller tasks."
+    else
+      "Warning: Could not create sub-coordinator for subtask #{subtask_id} due to concurrency limits. It remains in '#{subtask.state}' state."
+    end
+  rescue => e
+    Rails.logger.error "[CoordinatorAgent] Error creating sub-coordinator for subtask #{subtask_id}: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+    "Error creating sub-coordinator for subtask #{subtask_id}: #{e.message}"
+  end
 
   def check_subtasks
     unless task
@@ -779,8 +861,20 @@ class CoordinatorAgent < BaseAgent
   def process_completed_subtask(subtask_id, result)
     task.reload
 
-    # Log completion
-    update_task_status("Subtask #{subtask_id} completed successfully.")
+    # Get the completed subtask
+    subtask = Task.find_by(id: subtask_id)
+    return "Error: Completed subtask #{subtask_id} not found" unless subtask
+    
+    # Check if this was a subtask handled by a sub-coordinator
+    was_sub_coordinated = subtask.metadata&.dig("assigned_agent") == "CoordinatorAgent" &&
+                          subtask.metadata&.dig("requires_decomposition") == true
+    
+    # Log completion with appropriate context
+    if was_sub_coordinated
+      update_task_status("Subtask #{subtask_id} (#{subtask.title}) completed by sub-coordinator with further decomposition.")
+    else
+      update_task_status("Subtask #{subtask_id} completed successfully.")
+    end
 
     # Check overall task progress
     status_report = check_subtasks
@@ -795,8 +889,17 @@ class CoordinatorAgent < BaseAgent
     if eligible_subtasks.any?
       # Assign the highest priority eligible subtask
       next_subtask = select_next_subtask_to_assign(eligible_subtasks)
+      
+      # Determine if this subtask needs a sub-coordinator or a regular agent
       agent_type = next_subtask.metadata&.dig("suggested_agent") || determine_best_agent_for_subtask(next_subtask)
-      assign_result = assign_subtask(next_subtask.id, agent_type, "Assigning next eligible subtask")
+      
+      # If the LLM suggested a CoordinatorAgent, use create_sub_coordinator instead of assign_subtask
+      if agent_type == "CoordinatorAgent"
+        assign_result = create_sub_coordinator(next_subtask.id, "Complex subtask requiring further decomposition")
+      else
+        assign_result = assign_subtask(next_subtask.id, agent_type, "Assigning next eligible subtask")
+      end
+      
       return "#{status_report}\\n\\n#{assign_result}"
     end
 
@@ -893,7 +996,13 @@ class CoordinatorAgent < BaseAgent
       # Assign potentially multiple initially eligible tasks (those with no deps)
       eligible_subtasks.each do |subtask_to_assign|
          agent_type = subtask_to_assign.metadata&.dig("suggested_agent") || determine_best_agent_for_subtask(subtask_to_assign)
-         assign_subtask(subtask_to_assign.id, agent_type, "Assigning initial eligible subtask")
+         
+         # If the LLM suggested a CoordinatorAgent, use create_sub_coordinator instead of assign_subtask
+         if agent_type == "CoordinatorAgent"
+           create_sub_coordinator(subtask_to_assign.id, "Complex subtask requiring further decomposition")
+         else
+           assign_subtask(subtask_to_assign.id, agent_type, "Assigning initial eligible subtask")
+         end
          assigned_count += 1
       end
       "Task successfully decomposed into #{subtasks_data.count} subtasks. " +
@@ -1083,6 +1192,11 @@ class CoordinatorAgent < BaseAgent
       - CodeResearcherAgent: Code analysis and programming tasks
       - WriterAgent: Content creation and documentation
       - AnalyzerAgent: Data analysis and insight generation
+      - CoordinatorAgent: For complex subtasks that need further decomposition into smaller tasks
+
+      ## ASSESSMENT CRITERIA
+      - Choose CoordinatorAgent ONLY if the subtask is complex and would benefit from being broken down into multiple smaller subtasks
+      - For most straightforward tasks, choose one of the specialized agents
 
       ## REQUIRED OUTPUT FORMAT
       RECOMMENDED AGENT: [Single agent type from the list above]
