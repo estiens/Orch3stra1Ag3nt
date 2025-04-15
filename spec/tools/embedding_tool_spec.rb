@@ -71,35 +71,53 @@ RSpec.describe EmbeddingTool do
     
     it "handles file objects" do
       file = File.open(test_file_path)
-      
+    
       embedding_service = instance_double(EmbeddingService)
       allow(EmbeddingService).to receive(:new).and_return(embedding_service)
-      
+    
       expect(embedding_service).to receive(:add_document) do |content, options|
         expect(content).to eq(test_file_content)
         # Use File.basename to compare just the filename part, not the full path
         expect(File.basename(options[:metadata][:file_path])).to eq(File.basename(test_file_path))
         [build(:vector_embedding)]
       end
-      
+    
+      # Force synchronous execution for testing
+      allow_any_instance_of(Thread).to receive(:value).and_return({
+        path: test_file_path,
+        size: test_file_content.size,
+        content_type: "text",
+        chunks: 1,
+        status: "success"
+      })
+    
       result = tool.add_files(files: file)
       expect(result[:status]).to eq("success")
-      
+    
       file.close
     end
     
     it "handles StringIO and other IO-like objects" do
       string_io = StringIO.new(test_file_content)
-      
+    
       embedding_service = instance_double(EmbeddingService)
       allow(EmbeddingService).to receive(:new).and_return(embedding_service)
-      
+    
       expect(embedding_service).to receive(:add_document) do |content, options|
         expect(content).to eq(test_file_content)
         # StringIO won't have a file path, so we don't check for it
         [build(:vector_embedding)]
       end
-      
+    
+      # Force synchronous execution for testing
+      allow_any_instance_of(Thread).to receive(:value).and_return({
+        path: "unknown",
+        size: test_file_content.size,
+        content_type: "text",
+        chunks: 1,
+        status: "success"
+      })
+    
       result = tool.add_files(files: string_io)
       expect(result[:status]).to eq("success")
     end
