@@ -3,7 +3,7 @@ FactoryBot.define do
     sequence(:content) { |n| "Sample content for vector embedding #{n}" }
     content_type { "text" }
     collection { "default" }
-    embedding { Array.new(384) { rand } } # Default embedding size
+    embedding { Array.new(1024) { rand } } # Match the expected dimensions in the app
     metadata { { embedding_model: "test-model" } }
     
     trait :with_project do

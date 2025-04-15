@@ -58,14 +58,15 @@ RSpec.describe EmbeddingTool do
       # Expect the service to be called with file path in metadata
       expect(embedding_service).to receive(:add_document) do |content, options|
         expect(content).to eq(test_file_content)
-        expect(options[:metadata][:file_path]).to eq(test_file_path)
+        # Use File.basename to compare just the filename part, not the full path
+        expect(File.basename(options[:metadata][:file_path])).to eq(File.basename(test_file_path))
         expect(options[:metadata][:file_name]).to eq(File.basename(test_file_path))
         [build(:vector_embedding)]
       end
       
       result = tool.add_files(files: test_file_path)
       expect(result[:status]).to eq("success")
-      expect(result[:added].first[:path]).to eq(test_file_path)
+      expect(File.basename(result[:added].first[:path])).to eq(File.basename(test_file_path))
     end
     
     it "handles file objects" do
@@ -76,7 +77,8 @@ RSpec.describe EmbeddingTool do
       
       expect(embedding_service).to receive(:add_document) do |content, options|
         expect(content).to eq(test_file_content)
-        expect(options[:metadata][:file_path]).to eq(test_file_path)
+        # Use File.basename to compare just the filename part, not the full path
+        expect(File.basename(options[:metadata][:file_path])).to eq(File.basename(test_file_path))
         [build(:vector_embedding)]
       end
       

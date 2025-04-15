@@ -7,7 +7,7 @@ class EmbeddingService
   def initialize(collection: nil, task: nil, project: nil)
     @task = task
     @project = project || task&.project
-    @collection = collection || (@project ? "Project#{project.id}" : "default")
+    @collection = collection || (@project ? "Project#{@project.id}" : "default")
   end
 
 
@@ -307,6 +307,11 @@ class EmbeddingService
       .limit(k)
   end
 
+  # Generate embedding for a text
+  def generate_embedding(text)
+    generate_huggingface_embedding(text)
+  end
+
   # --------------------------
   # Private helpers and logic
   # --------------------------
@@ -395,10 +400,6 @@ class EmbeddingService
     conditions = { collection: @collection, content: content }
     conditions[:content_type] = content_type if content_type
     VectorEmbedding.exists?(conditions)
-  end
-
-  def generate_embedding(text)
-    generate_huggingface_embedding(text)
   end
 
   # Returns the embedding vector; raises if unsuccessful
@@ -613,7 +614,12 @@ class EmbeddingService
     start_time = Time.now
     Rails.logger.info("Starting chunking of #{text.bytesize} bytes text")
 
-    return [ text ] if text.length <= chunk_size
+    # Handle small texts or invalid parameters
+    return [text] if text.length <= chunk_size || chunk_size <= 0
+    
+    # Ensure chunk_overlap is valid
+    chunk_overlap = [0, chunk_overlap].max
+    chunk_overlap = [chunk_overlap, chunk_size - 1].min
 
     chunks = []
     current_pos = 0

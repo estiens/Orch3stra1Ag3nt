@@ -26,7 +26,7 @@ RSpec.describe EmbeddingService do
   describe "#add_text" do
     before do
       # Mock the embedding generation to avoid API calls
-      allow(service).to receive(:generate_embedding).and_return(Array.new(384) { rand })
+      allow(service).to receive(:generate_embedding).and_return(Array.new(1024) { rand })
     end
     
     it "returns nil for blank text" do

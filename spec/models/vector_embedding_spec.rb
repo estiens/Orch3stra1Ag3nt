@@ -3,8 +3,8 @@ require 'rails_helper'
 RSpec.describe VectorEmbedding, type: :model do
   # Helper method to generate a properly sized mock embedding vector
   def mock_embedding
-    # Create an array of 384 elements (typical for modern embedding models)
-    Array.new(384) { |i| i.to_f / 384 }
+    # Create an array of 1024 elements to match the expected dimensions
+    Array.new(1024) { |i| i.to_f / 1024 }
   end
 
   describe "validations" do
