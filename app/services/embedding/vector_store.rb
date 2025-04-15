@@ -62,11 +62,21 @@ module Embedding
         # Log the embedding format to help with debugging
         @logger.debug("Embedding format: #{embedding.class}, dimensions: #{embedding.size}")
         
-        # Use the Neighbor gem's nearest_neighbors method directly
-        # First filter by collection to ensure we're only searching within the right collection
-        VectorEmbedding.in_collection(@collection)
-                      .nearest_neighbors(:embedding, embedding, distance: distance)
-                      .limit(k)
+        # Use raw SQL operators directly to avoid AS clause conflicts
+        base_query = VectorEmbedding.in_collection(@collection)
+        
+        # Apply the appropriate distance operator based on the distance metric
+        case distance
+        when "cosine"
+          base_query = base_query.order(Arel.sql("embedding <=> ARRAY[#{embedding.join(',')}]::vector"))
+        when "inner_product"
+          base_query = base_query.order(Arel.sql("embedding <#> ARRAY[#{embedding.join(',')}]::vector"))
+        else # euclidean
+          base_query = base_query.order(Arel.sql("embedding <-> ARRAY[#{embedding.join(',')}]::vector"))
+        end
+        
+        # Apply limit and return results
+        base_query.limit(k)
       rescue => e
         @logger.error("Error in similarity_search_by_vector: #{e.message}")
         @logger.error("Embedding format that caused error: #{embedding.class}, #{embedding.inspect[0..100]}")
