@@ -63,19 +63,41 @@
         <% @root_tasks.each do |task| %>
           <div class="py-4">
             <div class="flex justify-between items-center">
-              <h3 class="font-medium"><%= task.title %></h3>
-              <span class="inline-block <%= task.state == 'active' ? 'bg-green-100 text-green-800' : 
-                                          task.state == 'completed' ? 'bg-blue-100 text-blue-800' : 
-                                          task.state == 'failed' ? 'bg-red-100 text-red-800' : 
-                                          'bg-gray-100 text-gray-800' %> 
-                    px-2 py-1 text-xs font-semibold rounded-full">
-                <%= task.state.capitalize %>
-              </span>
+              <div>
+                <h3 class="font-medium"><%= link_to task.title, task, class: "link link-hover" %></h3>
+                <div class="flex items-center mt-1 gap-2">
+                  <span class="badge <%= task.state == 'active' ? 'badge-success' :
+                                      task.state == 'completed' ? 'badge-info' :
+                                      task.state == 'failed' ? 'badge-error' :
+                                      task.state == 'paused' ? 'badge-warning' :
+                                      task.state == 'waiting_on_human' ? 'badge-secondary' :
+                                      'badge-ghost' %>">
+                    <%= task.state.capitalize %>
+                  </span>
+                  <span class="text-sm opacity-70">Type: <%= task.task_type.capitalize %></span>
+                </div>
+              </div>
+              <div class="flex-shrink-0">
+                <% if task.pending? %>
+                  <%= button_to activate_task_path(task), method: :post, form: { data: { turbo: true } }, class: "btn btn-sm btn-success" do %>
+                    Start
+                  <% end %>
+                <% elsif task.active? %>
+                  <%= button_to pause_task_path(task), method: :post, form: { data: { turbo: true } }, class: "btn btn-sm btn-warning" do %>
+                    Pause
+                  <% end %>
+                <% elsif task.paused? %>
+                  <%= button_to resume_task_path(task), method: :post, form: { data: { turbo: true } }, class: "btn btn-sm btn-success" do %>
+                    Resume
+                  <% end %>
+                <% end %>
+              </div>
             </div>
-            <p class="text-gray-600 mt-1"><%= task.description %></p>
-            <div class="mt-2 text-sm text-gray-500">
-              <span>Type: <%= task.task_type.capitalize %></span>
-              <span class="ml-4">Created: <%= time_ago_in_words(task.created_at) %> ago</span>
+            <% if task.description.present? %>
+              <p class="opacity-70 mt-1"><%= task.description %></p>
+            <% end %>
+            <div class="mt-2 text-xs opacity-60">
+              Created <%= time_ago_in_words(task.created_at) %> ago
             </div>
           </div>
         <% end %>
