@@ -258,7 +258,7 @@ class CoordinatorAgent < BaseAgent
         ## PROJECT CONTEXT
         Project Name: #{project.name}
         Project Description: #{project.description}
-        Project Goal: #{project.goal}
+        #{project.respond_to?(:goal) && project.goal.present? ? "Project Goal: #{project.goal}" : ""}
       PROJECT
     end
 
