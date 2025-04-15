@@ -27,20 +27,20 @@ class VectorEmbedding < ApplicationRecord
   # @param distance [String] The distance metric to use ("euclidean", "cosine", "inner_product")
   # @return [Array<VectorEmbedding>] Matching embeddings sorted by similarity
   def self.find_similar(query_embedding, limit: 5, collection: nil, task_id: nil, project_id: nil, distance: "cosine")
-    # Start with a nearest neighbors query
-    query = nearest_neighbors(:embedding, query_embedding, distance: distance)
-
+    # Build the base query with filters first
+    base_query = self
+    
     # Add collection filter if specified
-    query = query.in_collection(collection) if collection.present?
+    base_query = base_query.in_collection(collection) if collection.present?
 
     # Add task filter if specified
-    query = query.for_task(task_id) if task_id.present?
+    base_query = base_query.for_task(task_id) if task_id.present?
 
     # Add project filter if specified
-    query = query.for_project(project_id) if project_id.present?
-
-    # Get nearest neighbors
-    query.limit(limit)
+    base_query = base_query.for_project(project_id) if project_id.present?
+    
+    # Apply nearest neighbors search after filters to avoid SQL syntax errors
+    base_query.nearest_neighbors(:embedding, query_embedding, distance: distance).limit(limit)
   end
 
   # Generate an embedding for the given text using the embedding service
@@ -59,7 +59,12 @@ class VectorEmbedding < ApplicationRecord
   end
 
   def similar_to_me(limit: 5, distance: "cosine")
-    query = nearest_neighbors(:embedding, self.embedding, distance: distance)
-    query.limit(limit)
+    # Start with a base query for the same collection
+    base_query = VectorEmbedding.where(collection: self.collection)
+    
+    # Then apply nearest neighbors search
+    base_query.nearest_neighbors(:embedding, self.embedding, distance: distance)
+              .where.not(id: self.id) # Exclude self
+              .limit(limit)
   end
 end
