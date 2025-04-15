@@ -7,10 +7,8 @@ class Project < ApplicationRecord
 
   # Validations
   validates :name, presence: true
-# Serialization for settings and metadata
-serialize :settings, coder: JSON
-serialize :metadata, coder: JSON
-  # serialize :metadata, JSON
+# Settings and metadata are already jsonb columns in PostgreSQL
+# No need to serialize them as they're handled natively
 
   # Scopes
   scope :active, -> { where(status: "active") }

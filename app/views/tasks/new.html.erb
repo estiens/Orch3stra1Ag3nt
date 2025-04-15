@@ -1,7 +1,19 @@
-<div class="container">
-  <h1>New Task</h1>
-
-  <%= render 'form', task: @task %>
-
-  <%= link_to 'Back', tasks_path, class: "button" %>
+<div class="container mx-auto px-4 py-8">
+  <div class="max-w-3xl mx-auto">
+    <div class="mb-6 flex items-center justify-between">
+      <h1 class="text-2xl font-bold text-gray-900">New Task</h1>
+      <%= link_to tasks_path, class: "text-indigo-600 hover:text-indigo-900 flex items-center" do %>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+        Back to Tasks
+      <% end %>
+    </div>
+    
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+      <div class="px-4 py-5 sm:p-6">
+        <%= render 'form', task: @task %>
+      </div>
+    </div>
+  </div>
 </div>

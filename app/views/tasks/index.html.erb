@@ -1,28 +1,88 @@
-<div class="container">
-  <h1>Tasks</h1>
-
-  <div class="actions mb-4">
-    <%= link_to 'New Task', new_task_path, class: "button button-primary" %>
+<div class="container mx-auto px-4 py-8">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Tasks</h1>
+    <div>
+      <%= link_to new_task_path, class: "btn btn-primary" do %>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+        New Task
+      <% end %>
+      <%= link_to dashboard_path, class: "btn btn-outline ml-2" do %>
+        Back to Dashboard
+      <% end %>
+    </div>
   </div>
 
-  <div class="tasks-list">
-    <% @tasks.each do |task| %>
-      <div class="task-item">
-        <h2><%= link_to task.title, task %></h2>
-        <div class="task-meta">
-          <span class="status"><%= status_badge(task.state) %></span>
-          <span class="type"><%= task.task_type.humanize %></span>
-          <% if task.project %>
-            <span class="project">Project: <%= link_to task.project.name, task.project %></span>
-          <% end %>
-        </div>
-        <div class="task-description">
-          <%= truncate(task.description, length: 150) %>
-        </div>
-        <div class="task-actions">
-          <%= link_to 'Edit', edit_task_path(task), class: "button button-small" %>
-          <%= link_to 'Delete', task, method: :delete, data: { confirm: 'Are you sure?' }, class: "button button-small button-danger" %>
-        </div>
+  <% if @project %>
+    <div class="mb-6 bg-indigo-50 p-4 rounded-lg">
+      <h2 class="text-lg font-semibold text-indigo-800">
+        Viewing tasks for project: <%= link_to @project.name, @project, class: "underline" %>
+      </h2>
+    </div>
+  <% end %>
+
+  <div class="bg-white shadow-md rounded-lg overflow-hidden">
+    <% if @tasks.any? %>
+      <div class="divide-y divide-gray-200">
+        <% @tasks.each do |task| %>
+          <div class="p-6 hover:bg-gray-50">
+            <div class="flex justify-between items-start">
+              <div>
+                <h2 class="text-xl font-semibold">
+                  <%= link_to task.title, task, class: "hover:text-indigo-600" %>
+                </h2>
+                <div class="flex flex-wrap items-center gap-2 mt-2">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                    <%= task.state == 'active' ? 'bg-green-100 text-green-800' : 
+                       task.state == 'completed' ? 'bg-blue-100 text-blue-800' : 
+                       task.state == 'failed' ? 'bg-red-100 text-red-800' : 
+                       task.state == 'paused' ? 'bg-yellow-100 text-yellow-800' : 
+                       task.state == 'waiting_on_human' ? 'bg-purple-100 text-purple-800' : 
+                       'bg-gray-100 text-gray-800' %>">
+                    <%= task.state.capitalize %>
+                  </span>
+                  <span class="text-sm text-gray-500">Type: <%= task.task_type.humanize %></span>
+                  <% if task.project %>
+                    <span class="text-sm text-gray-500">
+                      Project: <%= link_to task.project.name, task.project, class: "text-indigo-600 hover:underline" %>
+                    </span>
+                  <% end %>
+                </div>
+              </div>
+              <div class="flex space-x-2">
+                <% if task.state == "pending" %>
+                  <%= button_to activate_task_path(task), method: :post, class: "btn btn-sm btn-success" do %>
+                    Start
+                  <% end %>
+                <% elsif task.state == "active" %>
+                  <%= button_to pause_task_path(task), method: :post, class: "btn btn-sm btn-warning" do %>
+                    Pause
+                  <% end %>
+                <% elsif task.state == "paused" %>
+                  <%= button_to resume_task_path(task), method: :post, class: "btn btn-sm btn-info" do %>
+                    Resume
+                  <% end %>
+                <% end %>
+                <%= link_to edit_task_path(task), class: "btn btn-sm btn-outline" do %>
+                  Edit
+                <% end %>
+              </div>
+            </div>
+            <% if task.description.present? %>
+              <div class="mt-2 text-gray-600">
+                <%= truncate(task.description, length: 150) %>
+              </div>
+            <% end %>
+            <div class="mt-2 text-xs text-gray-500">
+              Created <%= time_ago_in_words(task.created_at) %> ago
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <div class="p-6 text-center text-gray-500">
+        <p>No tasks found. Click "New Task" to create one.</p>
       </div>
     <% end %>
   </div>
