@@ -1,8 +1,8 @@
 class TasksController < ApplicationController
-  before_action :set_task, only: [:show, :edit, :update, :destroy, :activate, :pause, :resume]
+  before_action :set_task, only: [:show, :edit, :update, :destroy, :activate, :pause, :resume, :complete, :fail]
 
   def index
-    @tasks = Task.all
+    @tasks = Task.includes(:project).order(created_at: :desc)
   end
 
   def show
@@ -10,6 +10,11 @@ class TasksController < ApplicationController
 
   def new
     @task = Task.new
+    
+    # Pre-select project if project_id is provided
+    if params[:project_id].present?
+      @task.project_id = params[:project_id]
+    end
   end
 
   def edit
