@@ -152,9 +152,18 @@ class BaseAgent
   end
   def handle_run_error(e)
     Rails.logger.error("[#{self.class.name}] Agent error [Activity ID: #{@agent_activity&.id}]: #{e.message}\n#{e.backtrace&.first(10)&.join("\n")}")
-    if @agent_activity
-      @agent_activity.mark_failed(e.message)
+
+    begin
+      if @agent_activity
+        @agent_activity.mark_failed(e.message)
+      else
+        Rails.logger.warn("[#{self.class.name}] Cannot mark_failed: No agent_activity associated with this agent")
+      end
+    rescue => error_during_failure
+      Rails.logger.error("[#{self.class.name}] Error during failure handling: #{error_during_failure.message}")
+      # Don't re-raise this error, as it would mask the original error
     end
+
     persist_tool_executions
   end
   # --- End Lifecycle Hooks & Base Logging ---
@@ -210,12 +219,15 @@ class BaseAgent
     start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
     begin
+      # Format prompt for evaluation
+      prompt_text = prompt.is_a?(Array) ? prompt.to_json : prompt.to_s
+
       # Get provider - try to extract from response or fallback to default
       provider = if prompt_text.to_s.include?("Test prompt")
                    "openrouter" # Use openrouter for test prompts
-                 else
+      else
                    llm_response.try(:provider) || "OpenAI"
-                 end
+      end
 
       # Get model name - prioritize the one from the response
       model_name = llm_response.try(:model) ||
@@ -223,8 +235,7 @@ class BaseAgent
                    @llm.try(:model) ||
                    "unknown"
 
-      # Format prompt and response
-      prompt_text = prompt.is_a?(Array) ? prompt.to_json : prompt.to_s
+      # Format response
       response_text = llm_response.try(:chat_completion) || llm_response.try(:completion) || llm_response.to_s
 
       # Get token counts
