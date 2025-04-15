@@ -87,13 +87,20 @@ class WebResearcherAgent < BaseAgent
         execute_tool(:take_notes, "Alternative Research:\n#{alternative_research}")
       else
         # Parse search results to find promising URLs/Snippets
-        first_url = search_results_text.match(/URL:\s*(https?\S+)/i)&.[](1)
-
-        if first_url
-          # Step 2: Browse/Scrape promising source
+        urls = search_results_text.scan(/URL:\s*(https?:\/\/\S+)/i).flatten.uniq
+        
+        if urls.any?
+          # Step 2: Browse/Scrape promising source (first URL)
+          first_url = urls.first
           Rails.logger.info "[WebResearcherAgent-#{task&.id || 'no-task'}] Browsing first URL: #{first_url}"
           browsed_content = execute_tool(:browse_url, first_url)
           execute_tool(:take_notes, "Content from #{first_url}:\n#{browsed_content.truncate(1000)}")
+          
+          # If we have more URLs, make a note of them for potential future use
+          if urls.size > 1
+            additional_urls = urls[1..3].join("\n- ")
+            execute_tool(:take_notes, "Additional URLs found in search results:\n- #{additional_urls}")
+          end
         else
           Rails.logger.info "[WebResearcherAgent-#{task&.id || 'no-task'}] No URL found in initial search results to browse."
           execute_tool(:take_notes, "No URLs found in search results to browse.")
@@ -144,7 +151,8 @@ class WebResearcherAgent < BaseAgent
     if search_results[:citations].present?
       formatted_results += "Sources:\n"
       search_results[:citations].each_with_index do |citation, index|
-        formatted_results += "#{index + 1}. #{citation[:title]} - URL: #{citation[:url]}\n"
+        title = citation[:title] || citation[:url].to_s.split('/').last.to_s.gsub('-', ' ').capitalize
+        formatted_results += "#{index + 1}. #{title} - URL: #{citation[:url]}\n"
       end
     end
 

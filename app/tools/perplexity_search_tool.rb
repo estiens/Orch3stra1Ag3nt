@@ -41,16 +41,21 @@ class PerplexitySearchTool
       if response.success?
         data = JSON.parse(response.body)
 
-        # Format the response based on the updated API response structure
+        # Format the response based on the API response structure
         result = {
           query: @query,
-          response: data["choices"][0]["message"]["content"],
+          response: data.dig("choices", 0, "message", "content"),
           focus: @focus
         }
 
         # Add citation information if available
         if data["citations"]
-          result[:citations] = data["citations"]
+          result[:citations] = data["citations"].map do |citation|
+            {
+              title: citation.split('/').last.to_s.gsub('-', ' ').capitalize,
+              url: citation
+            }
+          end
         end
 
         result
@@ -58,10 +63,19 @@ class PerplexitySearchTool
         # Enhanced error handling to provide more diagnostic information
         begin
           error_data = JSON.parse(response.body)
-          error_message = error_data.dig("error", "message") ||
-                          error_data["error"] ||
-                          error_data["message"] ||
-                          "Error details not available"
+          
+          # Handle different error formats
+          error_message = if error_data.is_a?(Array)
+                           error_data.join(", ")
+                         elsif error_data.dig("error", "message")
+                           error_data.dig("error", "message")
+                         elsif error_data["error"]
+                           error_data["error"]
+                         elsif error_data["message"]
+                           error_data["message"]
+                         else
+                           "Error details not available"
+                         end
 
           Rails.logger.error("Perplexity API error: #{response.code} - #{error_message}")
           Rails.logger.error("Request body: #{request_body.to_json}")
