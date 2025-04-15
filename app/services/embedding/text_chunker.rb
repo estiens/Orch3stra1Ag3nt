@@ -12,7 +12,7 @@ module Embedding
     end
     
     # Efficiently chunk text using a simpler parallel approach
-    def chunk_text(text, chunk_size, chunk_overlap)
+    def chunk_text(text, chunk_size, chunk_overlap, content_type = nil)
       # For small texts, just return the whole thing or process sequentially
       return [ text.strip ] if text.length <= chunk_size
 
@@ -22,16 +22,20 @@ module Embedding
         return chunk_text_segment(text, chunk_size, chunk_overlap)
       end
 
+      # Detect content type if not provided
+      content_type ||= detect_content_type(text)
+      @logger.debug("Detected content type: #{content_type}")
+      
       # For larger texts, use a simpler and more efficient parallel approach
       processor_count = [ Concurrent.processor_count, 1 ].max
       @logger.debug("Using #{processor_count} threads for parallel chunking")
 
       # Divide text into segments more efficiently
-      segments = split_text_into_segments(text, processor_count, chunk_size, chunk_overlap)
+      segments = split_text_into_segments(text, processor_count, chunk_size, chunk_overlap, content_type)
       @logger.debug("Split text into #{segments.size} segments for processing")
 
       # Use a simple thread pool for processing
-      all_chunks = process_segments_with_threads(segments, chunk_size, chunk_overlap)
+      all_chunks = process_segments_with_threads(segments, chunk_size, chunk_overlap, content_type)
 
       # Remove duplicates that might have been created in overlap regions
       @logger.debug("Parallel chunking completed - generated #{all_chunks.size} chunks")
@@ -41,7 +45,7 @@ module Embedding
     private
 
     # Split text into segments for parallel processing
-    def split_text_into_segments(text, processor_count, chunk_size, chunk_overlap)
+    def split_text_into_segments(text, processor_count, chunk_size, chunk_overlap, content_type = nil)
       # Calculate optimal segment size based on text length and processor count
       # Aim for segments that are roughly equal in size
       target_segment_count = processor_count * 2  # Create 2x segments as processors for better load balancing
@@ -59,16 +63,30 @@ module Embedding
 
         # Find a natural breakpoint if not at the end
         if end_pos < text.length
-          # Look for paragraph or line breaks near the end position
+          # Get appropriate breakpoints based on content type
+          content_type ||= detect_content_type(text)
+          breakpoints = get_breakpoint_patterns(content_type)
+          
+          # Look for appropriate breaks near the end position
           search_window = [ 500, segment_size / 10 ].min  # Smaller search window
           search_start = [ end_pos - search_window, position ].max
           search_text = text[search_start...end_pos]
 
-          # Try to find a paragraph or line break
-          if search_text.include?("\n\n")
-            offset = search_text.rindex("\n\n")
-            end_pos = search_start + offset + 2 if offset
-          elsif search_text.include?("\n")
+          # Try each breakpoint pattern in order
+          found_break = false
+          breakpoints.each do |pattern, length|
+            if search_text.include?(pattern)
+              offset = search_text.rindex(pattern)
+              if offset
+                end_pos = search_start + offset + length
+                found_break = true
+                break
+              end
+            end
+          end
+          
+          # If no suitable break found, fall back to any newline
+          if !found_break && search_text.include?("\n")
             offset = search_text.rindex("\n")
             end_pos = search_start + offset + 1 if offset
           end
@@ -86,7 +104,7 @@ module Embedding
     end
 
     # Process segments using a simple thread pool
-    def process_segments_with_threads(segments, chunk_size, chunk_overlap)
+    def process_segments_with_threads(segments, chunk_size, chunk_overlap, content_type = nil)
       return [] if segments.empty?
 
       # Use a thread pool with a reasonable size
@@ -105,7 +123,7 @@ module Embedding
           begin
             # Process the segment
             start_time = Time.now
-            chunks = chunk_text_segment(segment, chunk_size, chunk_overlap)
+            chunks = chunk_text_segment(segment, chunk_size, chunk_overlap, content_type)
             duration = Time.now - start_time
 
             # Thread-safe append to results
@@ -128,7 +146,7 @@ module Embedding
     end
 
     # Optimized chunking algorithm for a single text segment
-    def chunk_text_segment(text, chunk_size, chunk_overlap)
+    def chunk_text_segment(text, chunk_size, chunk_overlap, content_type = detect_content_type(text))
       # For very small texts, just return the whole thing
       return [ text.strip ] if text.length <= chunk_size
 
@@ -136,10 +154,8 @@ module Embedding
       position = 0
       text_length = text.length
 
-      # Pre-calculate breakpoint patterns for faster matching
-      paragraph_break = "\n\n"
-      line_break = "\n"
-      sentence_end = ". "
+      # Choose appropriate breakpoint patterns based on content type
+      breakpoints = get_breakpoint_patterns(content_type)
 
       while position < text_length
         # Find end position
@@ -149,18 +165,22 @@ module Embedding
         if end_pos < text_length
           # Use a more efficient approach to find breakpoints
           # Start with a smaller search window
-          search_window = [ 80, chunk_size / 10 ].min
+          search_window = [ 200, chunk_size / 5 ].min
           search_start = [ end_pos - search_window, position ].max
           search_text = text[search_start...end_pos]
 
-          # Check for breakpoints in order of preference
-          if (pos = search_text.rindex(paragraph_break))
-            end_pos = search_start + pos + 2
-          elsif (pos = search_text.rindex(line_break))
-            end_pos = search_start + pos + 1
-          elsif (pos = search_text.rindex(sentence_end))
-            end_pos = search_start + pos + 2
-          elsif (pos = search_text.rindex(" "))
+          # Try each breakpoint pattern in order of preference
+          found_breakpoint = false
+          breakpoints.each do |pattern, length|
+            if (pos = search_text.rindex(pattern))
+              end_pos = search_start + pos + length
+              found_breakpoint = true
+              break
+            end
+          end
+
+          # If no breakpoint found, fall back to space
+          if !found_breakpoint && (pos = search_text.rindex(" "))
             end_pos = search_start + pos + 1
           end
         end
@@ -176,6 +196,64 @@ module Embedding
       end
 
       chunks
+    end
+
+    # Detect content type based on text characteristics
+    def detect_content_type(text)
+      # Simple heuristic to detect code vs natural language
+      code_indicators = [
+        "{", "}", ";", "def ", "class ", "function ", "import ", "public ", "private ",
+        "const ", "var ", "let ", "=>", "->", "#!/", "#include", "package ", "module "
+      ]
+      
+      sample = text[0...[5000, text.length].min]
+      
+      # Check for code indicators
+      code_score = code_indicators.sum { |indicator| sample.scan(indicator).count }
+      
+      # Check for code-like line structure (many lines starting with spaces/tabs)
+      indented_lines = sample.lines.count { |line| line.match?(/^\s+\S/) }
+      total_lines = [1, sample.lines.count].max
+      indentation_ratio = indented_lines.to_f / total_lines
+      
+      # If enough code indicators or high indentation ratio, treat as code
+      if code_score > 5 || indentation_ratio > 0.3
+        :code
+      else
+        :text
+      end
+    end
+
+    # Get appropriate breakpoint patterns based on content type
+    def get_breakpoint_patterns(content_type)
+      if content_type == :code
+        # For code, prioritize syntax boundaries
+        [
+          ["\n\n", 2],           # Paragraph break
+          [";\n", 2],            # End of statement with newline
+          ["}\n", 2],            # Closing brace with newline
+          ["{\n", 2],            # Opening brace with newline
+          ["\n    ", 5],         # Indentation change
+          ["\n  ", 3],           # Indentation change
+          ["\n\t", 2],           # Tab indentation
+          ["\n", 1],             # Any newline
+          ["; ", 2],             # Semicolon with space
+          ["} ", 2],             # Closing brace with space
+          [") ", 2],             # Closing parenthesis with space
+        ]
+      else
+        # For natural text, prioritize semantic boundaries
+        [
+          ["\n\n", 2],           # Paragraph break
+          [". ", 2],             # End of sentence
+          [".\n", 2],            # End of sentence with newline
+          ["\n", 1],             # Line break
+          [": ", 2],             # Colon with space
+          [", ", 2],             # Comma with space
+          [") ", 2],             # Closing parenthesis with space
+          ["] ", 2],             # Closing bracket with space
+        ]
+      end
     end
   end
 end
