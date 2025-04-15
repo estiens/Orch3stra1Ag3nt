@@ -34,8 +34,18 @@ class VectorEmbedding < ApplicationRecord
     query = query.for_project(project_id) if project_id.present?
     
     begin
-      # Use the Neighbor gem's nearest_neighbors method directly
-      query.nearest_neighbors(:embedding, query_embedding, distance: distance).limit(limit)
+      # Use raw SQL approach to avoid syntax errors
+      case distance
+      when "cosine"
+        query.order(Arel.sql("embedding <=> ARRAY[#{query_embedding.join(',')}]::vector"))
+             .limit(limit)
+      when "inner_product"
+        query.order(Arel.sql("embedding <#> ARRAY[#{query_embedding.join(',')}]::vector"))
+             .limit(limit)
+      else # euclidean
+        query.order(Arel.sql("embedding <-> ARRAY[#{query_embedding.join(',')}]::vector"))
+             .limit(limit)
+      end
     rescue => e
       Rails.logger.error("Error in find_similar: #{e.message}")
       # Fallback to a simpler approach if the query fails
@@ -61,12 +71,24 @@ class VectorEmbedding < ApplicationRecord
 
   def similar_to_me(limit: 5, distance: "cosine")
     begin
-      # Use the Neighbor gem's nearest_neighbors method directly
-      # First filter by collection and exclude self
-      VectorEmbedding.in_collection(self.collection)
-                    .where.not(id: self.id)
-                    .nearest_neighbors(:embedding, self.embedding, distance: distance)
-                    .limit(limit)
+      # Use raw SQL approach to avoid syntax errors
+      case distance
+      when "cosine"
+        VectorEmbedding.in_collection(self.collection)
+                      .where.not(id: self.id)
+                      .order(Arel.sql("embedding <=> ARRAY[#{self.embedding.join(',')}]::vector"))
+                      .limit(limit)
+      when "inner_product"
+        VectorEmbedding.in_collection(self.collection)
+                      .where.not(id: self.id)
+                      .order(Arel.sql("embedding <#> ARRAY[#{self.embedding.join(',')}]::vector"))
+                      .limit(limit)
+      else # euclidean
+        VectorEmbedding.in_collection(self.collection)
+                      .where.not(id: self.id)
+                      .order(Arel.sql("embedding <-> ARRAY[#{self.embedding.join(',')}]::vector"))
+                      .limit(limit)
+      end
     rescue => e
       Rails.logger.error("Error in similar_to_me: #{e.message}")
       # Fallback to a simpler approach if the query fails

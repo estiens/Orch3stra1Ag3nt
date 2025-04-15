@@ -59,10 +59,21 @@ module Embedding
     # Similarity search by vector
     def similarity_search_by_vector(embedding, k: 5, distance: "cosine")
       begin
-        # Use the Neighbor gem's nearest_neighbors method directly with our scope
-        VectorEmbedding.in_collection(@collection)
-                      .nearest_neighbors(:embedding, embedding, distance: distance)
-                      .limit(k)
+        # Use raw SQL approach to avoid syntax errors
+        case distance
+        when "cosine"
+          VectorEmbedding.in_collection(@collection)
+                        .order(Arel.sql("embedding <=> ARRAY[#{embedding.join(',')}]::vector"))
+                        .limit(k)
+        when "inner_product"
+          VectorEmbedding.in_collection(@collection)
+                        .order(Arel.sql("embedding <#> ARRAY[#{embedding.join(',')}]::vector"))
+                        .limit(k)
+        else # euclidean
+          VectorEmbedding.in_collection(@collection)
+                        .order(Arel.sql("embedding <-> ARRAY[#{embedding.join(',')}]::vector"))
+                        .limit(k)
+        end
       rescue => e
         @logger.error("Error in similarity_search_by_vector: #{e.message}")
         # Fallback to a simpler approach if the query fails
