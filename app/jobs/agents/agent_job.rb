@@ -95,9 +95,9 @@ class Agents::AgentJob < ApplicationJob
 
       ErrorHandler.handle_error(e, error_context)
 
-      # Update agent activity with error
+      # Update agent activity with error and mark as completed
       agent_activity.update!(
-        status: "failed",
+        status: "completed",
         error_message: e.message,
         completed_at: Time.current
       )

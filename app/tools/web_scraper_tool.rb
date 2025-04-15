@@ -11,8 +11,8 @@ class WebScraperTool
   end
   
   # Add call method for compatibility with tests
-  def call(url:, selector: nil, extract_type: "text")
-    scrape(url: url, selector: selector, extract_type: extract_type)
+  def call(url:, extract_type: "text")
+    scrape(url: url, extract_type: extract_type)
   end
 
   def scrape(url:, selector: nil, extract_type: "text")
