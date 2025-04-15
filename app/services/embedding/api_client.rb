@@ -9,7 +9,7 @@ module Embedding
   class ApiClient
     # Constants for API configuration
     DEFAULT_API_ENDPOINT = "https://piujqyd9p0cdbgx1.us-east4.gcp.endpoints.huggingface.cloud"
-    API_BATCH_SIZE = 32  # Maximum allowed by the API
+    API_BATCH_SIZE = 16  # Reduced from 32 to improve performance
     MAX_RETRIES = 3
     
     # Health tracking
@@ -69,9 +69,40 @@ module Embedding
         @logger.debug("Using reduced batch size of #{reduced_size} due to #{@@health_status[:consecutive_failures]} consecutive failures")
         reduced_size
       else
-        # Use standard batch size
-        API_BATCH_SIZE
+        # Use standard batch size, but consider system load
+        if system_under_high_load?
+          # Further reduce batch size under high load
+          smaller_size = [API_BATCH_SIZE / 2, 8].max
+          @logger.debug("System under high load, reducing batch size to #{smaller_size}")
+          smaller_size
+        else
+          API_BATCH_SIZE
+        end
       end
+    end
+    
+    # Check if system is under high load
+    def system_under_high_load?
+      begin
+        # Try to get CPU load average on Unix-like systems
+        if File.exist?('/proc/loadavg')
+          load_avg = File.read('/proc/loadavg').split(' ')[0].to_f
+          cpu_count = Concurrent.processor_count
+          return load_avg > (cpu_count * 0.7) # High load if > 70% of available CPUs
+        end
+        
+        # On macOS/BSD, use `sysctl`
+        if RUBY_PLATFORM =~ /darwin|bsd/
+          load_avg = `sysctl -n vm.loadavg`.split(' ')[1].to_f
+          cpu_count = Concurrent.processor_count
+          return load_avg > (cpu_count * 0.7)
+        end
+      rescue => e
+        @logger.debug("Error checking system load: #{e.message}")
+      end
+      
+      # Default to false if we can't determine load
+      false
     end
 
     # Generate embeddings for a batch of texts
@@ -96,31 +127,54 @@ module Embedding
       results = []
       total_batches = (texts.size.to_f / effective_batch_size).ceil
       
+      # Use a thread pool for parallel processing with controlled concurrency
+      pool = Concurrent::ThreadPoolExecutor.new(
+        min_threads: 1,
+        max_threads: 4, # Limit concurrent API calls
+        max_queue: 100,
+        fallback_policy: :caller_runs
+      )
+      
+      mutex = Mutex.new
+      futures = []
+      
       texts.each_slice(effective_batch_size).with_index do |batch, index|
-        @logger.debug("Processing batch #{index + 1}/#{total_batches} (#{batch.size} texts)")
-        
-        # Track request for health monitoring
-        @@health_status[:total_requests] += 1
-        
-        begin
-          batch_results = process_embedding_batch(batch)
+        # Submit batch processing to thread pool
+        futures << pool.post do
+          @logger.debug("Processing batch #{index + 1}/#{total_batches} (#{batch.size} texts)")
           
-          # Update health status on success
-          @@health_status[:consecutive_failures] = 0
-          @@health_status[:successful_requests] += 1
+          # Track request for health monitoring
+          mutex.synchronize { @@health_status[:total_requests] += 1 }
           
-          results.concat(batch_results)
-        rescue => e
-          # Update health status on failure
-          @@health_status[:consecutive_failures] += 1
-          @@health_status[:last_failure_time] = Time.now
-          
-          @logger.error("Batch #{index + 1}/#{total_batches} failed: #{e.message}")
-          
-          # Return nil placeholders for this batch
-          results.concat(Array.new(batch.size))
+          begin
+            batch_results = process_embedding_batch(batch)
+            
+            # Update health status on success
+            mutex.synchronize do
+              @@health_status[:consecutive_failures] = 0
+              @@health_status[:successful_requests] += 1
+            end
+            
+            # Thread-safe append to results
+            mutex.synchronize { results.concat(batch_results) }
+          rescue => e
+            # Update health status on failure
+            mutex.synchronize do
+              @@health_status[:consecutive_failures] += 1
+              @@health_status[:last_failure_time] = Time.now
+            end
+            
+            @logger.error("Batch #{index + 1}/#{total_batches} failed: #{e.message}")
+            
+            # Return nil placeholders for this batch
+            mutex.synchronize { results.concat(Array.new(batch.size)) }
+          end
         end
       end
+      
+      # Wait for all batches to complete
+      pool.shutdown
+      pool.wait_for_termination(300) # 5 minute timeout
 
       results
     end
@@ -152,8 +206,22 @@ module Embedding
       
       # Check for very large texts that might cause API issues
       total_chars = batch.sum(&:length)
-      if total_chars > 100_000
+      if total_chars > 50_000 # Reduced from 100,000
         @logger.warn("Large batch detected (#{total_chars} chars), may cause API timeout")
+        
+        # If batch is too large, split it further
+        if batch.size > 1 && total_chars > 80_000
+          @logger.info("Batch too large (#{total_chars} chars), splitting into smaller batches")
+          
+          # Process each item individually and return combined results
+          results = []
+          batch.each do |text|
+            @logger.debug("Processing individual text (#{text.length} chars)")
+            single_result = process_embedding_batch([text])
+            results.concat(single_result)
+          end
+          return results
+        end
       end
 
       uri = URI.parse(@endpoint)
@@ -174,8 +242,8 @@ module Embedding
 
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = (uri.scheme == "https")
-      http.read_timeout = 300  # 5 minutes
-      http.open_timeout = 30
+      http.read_timeout = 180  # 3 minutes - reduced from 5 minutes
+      http.open_timeout = 20   # Reduced from 30
       
       @logger.debug("Sending embedding request to API")
       start_time = Time.now
@@ -312,5 +380,8 @@ module Embedding
         { success: false, error: e.message }
       end
     end
+    
+    # Make test_connection public
+    public :test_connection
   end
 end
