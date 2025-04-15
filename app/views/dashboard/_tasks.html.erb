@@ -127,14 +127,14 @@
                 <dt class="font-medium">Created:</dt>
                 <dd><%= task.created_at.strftime("%Y-%m-%d %H:%M") %></dd>
                 
-                <% if task.started_at.present? %>
+                <% if task.state == "active" || task.state == "completed" || task.state == "failed" %>
                   <dt class="font-medium">Started:</dt>
-                  <dd><%= task.started_at.strftime("%Y-%m-%d %H:%M") %></dd>
+                  <dd><%= task.agent_activities.minimum(:created_at)&.strftime("%Y-%m-%d %H:%M") || "Unknown" %></dd>
                 <% end %>
                 
-                <% if task.completed_at.present? %>
+                <% if task.state == "completed" %>
                   <dt class="font-medium">Completed:</dt>
-                  <dd><%= task.completed_at.strftime("%Y-%m-%d %H:%M") %></dd>
+                  <dd><%= task.agent_activities.maximum(:updated_at)&.strftime("%Y-%m-%d %H:%M") || "Unknown" %></dd>
                 <% end %>
               </dl>
               
