@@ -41,7 +41,15 @@ class Task < ApplicationRecord
     event :activate do
       transitions from: [:pending, :paused], to: :active
       after do
-        DashboardTaskEvent.create(task: self, event_type: "activated")
+        # Publish event for dashboard updates
+        if agent_activities.any?
+          agent_activities.last.publish_event("task_activated", { task_id: id, task_title: title })
+        else
+          # Create a temporary agent activity if needed for the event
+          temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
+          temp_activity.publish_event("task_activated", { task_id: id, task_title: title })
+        end
+        
         # Enqueue the task for processing if it was activated
         enqueue_for_processing
       end
@@ -50,7 +58,14 @@ class Task < ApplicationRecord
     event :pause do
       transitions from: :active, to: :paused
       after do
-        DashboardTaskEvent.create(task: self, event_type: "paused")
+        # Publish event for dashboard updates
+        if agent_activities.any?
+          agent_activities.last.publish_event("task_paused", { task_id: id, task_title: title })
+        else
+          # Create a temporary agent activity if needed for the event
+          temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
+          temp_activity.publish_event("task_paused", { task_id: id, task_title: title })
+        end
       end
     end
 
@@ -61,21 +76,43 @@ class Task < ApplicationRecord
     event :complete do
       transitions from: [:active, :waiting_on_human, :paused], to: :completed
       after do
-        DashboardTaskEvent.create(task: self, event_type: "completed")
+        # Publish event for dashboard updates
+        if agent_activities.any?
+          agent_activities.last.publish_event("task_completed", { task_id: id, task_title: title })
+        else
+          # Create a temporary agent activity if needed for the event
+          temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
+          temp_activity.publish_event("task_completed", { task_id: id, task_title: title })
+        end
       end
     end
 
     event :fail do
       transitions from: [:pending, :active, :waiting_on_human, :paused], to: :failed
       after do
-        DashboardTaskEvent.create(task: self, event_type: "failed")
+        # Publish event for dashboard updates
+        if agent_activities.any?
+          agent_activities.last.publish_event("task_failed", { task_id: id, task_title: title, error: metadata&.dig("error_message") })
+        else
+          # Create a temporary agent activity if needed for the event
+          temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
+          temp_activity.publish_event("task_failed", { task_id: id, task_title: title, error: metadata&.dig("error_message") })
+        end
       end
     end
     
     event :resume do
       transitions from: :paused, to: :active
       after do
-        DashboardTaskEvent.create(task: self, event_type: "resumed")
+        # Publish event for dashboard updates
+        if agent_activities.any?
+          agent_activities.last.publish_event("task_resumed", { task_id: id, task_title: title })
+        else
+          # Create a temporary agent activity if needed for the event
+          temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
+          temp_activity.publish_event("task_resumed", { task_id: id, task_title: title })
+        end
+        
         # Enqueue the task for processing when resumed
         enqueue_for_processing
       end

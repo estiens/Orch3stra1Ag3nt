@@ -48,8 +48,7 @@ class Project < ApplicationRecord
       }
     )
     
-    # Create dashboard event
-    DashboardProjectEvent.create(project: self, event_type: "activated")
+    # Event will be published by the orchestration task when it's activated
 
     # Publish event to trigger OrchestratorAgent
     Event.publish(
@@ -107,18 +106,29 @@ class Project < ApplicationRecord
       task.pause! if task.may_pause?
     end
     
-    # Create dashboard event
-    DashboardProjectEvent.create(project: self, event_type: "paused")
+    # Find a task to publish the event through, or create a temporary one
+    publisher_task = tasks.first
     
-    # Publish event for other systems
-    Event.publish(
-      "project_paused",
-      {
-        project_id: id,
-        project_name: name
-      },
-      {}
-    ) if defined?(Event)
+    if publisher_task&.agent_activities&.any?
+      # Use the last agent activity to publish the event
+      publisher_task.agent_activities.last.publish_event(
+        "project_paused",
+        {
+          project_id: id,
+          project_name: name
+        }
+      )
+    else
+      # Create a system event if no agent activities exist
+      Event.publish(
+        "project_paused",
+        {
+          project_id: id,
+          project_name: name
+        },
+        {}
+      ) if defined?(Event)
+    end
     
     true
   end
@@ -130,18 +140,29 @@ class Project < ApplicationRecord
     # Update project status
     update(status: "active")
     
-    # Create dashboard event
-    DashboardProjectEvent.create(project: self, event_type: "resumed")
+    # Find a task to publish the event through, or create a temporary one
+    publisher_task = tasks.first
     
-    # Publish event for other systems
-    Event.publish(
-      "project_resumed",
-      {
-        project_id: id,
-        project_name: name
-      },
-      {}
-    ) if defined?(Event)
+    if publisher_task&.agent_activities&.any?
+      # Use the last agent activity to publish the event
+      publisher_task.agent_activities.last.publish_event(
+        "project_resumed",
+        {
+          project_id: id,
+          project_name: name
+        }
+      )
+    else
+      # Create a system event if no agent activities exist
+      Event.publish(
+        "project_resumed",
+        {
+          project_id: id,
+          project_name: name
+        },
+        {}
+      ) if defined?(Event)
+    end
     
     true
   end
