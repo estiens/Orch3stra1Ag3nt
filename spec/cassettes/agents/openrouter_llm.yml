@@ -1,0 +1,74 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# STRATEGIC
+        TASK ANALYSIS\n\nAs an expert project manager, analyze and decompose the following
+        task into a strategic plan of subtasks:\n\n\n## TASK DESCRIPTION\n\n\n## REQUIREMENTS\n1.
+        Break this down into 3-7 DISTINCT subtasks (no overlap)\n2. Each subtask should
+        have a SINGLE clear focus and objective\n3. Arrange subtasks in logical execution
+        order (dependencies first)\n4. Consider what specialized agent types are needed
+        for each subtask\n\n## OUTPUT FORMAT\nFor each subtask, provide:\n\nSubtask
+        1: {CLEAR, SPECIFIC TITLE}\nDescription: {DETAILED instructions with success
+        criteria}\nPriority: {high|normal|low}\nAgent: {ResearcherAgent|WebResearcherAgent|CodeResearcherAgent|WriterAgent|etc.}\nDependencies:
+        {List subtask numbers this depends on, or \"None\"}\n\n## SPECIALIZED AGENT
+        TYPES\n- ResearcherAgent: General information gathering and analysis\n- WebResearcherAgent:
+        Internet searches and web information retrieval\n- CodeResearcherAgent: Code
+        analysis, generation, and explanation, can run multiple in parallel analyzing
+        different parts of a codebase\n- WriterAgent: Content creation, editing, and
+        formatting\n- AnalyzerAgent: Data analysis and insight generation\n\nCreate
+        a comprehensive plan that when executed will FULLY accomplish the original
+        task.\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Tue, 15 Apr 2025 08:58:38 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 930a3e02eaf0a1fd-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n\n         \n{\"id\":\"gen-1744707518-bh8pBnVM9ltUv0W9dIdF\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744707518,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Certainly!
+        Please provide the **TASK DESCRIPTION** you would like analyzed and decomposed.
+        Once you share the task, I will break it down into a strategic plan as requested.\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_a1102cf978\",\"usage\":{\"prompt_tokens\":278,\"completion_tokens\":36,\"total_tokens\":314,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Tue, 15 Apr 2025 08:58:39 GMT
+recorded_with: VCR 6.3.1

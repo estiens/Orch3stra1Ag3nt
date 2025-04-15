@@ -27,7 +27,7 @@ class EmbeddingService
   end
 
   def add_text(text, content_type: "text", source_url: nil, source_title: nil, metadata: {}, force: false)
-    return if !force && @vector_store.embedding_exists?(text, content_type: content_type)
+    return nil if !force && embedding_exists?(text, content_type: content_type)
 
     # Generate embedding
     embedding = nil
@@ -43,7 +43,7 @@ class EmbeddingService
     @logger.info("Generated embedding in #{generation_time.round(2)}s (#{embedding.size} dimensions)")
 
     # Store in database
-    @vector_store.store(
+    store(
       content: text,
       embedding: embedding,
       content_type: content_type,
@@ -128,12 +128,16 @@ class EmbeddingService
   # Similarity search by input string
   def similarity_search(query, k: 5, distance: "cosine")
     query_embedding = generate_embedding(query)
-    similarity_search_by_vector(query_embedding, k: k, distance: distance)
+    # Ensure distance is passed as a symbol to avoid SQL AS clause duplication errors
+    distance_sym = distance.is_a?(Symbol) ? distance : distance.to_sym
+    similarity_search_by_vector(query_embedding, k: k, distance: distance_sym)
   end
 
   # Similarity search by vector
   def similarity_search_by_vector(embedding, k: 5, distance: "cosine")
-    @vector_store.similarity_search_by_vector(embedding, k: k, distance: distance)
+    # Always convert distance to symbol to avoid SQL AS clause duplication errors
+    distance_sym = distance.is_a?(Symbol) ? distance : distance.to_sym
+    @vector_store.similarity_search_by_vector(embedding, k: k, distance: distance_sym)
   end
 
   # Generate embedding for a text
@@ -142,6 +146,34 @@ class EmbeddingService
 
     # Ensure we have the right dimensions
     normalize_embedding_dimensions(embedding)
+  end
+
+  # Check if embedding exists - delegate to vector_store
+  def embedding_exists?(content, content_type: nil)
+    @vector_store.embedding_exists?(content, content_type: content_type)
+  end
+
+  # Store a single embedding - delegate to vector_store
+  def store(content:, embedding: nil, content_type: "text", source_url: nil, source_title: nil, metadata: {})
+    return if content.blank?
+
+    # Generate embedding if not provided
+    embedding ||= generate_embedding(content)
+
+    # Store in database
+    @vector_store.store(
+      content: content,
+      embedding: embedding,
+      content_type: content_type,
+      source_url: source_url,
+      source_title: source_title,
+      metadata: metadata
+    )
+  end
+
+  # Chunk text - delegate to text_chunker
+  def chunk_text(text, chunk_size, chunk_overlap, content_type = nil)
+    @text_chunker.chunk_text(text, chunk_size, chunk_overlap, content_type)
   end
 
   # --------------------------

@@ -93,7 +93,7 @@ RSpec.describe VectorEmbedding, type: :model do
 
     it "calls nearest_neighbors with the query embedding" do
       query_embedding = mock_embedding
-      expect(VectorEmbedding).to receive(:nearest_neighbors).with(:embedding, query_embedding, distance: "cosine")
+      expect(VectorEmbedding).to receive(:nearest_neighbors).with(:embedding, query_embedding, distance: :cosine)
       VectorEmbedding.find_similar(query_embedding)
     end
 
@@ -118,7 +118,7 @@ RSpec.describe VectorEmbedding, type: :model do
     end
 
     it "uses the specified distance metric" do
-      expect(VectorEmbedding).to receive(:nearest_neighbors).with(:embedding, mock_embedding, distance: "euclidean")
+      expect(VectorEmbedding).to receive(:nearest_neighbors).with(:embedding, mock_embedding, distance: :euclidean)
       VectorEmbedding.find_similar(mock_embedding, distance: "euclidean")
     end
   end

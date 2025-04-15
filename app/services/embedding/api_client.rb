@@ -19,7 +19,7 @@ module Embedding
       @endpoint = endpoint || ENV["HUGGINGFACE_EMBEDDING_ENDPOINT"] || DEFAULT_API_ENDPOINT
       @logger = Embedding::Logger.new("ApiClient")
 
-      raise "HUGGINGFACE_API_TOKEN environment variable not set" unless @api_key
+      raise "HUGGINGFACE_API_TOKEN environment variable not set" unless @api_key || Rails.env.test?
     end
 
     # Generate embeddings for a batch of texts

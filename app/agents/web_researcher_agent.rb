@@ -15,6 +15,19 @@ class WebResearcherAgent < BaseAgent
     [ PerplexitySearchTool, WebScraperTool ]
   end
 
+  # Define the tools
+  tool :search_with_perplexity, "Search the web using Perplexity AI" do |query, focus = "web"|
+    search_with_perplexity(query, focus)
+  end
+
+  tool :browse_url, "Browse a URL and extract its content" do |url|
+    browse_url(url)
+  end
+
+  tool :scrape_webpage, "Scrape specific content from a webpage using CSS selectors" do |url, selector = nil, extract_type = "text"|
+    scrape_webpage(url, selector, extract_type)
+  end
+
   # Placeholder for Vector DB tool
   tool :semantic_memory, "Store and retrieve information using vector embeddings (Not Implemented)" do |query|
     "Vector DB search/retrieval not implemented yet."

@@ -24,19 +24,35 @@ class VectorEmbedding < ApplicationRecord
   # @param collection [String] Optional collection to search within
   # @param task_id [Integer] Optional task_id to filter by
   # @param project_id [Integer] Optional project_id to filter by
-  # @param distance [String] The distance metric to use ("euclidean", "cosine", "inner_product")
+  # @param distance [String, Symbol] The distance metric to use ("euclidean", "cosine", "inner_product")
+  #                                 NOTE: Must be a symbol to avoid SQL syntax errors
   # @return [Array<VectorEmbedding>] Matching embeddings sorted by similarity
   def self.find_similar(query_embedding, limit: 5, collection: nil, task_id: nil, project_id: nil, distance: "cosine")
     begin
       # Log the embedding format to help with debugging
       Rails.logger.debug("Query embedding format: #{query_embedding.class}, dimensions: #{query_embedding.size}")
 
-      # Use nearest_neighbors from the Neighbor gem which safely handles vector queries
-      query = nearest_neighbors(:embedding, query_embedding, distance: distance)
+      # Ensure distance is a symbol to avoid SQL AS clause duplication errors
+      distance_sym = distance.is_a?(Symbol) ? distance : distance.to_sym
+
+      # IMPORTANT: Order of operations matters to avoid SQL AS clause duplication:
+      # 1. Start with base query
+      query = all
+
+      # 2. Apply vector search FIRST to avoid SQL issues
+      query = query.nearest_neighbors(:embedding, query_embedding, distance: distance_sym)
+
+      # 3. Apply filters AFTER the vector search
       query = query.in_collection(collection) if collection.present?
       query = query.for_task(task_id) if task_id.present?
       query = query.for_project(project_id) if project_id.present?
-      query.limit(limit)
+
+      # 4. Apply limit and eagerly load data to avoid lazy loading issues
+      # Add any associations you need to preload to avoid N+1 queries
+      results = query.limit(limit).to_a
+
+      # Return fully loaded array of results
+      results
     rescue => e
       Rails.logger.error("Error in find_similar: #{e.message}")
       Rails.logger.error("Embedding format that caused error: #{query_embedding.class}, #{query_embedding.inspect[0..100]}")
@@ -48,7 +64,7 @@ class VectorEmbedding < ApplicationRecord
       query = query.for_project(project_id) if project_id.present?
 
       filtered_ids = query.pluck(:id)
-      VectorEmbedding.where(id: filtered_ids).limit(limit)
+      VectorEmbedding.where(id: filtered_ids).limit(limit).to_a
     end
   end
 
@@ -57,6 +73,19 @@ class VectorEmbedding < ApplicationRecord
   # @return [Array<Float>] The embedding vector
   def self.generate_embedding(text)
     EmbeddingService.new.generate_embedding(text)
+  end
+
+  # Search method for project search_knowledge delegation
+  def self.search(text:, limit: 5, project_id: nil)
+    # Create embedding for search
+    query_embedding = generate_embedding(text)
+
+    # Use find_similar to perform the search
+    find_similar(
+      query_embedding,
+      limit: limit,
+      project_id: project_id
+    )
   end
 
   def similarity(other_embedding)

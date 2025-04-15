@@ -3,7 +3,7 @@ class AvailableTools
       tools = [
         PerplexitySearchTool,
         ResearchTool,
-        LangchainEmbeddingTool
+        EmbeddingTool
       ]
 
       # Add Langchain built-in tools

@@ -10,7 +10,7 @@ class EmbeddingTool
   # Constants for default values
   DEFAULT_COLLECTION = "default"
   DEFAULT_CONTENT_TYPE = "text"
-  DEFAULT_LIMIT = 10
+  DEFAULT_LIMIT = 7
   DEFAULT_DISTANCE = "euclidean"
   DEFAULT_CHUNK_SIZE = 500
   DEFAULT_CHUNK_OVERLAP = 25
@@ -200,7 +200,8 @@ class EmbeddingTool
 
         # Use the service's similarity_search method which properly handles the embedding format
         # and uses the Neighbor gem's methods correctly
-        results = service.similarity_search(query, k: limit, distance: distance)
+        # Ensure distance is a symbol to avoid SQL AS clause duplication errors
+        results = service.similarity_search(query, k: limit, distance: distance.to_sym)
 
         Rails.logger.info("Found #{results.count} similar documents")
 
@@ -565,23 +566,49 @@ class EmbeddingTool
 
   # Format search result for consistent output
   def format_search_result(result)
-    metadata = result.respond_to?(:metadata) ? result.metadata : {}
-    {
-      id: result.respond_to?(:id) ? result.id : nil,
-      content: extract_content(result, metadata),
-      content_type: metadata[:content_type] || result.try(:content_type) || "unknown",
-      source_url: metadata[:source_url] || result.try(:source_url),
-      source_title: metadata[:source_title] || result.try(:source_title),
-      metadata: metadata
-    }
+    # Handle result being a VectorEmbedding object or a hash
+    if result.is_a?(VectorEmbedding)
+      # Safely access VectorEmbedding attributes
+      metadata = result.metadata.to_h rescue {}
+      {
+        id: result.id,
+        content: result.content.to_s,
+        content_type: result.content_type.to_s,
+        source_url: result.source_url,
+        source_title: result.source_title,
+        metadata: metadata
+      }
+    else
+      # Fall back to dynamic approach for other object types
+      metadata = result.respond_to?(:metadata) ? result.metadata : {}
+      {
+        id: result.respond_to?(:id) ? result.id : nil,
+        content: extract_content(result, metadata),
+        content_type: metadata[:content_type] || (result.respond_to?(:content_type) ? result.content_type : "unknown"),
+        source_url: metadata[:source_url] || (result.respond_to?(:source_url) ? result.source_url : nil),
+        source_title: metadata[:source_title] || (result.respond_to?(:source_title) ? result.source_title : nil),
+        metadata: metadata
+      }
+    end
   end
 
   # Extract content from various result types
   def extract_content(result, metadata = {})
-    metadata[:content] ||
-      (result.respond_to?(:page_content) && result.page_content.to_s.truncate(MAX_CONTENT_PREVIEW)) ||
-      (result.respond_to?(:content) && result.content.to_s.truncate(MAX_CONTENT_PREVIEW)) ||
-      "Unknown content"
+    content = nil
+
+    # Try different access patterns without triggering SQL queries
+    if metadata[:content].present?
+      content = metadata[:content]
+    elsif result.respond_to?(:page_content) && result.page_content.present?
+      content = result.page_content.to_s
+    elsif result.respond_to?(:content) && result.content.present?
+      content = result.content.to_s
+    else
+      content = "Unknown content"
+    end
+
+    # Truncate content to a reasonable size
+    content.to_s.truncate(MAX_CONTENT_PREVIEW)
   end
 
   # Log LLM calls

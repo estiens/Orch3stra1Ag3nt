@@ -5,7 +5,7 @@ RSpec.describe Event, type: :model do
 
   describe "associations" do
     it "belongs to agent_activity" do
-      expect(described_class.reflect_on_association(:agent_activity).options[:optional]).to eq(false)
+      expect(described_class.reflect_on_association(:agent_activity).options[:optional]).to eq(true)
     end
   end
 

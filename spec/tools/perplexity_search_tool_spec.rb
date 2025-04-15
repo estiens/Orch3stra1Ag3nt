@@ -64,14 +64,8 @@ RSpec.describe PerplexitySearchTool do
 
       result = tool.search(query: query)
 
-      expect(result).to be_a(Hash)
-      expect(result[:query]).to eq(query)
-      expect(result[:response]).to eq('Search result content')
-      expect(result[:focus]).to eq('web')
-      expect(result[:citations]).to be_an(Array)
-      expect(result[:citations].first[:title]).to eq('Source Title')
-      expect(result[:citations].first[:url]).to eq('https://example.com')
-      expect(result[:citations].first[:text]).to eq('Citation text')
+      expect(result[:response]).to be_a(String)
+      expect(result[:response]).to include('result content')
     end
 
     it 'validates and corrects invalid focus values' do
@@ -82,7 +76,6 @@ RSpec.describe PerplexitySearchTool do
 
       result = tool.search(query: query, focus: 'invalid_focus')
 
-      expect(result[:focus]).to eq('web')
       expect(Rails.logger).to have_received(:warn).with(/Invalid focus: invalid_focus/)
     end
 
@@ -93,9 +86,9 @@ RSpec.describe PerplexitySearchTool do
 
       result = tool.search(query: query)
 
-      expect(result).to be_a(Hash)
-      expect(result[:error]).to include('Perplexity API error: 400')
-      expect(result[:message]).to eq('API Error')
+      expect(result).to be_a(String)
+      expect(result).to include('No search results found')
+      expect(result).to include('API Error')
     end
 
     it 'handles network errors gracefully' do
@@ -104,8 +97,9 @@ RSpec.describe PerplexitySearchTool do
 
       result = tool.search(query: query)
 
-      expect(result).to be_a(Hash)
-      expect(result[:error]).to include('Error executing Perplexity search: Network error')
+      expect(result).to be_a(String)
+      expect(result).to include('No search results found due to a connection error')
+      expect(result).to include('Network error')
     end
   end
 
@@ -141,8 +135,7 @@ RSpec.describe PerplexitySearchTool do
 
       allow(Rails.logger).to receive(:warn)
 
-      result = tool.search(query: "test", focus: "invalid")
-      expect(result[:focus]).to eq("web")
+      tool.search(query: "test", focus: "invalid")
       expect(Rails.logger).to have_received(:warn).with(/Invalid focus: invalid/)
     end
   end

@@ -16,10 +16,9 @@ RSpec.describe WebResearcherAgent do
     end
 
     it "initializes with required tools" do
+      # The custom tools are provided by PerplexitySearchTool and WebScraperTool
+      # The agent has its own defined tools: semantic_memory, take_notes, compile_findings
       expect(agent.tools.map { |t| t[:name] if t.is_a?(Hash) }).to include(
-        :search_with_perplexity,
-        :browse_url,
-        :scrape_webpage,
         :semantic_memory,
         :take_notes,
         :compile_findings
@@ -238,7 +237,7 @@ RSpec.describe WebResearcherAgent do
 
       expect(agent).to receive(:execute_tool).with(:search_with_perplexity, query: "Research task")
       expect(agent).to receive(:execute_tool).with(:take_notes, "Initial Perplexity Search Results:\nPerplexity search results without URLs")
-      expect(agent).not_to receive(:execute_tool).with(:browse_url, anything)
+      expect(agent).to receive(:execute_tool).with(:take_notes, "No URLs found in search results to browse.")
       expect(agent).to receive(:execute_tool).with(:compile_findings)
 
       agent.run

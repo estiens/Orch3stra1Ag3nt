@@ -63,13 +63,15 @@ module Embedding
         @logger.debug("Embedding format: #{embedding.class}, dimensions: #{embedding.size}")
 
         # Use VectorEmbedding.find_similar to handle the vector search safely
+        # Always convert distance to symbol to avoid SQL AS clause duplication errors
+        distance_sym = distance.is_a?(Symbol) ? distance : distance.to_sym
         VectorEmbedding.find_similar(
           embedding,
           limit: k,
           collection: @collection,
           task_id: @task&.id,
           project_id: @project&.id,
-          distance: distance
+          distance: distance_sym
         )
       rescue => e
         @logger.error("Error in similarity_search_by_vector: #{e.message}")

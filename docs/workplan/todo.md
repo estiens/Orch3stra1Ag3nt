@@ -8,11 +8,17 @@
 
 ## TODO
 
-REVIEW OUR PRELIMINARY DASHBOARD IMPLEMENTATION IN APP/VIEW
+FIX ALL THESE SPECS - prefer changing the spec file to the implementation unless the implementation is def wrong. Go through one spec at a time, fix the spec and then move on
 
-add daisyui and make the styling better
-review information architecture and make sure it works
-allow starting and pausing tasks from the project show page
+rspec ./spec/agents/code_researcher_agent_vcr_spec.rb:16 # CodeResearcherAgent integration with OpenRouter performs a complete code research workflow
+rspec ./spec/agents/code_researcher_agent_vcr_spec.rb:125 # CodeResearcherAgent comprehensive workflow executes a multi-step research workflow with OpenRouter
+rspec ./spec/agents/coordinator_agent_spec.rb:117 # CoordinatorAgent event handlers #handle_human_input_provided activates the task and spawns a new coordinator
+rspec ./spec/agents/coordinator_agent_spec.rb:227 # CoordinatorAgent tool implementations #assign_subtask assigns a subtask to the specified agent type
+rspec ./spec/agents/orchestrator_agent_spec.rb:249 # OrchestratorAgent tool implementations #adjust_system_priorities adjusts priorities for multiple tasks
+rspec ./spec/agents/orchestrator_agent_spec.rb:270 # OrchestratorAgent tool implementations #adjust_system_priorities handles errors for individual tasks
+rspec ./spec/agents/orchestrator_agent_spec.rb:304 # OrchestratorAgent tool implementations #check_resource_usage gathers resource metrics and calls LLM for analysis
+rspec ./spec/agents/orchestrator_agent_spec.rb:322 # OrchestratorAgent tool implementations #check_resource_usage handles LLM errors
+rspec ./spec/agents/orchestrator_agent_spec.rb:379 # OrchestratorAgent lifecycle hooks logs decisions in after_run
 
 NEXT TASKS:
 

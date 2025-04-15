@@ -85,7 +85,7 @@ RSpec.describe EmbeddingService do
       expect(embedding.metadata["file_path"]).to eq("/path/to/file.txt")
       expect(embedding.metadata["file_name"]).to eq("file.txt")
       expect(embedding.metadata["custom_field"]).to eq("custom value")
-      expect(embedding.metadata["embedding_model"]).to eq("huggingface")
+      expect(embedding.metadata["embedding_model"]).to eq("gte-large-buc")
       expect(embedding.metadata["timestamp"]).to be_present
     end
 
@@ -119,11 +119,11 @@ RSpec.describe EmbeddingService do
       before do
         # Always mock the API call to avoid external dependencies in tests
         sample_response = [ [ -0.0085261, 0.00050742645, 0.0081073325 ] ]
-        allow(service).to receive(:generate_huggingface_embedding).and_return(sample_response)
+        allow(service.api_client).to receive(:generate_embedding).and_return(sample_response)
       end
 
       it "returns an array of floats" do
-        embedding = service.generate_embedding(sample_text)
+        embedding = service.generate_embedding(sample_text).flatten
         expect(embedding).to be_an(Array)
         expect(embedding.first).to be_a(Float)
       end
@@ -145,13 +145,13 @@ RSpec.describe EmbeddingService do
     end
 
     it "calls similarity_search_by_vector with the generated embedding" do
-      expect(service).to receive(:similarity_search_by_vector).with(embedding, k: 5, distance: "cosine")
+      expect(service).to receive(:similarity_search_by_vector).with(embedding, k: 5, distance: :cosine)
       service.similarity_search(query)
     end
 
     it "passes custom parameters to similarity_search_by_vector" do
-      expect(service).to receive(:similarity_search_by_vector).with(embedding, k: 10, distance: "euclidean")
-      service.similarity_search(query, k: 10, distance: "euclidean")
+      expect(service).to receive(:similarity_search_by_vector).with(embedding, k: 10, distance: :euclidean)
+      service.similarity_search(query, k: 10, distance: :euclidean)
     end
   end
 

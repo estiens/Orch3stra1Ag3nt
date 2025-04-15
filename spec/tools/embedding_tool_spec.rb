@@ -125,7 +125,7 @@ RSpec.describe EmbeddingTool do
 
     it "passes parameters to embedding service" do
       expect_any_instance_of(EmbeddingService).to receive(:similarity_search).with(
-        "test query", k: 10, distance: "cosine"
+        "test query", k: 10, distance: :cosine
       )
       tool.similarity_search(query: "test query", limit: 10, distance: "cosine")
     end
