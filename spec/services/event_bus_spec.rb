@@ -49,6 +49,64 @@ RSpec.describe EventBus do
     end
   end
 
+  describe '.register_handler' do
+    it 'registers a handler with metadata' do
+      test_handler = Class.new do
+        def self.process(event)
+          # Test handler
+        end
+      end
+
+      EventBus.register_handler('test_event', test_handler, 
+                               description: 'Test handler description', 
+                               priority: 20)
+
+      handlers = @bus.instance_variable_get(:@handlers)
+      expect(handlers['test_event']).to include(test_handler)
+      
+      metadata = @bus.instance_variable_get(:@handler_metadata)
+      expect(metadata['test_event:' + test_handler.to_s][:description]).to eq('Test handler description')
+      expect(metadata['test_event:' + test_handler.to_s][:priority]).to eq(20)
+    end
+  end
+
+  describe '.handlers_for' do
+    it 'returns handlers sorted by priority' do
+      high_priority = Class.new do
+        def self.process(event); end
+      end
+      
+      low_priority = Class.new do
+        def self.process(event); end
+      end
+      
+      EventBus.register_handler('test_event', low_priority, priority: 10)
+      EventBus.register_handler('test_event', high_priority, priority: 30)
+      
+      handlers = EventBus.handlers_for('test_event')
+      expect(handlers.first).to eq(high_priority)
+      expect(handlers.last).to eq(low_priority)
+    end
+  end
+
+  describe '.handler_registry' do
+    it 'returns the full handler registry with metadata' do
+      test_handler = Class.new do
+        def self.process(event); end
+      end
+      
+      EventBus.register_handler('test_event', test_handler, 
+                               description: 'Test description', 
+                               priority: 15)
+      
+      registry = EventBus.handler_registry
+      expect(registry['test_event']).to be_an(Array)
+      expect(registry['test_event'].first[:handler]).to eq(test_handler)
+      expect(registry['test_event'].first[:metadata][:description]).to eq('Test description')
+      expect(registry['test_event'].first[:metadata][:priority]).to eq(15)
+    end
+  end
+
   describe '.publish' do
     let(:event) { Event.create!(event_type: 'test_event', agent_activity: agent_activity, data: { foo: 'bar' }) }
 
@@ -98,6 +156,44 @@ RSpec.describe EventBus do
       }.not_to raise_error
 
       expect(Rails.logger).to have_received(:error).with(/Error dispatching event/)
+    end
+    
+    it 'enqueues an EventDispatchJob when async is true' do
+      expect(EventDispatchJob).to receive(:perform_later).with(event.id)
+      EventBus.publish(event, async: true)
+    end
+  end
+  
+  describe '#dispatch_event' do
+    let(:event) { Event.create!(event_type: 'test_event', agent_activity: agent_activity, data: { foo: 'bar' }) }
+    
+    it 'dispatches to a handler with process method' do
+      handler = double('Handler')
+      allow(handler).to receive(:respond_to?).with(:process).and_return(true)
+      expect(handler).to receive(:process).with(event)
+      
+      EventBus.register_handler('test_event', handler)
+      EventBus.instance.dispatch_event(event)
+    end
+    
+    it 'dispatches to a handler with handle_event method' do
+      handler_class = Class.new do
+        def handle_event(event)
+          # Handle event
+        end
+      end
+      
+      handler_instance = handler_class.new
+      
+      allow(handler_class).to receive(:respond_to?).with(:process).and_return(false)
+      allow(handler_class).to receive(:respond_to?).with(:handle_event).and_return(true)
+      allow(handler_class).to receive(:is_a?).with(Class).and_return(true)
+      allow(handler_class).to receive(:new).and_return(handler_instance)
+      
+      expect(handler_instance).to receive(:handle_event).with(event)
+      
+      EventBus.register_handler('test_event', handler_class)
+      EventBus.instance.dispatch_event(event)
     end
   end
 end
