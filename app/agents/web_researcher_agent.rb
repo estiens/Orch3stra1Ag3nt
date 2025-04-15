@@ -58,17 +58,34 @@ class WebResearcherAgent < BaseAgent
       search_results_text = execute_tool(:search_with_perplexity, query: research_topic)
       execute_tool(:take_notes, "Initial Perplexity Search Results:\n#{search_results_text}")
 
-      # TODO: Parse search results to find promising URLs/Snippets
-      # Placeholder: Just try browsing the first URL if found
-      first_url = search_results_text.match(/URL:\s*(https?\S+)/i)&.[](1)
-
-      if first_url
-         # Step 2: Browse/Scrape promising source
-         Rails.logger.info "[WebResearcherAgent-#{task&.id || 'no-task'}] Browsing first URL: #{first_url}"
-         browsed_content = execute_tool(:browse_url, first_url)
-         execute_tool(:take_notes, "Content from #{first_url}:\n#{browsed_content.truncate(1000)}")
+      # Check if search was successful by looking for error messages
+      if search_results_text.include?("No search results found") || search_results_text.include?("Error performing Perplexity search")
+        # If Perplexity search failed, try an alternative approach
+        Rails.logger.warn "[WebResearcherAgent-#{task&.id || 'no-task'}] Perplexity search failed, using alternative research approach"
+        
+        # Record the failure
+        execute_tool(:take_notes, "Perplexity search failed. Using alternative research approach.")
+        
+        # Try a different approach - for example, we could use a different search tool here
+        # For now, we'll just continue with what we have
+        alternative_research = "Based on the research topic '#{research_topic}', here's what I can determine without external search:\n\n" +
+                              "This is a placeholder for alternative research methods when external search fails. " +
+                              "In a production environment, this would use backup search providers or other information sources."
+        
+        execute_tool(:take_notes, "Alternative Research:\n#{alternative_research}")
       else
-         Rails.logger.info "[WebResearcherAgent-#{task&.id || 'no-task'}] No URL found in initial search results to browse."
+        # Parse search results to find promising URLs/Snippets
+        first_url = search_results_text.match(/URL:\s*(https?\S+)/i)&.[](1)
+
+        if first_url
+          # Step 2: Browse/Scrape promising source
+          Rails.logger.info "[WebResearcherAgent-#{task&.id || 'no-task'}] Browsing first URL: #{first_url}"
+          browsed_content = execute_tool(:browse_url, first_url)
+          execute_tool(:take_notes, "Content from #{first_url}:\n#{browsed_content.truncate(1000)}")
+        else
+          Rails.logger.info "[WebResearcherAgent-#{task&.id || 'no-task'}] No URL found in initial search results to browse."
+          execute_tool(:take_notes, "No URLs found in search results to browse.")
+        end
       end
 
       # Step 3: Compile findings based on notes
@@ -94,12 +111,15 @@ class WebResearcherAgent < BaseAgent
     # Use call method for test compatibility
     search_results = search_tool.call(query: query, focus: focus)
 
-    # Handle error response from the API
-    if search_results.is_a?(Hash) && search_results[:error].present?
+    # Handle different response types
+    if search_results.is_a?(String)
+      # The API returned an error message as a string
+      return search_results
+    elsif search_results.is_a?(Hash) && search_results[:error].present?
       return "Perplexity search error: #{search_results[:error]}"
     end
 
-    # Format the response
+    # Format the response for a successful search
     formatted_results = "Perplexity search results for: #{query}\n\n#{search_results[:response]}\n\n"
     if search_results[:citations].present?
       formatted_results += "Sources:\n"

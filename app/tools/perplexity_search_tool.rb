@@ -34,8 +34,7 @@ class PerplexitySearchTool
         base_url,
         headers: headers,
         body: request_body.to_json,
-        timeout: 30,
-        debug_output: $stderr
+        timeout: 30
       )
 
       # Handle API response
@@ -67,25 +66,18 @@ class PerplexitySearchTool
           Rails.logger.error("Perplexity API error: #{response.code} - #{error_message}")
           Rails.logger.error("Request body: #{request_body.to_json}")
 
-          {
-            error: "Perplexity API error: #{response.code}",
-            message: error_message,
-            request: request_body,
-            response_body: error_data
-          }
+          # Return a more user-friendly message that can be displayed to the user
+          "No search results found. The search API returned an error: #{error_message}. Please try a different search query or try again later."
         rescue StandardError => e
           Rails.logger.error("Failed to parse error response: #{e.message}")
           Rails.logger.error("Raw response: #{response.body}")
 
-          {
-            error: "Perplexity API error: #{response.code}",
-            message: "Failed to parse error response: #{response.body[0..200]}...",
-            raw_response: response.body[0..500]
-          }
+          "No search results found. The search API returned an error. Please try a different search query or try again later."
         end
       end
     rescue => e
-      { error: "Error executing Perplexity search: #{e.message}" }
+      Rails.logger.error("Error executing Perplexity search: #{e.message}")
+      "No search results found due to a connection error: #{e.message}. Please try again later."
     end
   end
 
