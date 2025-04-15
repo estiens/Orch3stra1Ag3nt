@@ -30,6 +30,16 @@ Rails.application.routes.draw do
       post :activate
       post :pause
       post :resume
+      post :complete
+      post :fail
+    end
+    
+    collection do
+      get :pending
+      get :active
+      get :completed
+      get :failed
+      get :paused
     end
   end
   
