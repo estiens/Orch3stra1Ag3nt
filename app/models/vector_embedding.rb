@@ -40,10 +40,11 @@ class VectorEmbedding < ApplicationRecord
     base_query = base_query.for_project(project_id) if project_id.present?
     
     # Apply nearest neighbors search after filters to avoid SQL syntax errors
-    # Use select to explicitly specify the columns we want to avoid SQL syntax errors
-    base_query.select("vector_embeddings.*")
-              .nearest_neighbors(:embedding, query_embedding, distance: distance)
-              .limit(limit)
+    # Use a subquery to avoid the AS syntax error
+    filtered_ids = base_query.pluck(:id)
+    VectorEmbedding.where(id: filtered_ids)
+                  .nearest_neighbors(:embedding, query_embedding, distance: distance)
+                  .limit(limit)
   end
 
   # Generate an embedding for the given text using the embedding service
@@ -63,12 +64,14 @@ class VectorEmbedding < ApplicationRecord
 
   def similar_to_me(limit: 5, distance: "cosine")
     # Start with a base query for the same collection
-    base_query = VectorEmbedding.where(collection: self.collection)
+    # Use a subquery approach to avoid SQL syntax errors
+    collection_ids = VectorEmbedding.where(collection: self.collection)
+                                   .where.not(id: self.id)
+                                   .pluck(:id)
     
-    # Then apply nearest neighbors search with explicit column selection
-    base_query.select("vector_embeddings.*")
-              .nearest_neighbors(:embedding, self.embedding, distance: distance)
-              .where.not(id: self.id) # Exclude self
-              .limit(limit)
+    # Then apply nearest neighbors search on the filtered IDs
+    VectorEmbedding.where(id: collection_ids)
+                  .nearest_neighbors(:embedding, self.embedding, distance: distance)
+                  .limit(limit)
   end
 end

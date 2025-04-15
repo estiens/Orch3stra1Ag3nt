@@ -59,12 +59,13 @@ module Embedding
     # Similarity search by vector
     def similarity_search_by_vector(embedding, k: 5, distance: "cosine")
       # First filter by collection to avoid SQL syntax errors
-      base_query = VectorEmbedding.where(collection: @collection)
+      # Use a subquery approach to avoid the AS syntax error
+      collection_ids = VectorEmbedding.where(collection: @collection).pluck(:id)
       
-      # Then apply nearest neighbors search with explicit column selection
-      base_query.select("vector_embeddings.*")
-                .nearest_neighbors(:embedding, embedding, distance: distance)
-                .limit(k)
+      # Then apply nearest neighbors search on the filtered IDs
+      VectorEmbedding.where(id: collection_ids)
+                    .nearest_neighbors(:embedding, embedding, distance: distance)
+                    .limit(k)
     end
 
     # Commit a batch of chunks and embeddings to the database
