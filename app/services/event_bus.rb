@@ -162,13 +162,11 @@ class EventBus
           handler_class.process(event)
         elsif handler_class.respond_to?(:handle_event)
           # Use the handle_event method if available (for instance methods)
-          if handler_class.is_a?(Class)
-            handler = handler_class.new
-            handler.handle_event(event)
-          else
-            # For test doubles or instances
-            handler_class.handle_event(event)
-          end
+          handler_class.handle_event(event)
+        elsif handler_class.is_a?(Class) && handler_class.instance_methods.include?(:handle_event)
+          # For classes with instance method handle_event
+          handler = handler_class.new
+          handler.handle_event(event)
         else
           Rails.logger.warn("Handler #{handler_class} does not respond to process or handle_event")
         end

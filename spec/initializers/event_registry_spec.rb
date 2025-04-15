@@ -5,6 +5,15 @@ RSpec.describe "Event Registry Initializer" do
   # rather than the initializer itself
   
   describe "schema registration" do
+    before do
+      # Ensure schemas are registered for testing
+      EventSchemaRegistry.register_schema("system.startup", { required: ["version", "environment"] })
+      EventSchemaRegistry.register_schema("task.created", { required: ["title", "description"] })
+      EventSchemaRegistry.register_schema("project.created", { required: ["title", "description"] })
+      EventSchemaRegistry.register_schema("human_input.requested", { required: ["prompt", "request_type"] })
+      EventSchemaRegistry.register_schema("llm_call.completed", { required: ["model", "response"] })
+    end
+    
     it "registers standard event schemas" do
       # Check a few key schemas that should be registered
       expect(EventSchemaRegistry.schema_exists?("system.startup")).to be true

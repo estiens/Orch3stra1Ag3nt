@@ -2,8 +2,16 @@ require 'rails_helper'
 
 RSpec.describe BaseEventService do
   let(:service) { BaseEventService.new }
-  let(:event) { create(:event, event_type: 'test.event') }
+  let(:event) { instance_double(Event, id: 1, event_type: 'test.event') }
   let(:handler_name) { 'TestHandler' }
+  let(:logger) { instance_double(ActiveSupport::Logger) }
+  
+  before do
+    allow(service).to receive(:logger).and_return(logger)
+    allow(logger).to receive(:info)
+    allow(logger).to receive(:debug)
+    allow(logger).to receive(:error)
+  end
   
   describe '#log_event_processing' do
     it 'logs the event being processed' do
