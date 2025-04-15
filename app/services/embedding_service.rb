@@ -14,7 +14,7 @@ class EmbeddingService
   EMBEDDING_DIMENSIONS = 1024
   
   # Constants for batch processing
-  API_BATCH_SIZE = 8
+  API_BATCH_SIZE = 32  # Maximum allowed by the API
   DB_COMMIT_FREQUENCY = 10
   MAX_RETRIES = 3
   
@@ -456,8 +456,11 @@ class EmbeddingService
   end
 
   # Generate embeddings for a batch of texts
-  def generate_tei_embeddings(texts, batch_size: API_BATCH_SIZE)
+  def generate_tei_embeddings(texts, batch_size: nil)
     return [] if texts.empty?
+    
+    # Ensure we never exceed the API's maximum batch size
+    effective_batch_size = [batch_size || API_BATCH_SIZE, API_BATCH_SIZE].min
     
     api_key = ENV["HUGGINGFACE_API_TOKEN"]
     Rails.logger.debug("EmbeddingService: API key present? #{api_key.present?}")
@@ -468,7 +471,7 @@ class EmbeddingService
     
     # Process in smaller batches if needed
     results = []
-    texts.each_slice(batch_size) do |batch|
+    texts.each_slice(effective_batch_size) do |batch|
       batch_results = process_embedding_batch(batch, endpoint, api_key)
       results.concat(batch_results)
     end
@@ -481,6 +484,12 @@ class EmbeddingService
     require "net/http"
     require "uri"
     require "json"
+
+    # Safety check - ensure batch size doesn't exceed API limit
+    if batch.size > API_BATCH_SIZE
+      Rails.logger.warn("EmbeddingService: Batch size #{batch.size} exceeds API limit of #{API_BATCH_SIZE}, truncating")
+      batch = batch.take(API_BATCH_SIZE)
+    end
 
     uri = URI.parse(endpoint)
     Rails.logger.debug("EmbeddingService: Creating HTTP request to #{uri}")
