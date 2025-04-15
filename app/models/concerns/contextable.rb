@@ -21,9 +21,9 @@ module Contextable
   # @return [Hash] the current context
   def context
     {
-      task_id: task_id,
-      project_id: project_id,
-      agent_activity_id: agent_activity_id
+      task_id: self.try(:task_id),
+      project_id: self.try(:project_id),
+      agent_activity_id: self.try(:agent_activity_id)
     }.compact
   end
 
@@ -33,14 +33,14 @@ module Contextable
   def with_context(contextable)
     case contextable
     when Hash
-      self.task_id = contextable[:task_id] if contextable[:task_id] && respond_to?(:task_id=)
-      self.project_id = contextable[:project_id] if contextable[:project_id] && respond_to?(:project_id=)
-      self.agent_activity_id = contextable[:agent_activity_id] if contextable[:agent_activity_id] && respond_to?(:agent_activity_id=)
+      self.task_id = contextable[:task_id] if contextable[:task_id].present? && respond_to?(:task_id=)
+      self.project_id = contextable[:project_id] if contextable[:project_id].present? && respond_to?(:project_id=)
+      self.agent_activity_id = contextable[:agent_activity_id] if contextable[:agent_activity_id].present? && respond_to?(:agent_activity_id=)
     else
       # Try to get context from the object
-      self.task_id = contextable.task_id if contextable.respond_to?(:task_id) && respond_to?(:task_id=)
-      self.project_id = contextable.project_id if contextable.respond_to?(:project_id) && respond_to?(:project_id=)
-      self.agent_activity_id = contextable.agent_activity_id if contextable.respond_to?(:agent_activity_id) && respond_to?(:agent_activity_id=)
+      self.task_id = contextable.task_id if contextable.respond_to?(:task_id) && contextable.task_id.present? && respond_to?(:task_id=)
+      self.project_id = contextable.project_id if contextable.respond_to?(:project_id) && contextable.project_id.present? && respond_to?(:project_id=)
+      self.agent_activity_id = contextable.agent_activity_id if contextable.respond_to?(:agent_activity_id) && contextable.agent_activity_id.present? && respond_to?(:agent_activity_id=)
     end
     self
   end
@@ -75,14 +75,14 @@ module Contextable
   # Propagate context from associations
   def propagate_context
     # If we have a task but no project, get project from task
-    if respond_to?(:project_id=) && respond_to?(:task) && task.present? && 
-       (!respond_to?(:project_id) || project_id.blank?)
+    if respond_to?(:project_id=) && respond_to?(:task) && task.present? && task.project_id.present? && 
+       (self.try(:project_id).blank?)
       self.project_id = task.project_id
     end
 
     # If we have an agent_activity but no task, get task from agent_activity
-    if respond_to?(:task_id=) && respond_to?(:agent_activity) && agent_activity.present? && 
-       (!respond_to?(:task_id) || task_id.blank?)
+    if respond_to?(:task_id=) && respond_to?(:agent_activity) && agent_activity.present? && agent_activity.task_id.present? && 
+       (self.try(:task_id).blank?)
       self.task_id = agent_activity.task_id
     end
   end

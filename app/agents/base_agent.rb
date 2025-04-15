@@ -240,8 +240,26 @@ class BaseAgent
 
   # Helper method to publish events with context
   def publish_event(event_type, data = {}, options = {})
+    # Ensure context exists
+    @context ||= {}
+    
     # Merge context with options
-    merged_options = @context.merge(options)
+    merged_options = @context.dup.merge(options)
+    
+    # Ensure we have agent_activity_id
+    if merged_options[:agent_activity_id].blank? && @agent_activity.present?
+      merged_options[:agent_activity_id] = @agent_activity.id
+    end
+    
+    # Ensure we have task_id
+    if merged_options[:task_id].blank? && @task.present?
+      merged_options[:task_id] = @task.id
+    end
+    
+    # Ensure we have project_id
+    if merged_options[:project_id].blank? && @task&.project_id.present?
+      merged_options[:project_id] = @task.project_id
+    end
     
     # Publish event through the EventBus
     Event.publish(event_type, data, merged_options)
