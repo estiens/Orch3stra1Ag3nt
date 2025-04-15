@@ -49,7 +49,7 @@ class EmbeddingService
     text_size = text.bytesize
     Rails.logger.tagged("EmbeddingService", "add_document") do
       Rails.logger.info("Starting document processing: #{text_size} bytes, chunk_size=#{chunk_size}, overlap=#{chunk_overlap}")
-      
+
       # Log file information if available
       if metadata[:file_path].present?
         Rails.logger.info("Processing file: #{metadata[:file_path]}")
@@ -139,17 +139,17 @@ class EmbeddingService
               chunk_overlap: chunk_overlap,
               document_size: text_size
             }
-            
+
             # Add task and project info
             base_metadata[:task_id] = @task.id if @task
             base_metadata[:project_id] = @project.id if @project
-            
+
             # Preserve file path information from metadata
             if metadata.present?
               %i[file_path file_name file_ext file_dir].each do |key|
                 base_metadata[key] = metadata[key] if metadata[key].present?
               end
-              
+
               # Merge remaining metadata
               base_metadata.merge!(metadata)
             end
@@ -158,7 +158,7 @@ class EmbeddingService
             records = []
             pending_chunks.zip(pending_embeddings).each_with_index do |(chunk, embedding), chunk_idx|
               next if embedding.nil?
-              
+
               # Add chunk-specific metadata
               chunk_metadata = base_metadata.dup
               chunk_metadata[:chunk_index] = chunk_idx
@@ -310,12 +310,12 @@ class EmbeddingService
   # Generate embedding for a text
   def generate_embedding(text)
     embedding = generate_huggingface_embedding(text)
-    
+
     # Handle nested array format (API sometimes returns [[float, float, ...]])
     if embedding.is_a?(Array) && embedding.size == 1 && embedding.first.is_a?(Array)
       embedding = embedding.first
     end
-    
+
     # Ensure we have the right dimensions
     if embedding.size != 1024
       if embedding.size < 1024
@@ -324,7 +324,7 @@ class EmbeddingService
         embedding = embedding[0...1024]
       end
     end
-    
+
     embedding
   end
 
@@ -332,69 +332,6 @@ class EmbeddingService
   # Private helpers and logic
   # --------------------------
   private
-
-  def fast_chunk_text(text, chunk_size, chunk_overlap)
-    return [text] if text.length <= chunk_size
-
-    # Simple and fast chunking approach - split by newlines first, then recombine
-    lines = text.split(/\n/)
-    
-    chunks = []
-    current_chunk = ""
-    
-    lines.each do |line|
-      line = line.strip
-      next if line.empty?
-      
-      # If adding this line would exceed chunk size, start a new chunk
-      if current_chunk.length + line.length + 1 > chunk_size && !current_chunk.empty?
-        chunks << current_chunk.strip
-        # Start new chunk with overlap
-        if chunk_overlap > 0 && current_chunk.length > chunk_overlap
-          # Take the last part of the previous chunk for overlap
-          overlap_text = current_chunk[-chunk_overlap..-1] || ""
-          current_chunk = overlap_text
-        else
-          current_chunk = ""
-        end
-      end
-      
-      # Add the line to the current chunk
-      current_chunk += (current_chunk.empty? ? "" : "\n") + line
-    end
-    
-    # Add the last chunk if it's not empty
-    chunks << current_chunk.strip if !current_chunk.empty?
-    
-    # If we couldn't create any chunks, fall back to simple splitting
-    if chunks.empty?
-      # Simple character-based chunking as fallback
-      chunks = []
-      start_pos = 0
-      
-      while start_pos < text.length
-        end_pos = [start_pos + chunk_size, text.length].min
-        
-        # Try to find a good break point
-        if end_pos < text.length
-          # Try to find a space to break at
-          if (break_pos = text.rindex(/\s/, end_pos)) && break_pos > start_pos
-            end_pos = break_pos
-          end
-        end
-        
-        chunk = text[start_pos...end_pos].strip
-        chunks << chunk if !chunk.empty?
-        
-        # Move to next position with overlap
-        start_pos = end_pos - chunk_overlap
-        start_pos = [start_pos, end_pos].min # Ensure we make progress
-      end
-    end
-    
-    # Filter out any empty chunks and ensure minimum size
-    chunks.select { |chunk| chunk.length >= 10 }
-  end
 
 
   def embedding_exists?(content, content_type: nil)
@@ -428,12 +365,12 @@ class EmbeddingService
       if response.code == "200"
         # Parse the response body
         result = JSON.parse(response.body)
-        
+
         # The API can return different formats:
         # 1. An array of embeddings: [[float, float, ...]]
         # 2. A single embedding: [float, float, ...]
         # 3. An object with an embedding key: {"embedding": [float, float, ...]}
-        
+
         if result.is_a?(Array)
           # Return as is - we'll handle the nested array in the generate_embedding method
           result
@@ -467,7 +404,7 @@ class EmbeddingService
   # @return [VectorEmbedding] The created embedding record
   def store(content:, content_type: "text", source_url: nil, source_title: nil, metadata: {})
     return if content.blank?
-    
+
     # Prepare metadata
     full_metadata = {
       content_type: content_type,
@@ -476,18 +413,18 @@ class EmbeddingService
       embedding_model: "huggingface",
       timestamp: Time.now.iso8601
     }
-    
+
     # Add task and project info
     full_metadata[:task_id] = @task.id if @task
     full_metadata[:project_id] = @project.id if @project
-    
+
     # Merge additional metadata, preserving file path information
     if metadata.present?
       # Ensure file path information is preserved
       %i[file_path file_name file_ext file_dir].each do |key|
         full_metadata[key] = metadata[key] if metadata[key].present?
       end
-      
+
       # Merge the rest
       full_metadata.merge!(metadata)
     end
@@ -496,12 +433,12 @@ class EmbeddingService
     start_time = Time.now
     embedding = generate_embedding(content).flatten
     generation_time = Time.now - start_time
-    
+
     if embedding.nil? || embedding.empty?
       Rails.logger.error("Embedding generation failed for content: #{content.truncate(100)}")
       raise "Embedding generation failed"
     end
-    
+
     Rails.logger.info("Generated embedding in #{generation_time.round(2)}s (#{embedding.size} dimensions)")
 
     # Create record
@@ -626,91 +563,67 @@ class EmbeddingService
 
 
   def chunk_text(text, chunk_size, chunk_overlap)
-    # For monitoring performance
-    start_time = Time.now
-    Rails.logger.info("Starting chunking of #{text.bytesize} bytes text")
+    start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
-    # Handle small texts or invalid parameters
-    return [text] if text.length <= chunk_size || chunk_size <= 0
-    
-    # Ensure chunk_overlap is valid
-    chunk_overlap = [0, chunk_overlap].max
-    chunk_overlap = [chunk_overlap, chunk_size - 1].min
-
-    # Use a faster chunking approach for large texts
-    if text.bytesize > 10_000
-      return fast_chunk_text(text, chunk_size, chunk_overlap)
+    # For very small texts, just return the whole thing
+    if text.length <= chunk_size
+      Rails.logger.info("Text smaller than chunk size, returning as single chunk")
+      return [ text.strip ]
     end
 
+    # Ultra-fast chunking approach
     chunks = []
-    current_pos = 0
+    position = 0
     text_length = text.length
 
-    # Set a higher timeout for larger texts
-    timeout_seconds = [60, text.bytesize / 5000].max
+    # Use a simple character-based chunking approach for speed
+    while position < text_length
+      # Find end position (simple math, no searching)
+      end_pos = [ position + chunk_size, text_length ].min
 
-    begin
-      while current_pos < text_length
-        # Check for timeout to prevent hanging
-        elapsed = Time.now - start_time
-        if elapsed > timeout_seconds
-          remaining_bytes = text_length - current_pos
-          Rails.logger.error("Chunking timeout after #{elapsed.round}s. Processed #{current_pos}/#{text_length} bytes, #{chunks.size} chunks created, #{remaining_bytes} bytes remaining")
-          # Instead of breaking, just return what we have so far plus the remaining text as one chunk
-          if remaining_bytes > 0
-            chunks << text[current_pos..-1].strip
-          end
-          break
+      # Only do breakpoint search within a limited window
+      if end_pos < text_length
+        # Quick search for a good breakpoint - limit search to last 100 chars only
+        search_start = [ position + chunk_size - 100, position ].max
+        search_text = text[search_start...end_pos]
+
+        # Try to find paragraph break (fastest to slowest)
+        break_pos = nil
+
+        # First look for paragraph breaks (fastest checks first)
+        if search_text.include?("\n\n")
+          offset = search_text.rindex("\n\n")
+          break_pos = search_start + offset + 2 if offset
+        elsif search_text.include?("\n")
+          offset = search_text.rindex("\n")
+          break_pos = search_start + offset + 1 if offset
+        elsif search_text.include?(". ")
+          offset = search_text.rindex(". ")
+          break_pos = search_start + offset + 2 if offset
+        elsif search_text.include?(" ")
+          offset = search_text.rindex(" ")
+          break_pos = search_start + offset + 1 if offset
         end
 
-        # Calculate end position
-        end_pos = [current_pos + chunk_size, text_length].min
-
-        # Find a good break point
-        if end_pos < text_length
-          # Quick search for paragraph breaks (fastest option)
-          if (break_pos = text.index("\n\n", [current_pos, end_pos - 100].max)) && break_pos < end_pos
-            end_pos = break_pos + 2
-          # Try single line breaks
-          elsif (break_pos = text.index("\n", [current_pos, end_pos - 100].max)) && break_pos < end_pos
-            end_pos = break_pos + 1
-          # Try sentence endings
-          elsif (break_pos = text.index(". ", [current_pos, end_pos - 100].max)) && break_pos < end_pos
-            end_pos = break_pos + 2
-          # Last resort: find a space
-          elsif (break_pos = text.rindex(" ", end_pos)) && break_pos > current_pos
-            end_pos = break_pos + 1
-          end
-        end
-
-        # Extract chunk and validate
-        chunk = text[current_pos...end_pos].strip
-        if chunk.length >= 10 # Lower minimum size to avoid losing content
-          chunks << chunk
-        end
-
-        # Move position with overlap
-        current_pos = end_pos - chunk_overlap
-        current_pos = [current_pos, end_pos].min  # Ensure we make progress
+        # If we found a breakpoint, use it
+        end_pos = break_pos if break_pos
       end
 
-      # Log performance metrics
-      duration = Time.now - start_time
-      if chunks.empty?
-        Rails.logger.warn("No chunks generated after #{duration.round(2)}s")
-        # Return the original text as a single chunk if we couldn't create any chunks
-        return [text]
-      else
-        Rails.logger.info("Chunking completed: #{chunks.size} chunks in #{duration.round(2)}s (#{(duration/chunks.size).round(3)}s per chunk)")
-      end
+      # Extract chunk - no additional processing or validation
+      chunk = text[position...end_pos].strip
+      chunks << chunk if chunk.length > 0
 
-      chunks
-    rescue => e
-      Rails.logger.error("Chunking error: #{e.message}")
-      Rails.logger.error(e.backtrace.join("\n"))
-      # Return whatever chunks we have so far
-      chunks.empty? ? [text] : chunks
+      # Move position with overlap
+      position = end_pos - chunk_overlap
+      position = position + 1 if position <= end_pos - chunk_size  # Ensure progress
     end
+
+    duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time
+    chunks_per_second = chunks.size / [ duration, 0.001 ].max  # Avoid division by zero
+
+    Rails.logger.info("Fast chunking completed: #{chunks.size} chunks in #{duration.round(3)}s (#{chunks_per_second.round(1)} chunks/sec)")
+
+    chunks
   end
 
 
