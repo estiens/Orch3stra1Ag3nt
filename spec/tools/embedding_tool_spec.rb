@@ -88,6 +88,22 @@ RSpec.describe EmbeddingTool do
       file.close
     end
     
+    it "handles StringIO and other IO-like objects" do
+      string_io = StringIO.new(test_file_content)
+      
+      embedding_service = instance_double(EmbeddingService)
+      allow(EmbeddingService).to receive(:new).and_return(embedding_service)
+      
+      expect(embedding_service).to receive(:add_document) do |content, options|
+        expect(content).to eq(test_file_content)
+        # StringIO won't have a file path, so we don't check for it
+        [build(:vector_embedding)]
+      end
+      
+      result = tool.add_files(files: string_io)
+      expect(result[:status]).to eq("success")
+    end
+    
     it "detects content type from file extension" do
       # Create test files with different extensions
       extensions = {

@@ -321,14 +321,17 @@ class EmbeddingTool
       File.open(expanded_path)
     elsif file.respond_to?(:read)
       # Handle file-like objects
-      if file.respond_to?(:path) && file.path
+      if file.respond_to?(:path) && file.path && !file.path.empty?
         path = file.path
-        raise ArgumentError, "File not found: #{path}" unless File.exist?(path)
-        raise ArgumentError, "File is not readable: #{path}" unless File.readable?(path)
-
-        # Check if file is at beginning
-        if file.respond_to?(:pos) && file.pos > 0
-          file.rewind rescue nil
+        # Only validate the path if it appears to be a real file path
+        # (not a StringIO or other IO-like object with a non-file path)
+        if File.exist?(path)
+          raise ArgumentError, "File is not readable: #{path}" unless File.readable?(path)
+          
+          # Check if file is at beginning
+          if file.respond_to?(:pos) && file.pos > 0
+            file.rewind rescue nil
+          end
         end
       end
       file
@@ -355,7 +358,7 @@ def build_file_metadata(file_obj, merge: {}, content_type: nil, source_url: nil,
   metadata[:source_url]     = source_url if source_url
 
   # Extract file path information
-  if file_obj.respond_to?(:path)
+  if file_obj.respond_to?(:path) && file_obj.path && !file_obj.path.empty?
     file_path = file_obj.path
     metadata[:source_title] ||= file_path
     metadata[:file_path]      = file_path
@@ -378,11 +381,17 @@ def build_file_metadata(file_obj, merge: {}, content_type: nil, source_url: nil,
     end
   end
 
+  # For IO objects without a path (like StringIO)
+  if !metadata[:source_title] && !source_title
+    metadata[:source_title] = "In-memory content"
+  end
+
   metadata[:file_size]        = file_obj.size if file_obj.respond_to?(:size)
   metadata[:content_type]     = content_type ||
     (file_obj.respond_to?(:content_type) && file_obj.content_type) ||
     DEFAULT_CONTENT_TYPE
   metadata[:timestamp]        = Time.now.iso8601
+  metadata[:io_class]         = file_obj.class.name
 
   # Merge any additional metadata
   metadata.merge!(file_obj.metadata) if file_obj.respond_to?(:metadata)
