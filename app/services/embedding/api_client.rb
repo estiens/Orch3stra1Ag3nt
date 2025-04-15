@@ -11,15 +11,6 @@ module Embedding
     DEFAULT_API_ENDPOINT = "https://piujqyd9p0cdbgx1.us-east4.gcp.endpoints.huggingface.cloud"
     API_BATCH_SIZE = 16  # Reduced from 32 to improve performance
     MAX_RETRIES = 3
-    
-    # Health tracking
-    @@health_status = {
-      consecutive_failures: 0,
-      last_failure_time: nil,
-      current_batch_size: API_BATCH_SIZE,
-      total_requests: 0,
-      successful_requests: 0
-    }
 
     attr_reader :api_key, :endpoint, :logger
 
@@ -30,98 +21,20 @@ module Embedding
 
       raise "HUGGINGFACE_API_TOKEN environment variable not set" unless @api_key
     end
-    
-    # Get current API health status
-    def self.health_status
-      success_rate = if @@health_status[:total_requests] > 0
-                       (@@health_status[:successful_requests].to_f / @@health_status[:total_requests] * 100).round(1)
-                     else
-                       0.0
-                     end
-                     
-      {
-        consecutive_failures: @@health_status[:consecutive_failures],
-        last_failure_time: @@health_status[:last_failure_time],
-        current_batch_size: @@health_status[:current_batch_size],
-        total_requests: @@health_status[:total_requests],
-        successful_requests: @@health_status[:successful_requests],
-        success_rate: "#{success_rate}%"
-      }
-    end
-    
-    # Reset health status (e.g., after service restart)
-    def self.reset_health_status
-      @@health_status = {
-        consecutive_failures: 0,
-        last_failure_time: nil,
-        current_batch_size: API_BATCH_SIZE,
-        total_requests: 0,
-        successful_requests: 0
-      }
-    end
-    
-    # Get recommended batch size based on health status
-    def recommended_batch_size
-      # If we've had failures, reduce batch size
-      if @@health_status[:consecutive_failures] > 0
-        # Reduce batch size based on consecutive failures
-        reduced_size = [API_BATCH_SIZE - (@@health_status[:consecutive_failures] * 4), 4].max
-        @logger.debug("Using reduced batch size of #{reduced_size} due to #{@@health_status[:consecutive_failures]} consecutive failures")
-        reduced_size
-      else
-        # Use standard batch size, but consider system load
-        if system_under_high_load?
-          # Further reduce batch size under high load
-          smaller_size = [API_BATCH_SIZE / 2, 8].max
-          @logger.debug("System under high load, reducing batch size to #{smaller_size}")
-          smaller_size
-        else
-          API_BATCH_SIZE
-        end
-      end
-    end
-    
-    # Check if system is under high load
-    def system_under_high_load?
-      begin
-        # Try to get CPU load average on Unix-like systems
-        if File.exist?('/proc/loadavg')
-          load_avg = File.read('/proc/loadavg').split(' ')[0].to_f
-          cpu_count = Concurrent.processor_count
-          return load_avg > (cpu_count * 0.7) # High load if > 70% of available CPUs
-        end
-        
-        # On macOS/BSD, use `sysctl`
-        if RUBY_PLATFORM =~ /darwin|bsd/
-          load_avg = `sysctl -n vm.loadavg`.split(' ')[1].to_f
-          cpu_count = Concurrent.processor_count
-          return load_avg > (cpu_count * 0.7)
-        end
-      rescue => e
-        @logger.debug("Error checking system load: #{e.message}")
-      end
-      
-      # Default to false if we can't determine load
-      false
-    end
 
     # Generate embeddings for a batch of texts
     def generate_batch_embeddings(texts, batch_size: nil)
       return [] if texts.empty?
-
-      # Get health-aware batch size
-      health_batch_size = recommended_batch_size
       
-      # Use the smaller of requested batch size, health-based size, or API limit
+      # Use the smaller of requested batch size or API limit
       effective_batch_size = [
         batch_size || API_BATCH_SIZE,
-        health_batch_size,
         API_BATCH_SIZE
       ].compact.min
 
       @logger.debug("API key present? #{@api_key.present?}")
       @logger.debug("Using embedding endpoint: #{@endpoint}")
-      @logger.debug("Using batch size: #{effective_batch_size} (health status: #{@@health_status[:consecutive_failures]} failures)")
+      @logger.debug("Using batch size: #{effective_batch_size}")
 
       # Process in smaller batches if needed
       results = []
@@ -143,27 +56,12 @@ module Embedding
         futures << pool.post do
           @logger.debug("Processing batch #{index + 1}/#{total_batches} (#{batch.size} texts)")
           
-          # Track request for health monitoring
-          mutex.synchronize { @@health_status[:total_requests] += 1 }
-          
           begin
             batch_results = process_embedding_batch(batch)
-            
-            # Update health status on success
-            mutex.synchronize do
-              @@health_status[:consecutive_failures] = 0
-              @@health_status[:successful_requests] += 1
-            end
             
             # Thread-safe append to results
             mutex.synchronize { results.concat(batch_results) }
           rescue => e
-            # Update health status on failure
-            mutex.synchronize do
-              @@health_status[:consecutive_failures] += 1
-              @@health_status[:last_failure_time] = Time.now
-            end
-            
             @logger.error("Batch #{index + 1}/#{total_batches} failed: #{e.message}")
             
             # Return nil placeholders for this batch
@@ -291,7 +189,7 @@ module Embedding
           sleep(backoff)
           retry
         else
-          @logger.error("Failed to generate embeddings after #{MAX_RETRIES} retries: #{e.message}\n#{e.backtrace.join("\n")}")
+          @logger.error("Failed to generate embeddings after #{MAX_RETRIES} retries: #{e.message}")
           # Return nil placeholders to maintain array positions
           Array.new(batch.size)
         end
