@@ -43,11 +43,11 @@ class VectorEmbedding < ApplicationRecord
     query.limit(limit)
   end
 
-  # Generate an embedding for the given text using OpenAI's embeddings API
+  # Generate an embedding for the given text using the embedding service
   # @param text [String] The text to embed
   # @return [Array<Float>] The embedding vector
   def self.generate_embedding(text)
-    EmbeddingService.new.add_text(text
+    EmbeddingService.new.generate_embedding(text)
   end
 
   def similarity(other_embedding)
