@@ -309,7 +309,23 @@ class EmbeddingService
 
   # Generate embedding for a text
   def generate_embedding(text)
-    generate_huggingface_embedding(text)
+    embedding = generate_huggingface_embedding(text)
+    
+    # Handle nested array format (API sometimes returns [[float, float, ...]])
+    if embedding.is_a?(Array) && embedding.size == 1 && embedding.first.is_a?(Array)
+      embedding = embedding.first
+    end
+    
+    # Ensure we have the right dimensions
+    if embedding.size != 1024
+      if embedding.size < 1024
+        embedding = embedding + Array.new(1024 - embedding.size, 0.0)
+      else
+        embedding = embedding[0...1024]
+      end
+    end
+    
+    embedding
   end
 
   # --------------------------
@@ -425,33 +441,30 @@ class EmbeddingService
     begin
       response = http.request(request)
       if response.code == "200"
+        # Parse the response body
         result = JSON.parse(response.body)
-        # Normalize the result to ensure it's a flat array of floats
-        embedding = result.is_a?(Array) ? result : result["embedding"]
         
-        # If it's a nested array with just one element, flatten it
-        if embedding.is_a?(Array) && embedding.size == 1 && embedding.first.is_a?(Array)
-          embedding = embedding.first
+        # The API can return different formats:
+        # 1. An array of embeddings: [[float, float, ...]]
+        # 2. A single embedding: [float, float, ...]
+        # 3. An object with an embedding key: {"embedding": [float, float, ...]}
+        
+        if result.is_a?(Array)
+          # Return as is - we'll handle the nested array in the generate_embedding method
+          result
+        elsif result.is_a?(Hash) && result["embedding"]
+          result["embedding"]
+        else
+          Rails.logger.error("Unexpected embedding format: #{result.class}")
+          raise "Unexpected embedding format from API"
         end
-        
-        # Ensure we have the right dimensions for the database
-        if embedding.size != 1024
-          # Pad or truncate to 1024 dimensions for testing purposes
-          if embedding.size < 1024
-            embedding = embedding + Array.new(1024 - embedding.size, 0.0)
-          else
-            embedding = embedding[0...1024]
-          end
-        end
-        
-        embedding
       else
-        raise "Hugging Face API error: #{response.body}"
+        raise "Hugging Face API error: #{response.code} - #{response.body}"
       end
     rescue => e
       retries += 1
       if retries < 3
-        sleep(30)
+        sleep(retries * 10) # Exponential backoff
         retry
       else
         Rails.logger.error("Failed HF embed: #{e.message}")
