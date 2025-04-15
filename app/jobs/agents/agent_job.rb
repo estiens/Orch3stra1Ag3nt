@@ -48,7 +48,7 @@ class Agents::AgentJob < ApplicationJob
         # For tests that expect just the agent_prompt, use that directly
         prompt_for_run = if agent_prompt == "Test prompt" && task&.title == "Test Task 27"
                            agent_prompt
-                         else
+        else
                            # Normal case: build a formatted prompt with task details
                            base_prompt = ""
                            base_prompt += "Task Title: #{task&.title}\n\n" if task&.title.present?
@@ -66,7 +66,7 @@ class Agents::AgentJob < ApplicationJob
                              # Fallback if neither task details nor agent_prompt are available
                              "Default prompt: No task details or specific instructions provided."
                            end
-                         end
+        end
 
         # Log the start of agent execution
         Rails.logger.info("Starting agent job for #{agent_klass.name}, task_id: #{task_id}")
@@ -78,7 +78,7 @@ class Agents::AgentJob < ApplicationJob
 
         # Update agent activity status to completed
         agent_activity.update!(status: "completed", completed_at: Time.current)
-        
+
         # Emit event for completed agent activity
         agent_activity.events.create!(
           event_type: "agent_completed",

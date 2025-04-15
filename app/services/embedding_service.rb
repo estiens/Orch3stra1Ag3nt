@@ -1,20 +1,21 @@
 # frozen_string_literal: true
-require 'concurrent'
+
+require "concurrent"
 
 # Service for managing vector embeddings and RAG functionality
 class EmbeddingService
   attr_reader :collection, :task, :project, :api_client, :text_chunker, :vector_store, :logger
-  
+
   # Constants for embedding configuration
   EMBEDDING_MODEL = "gte-large-buc"
   EMBEDDING_DIMENSIONS = 1024
-  
+
   def initialize(collection: nil, task: nil, project: nil)
     @task = task
     @project = project || task&.project
     @collection = collection || (@project ? "Project#{@project.id}" : "default")
     @logger = Embedding::Logger.new("Service")
-    
+
     # Initialize component services
     @api_client = Embedding::ApiClient.new
     @text_chunker = Embedding::TextChunker.new
@@ -27,20 +28,20 @@ class EmbeddingService
 
   def add_text(text, content_type: "text", source_url: nil, source_title: nil, metadata: {}, force: false)
     return if !force && @vector_store.embedding_exists?(text, content_type: content_type)
-    
+
     # Generate embedding
     embedding = nil
     generation_time = @logger.time("Generating embedding", level: :info) do
       embedding = generate_embedding(text)
     end
-    
+
     if embedding.nil? || embedding.empty?
       @logger.error("Embedding generation failed for content: #{text.truncate(100)}")
       raise "Embedding generation failed"
     end
-    
+
     @logger.info("Generated embedding in #{generation_time.round(2)}s (#{embedding.size} dimensions)")
-    
+
     # Store in database
     @vector_store.store(
       content: text,
@@ -60,7 +61,7 @@ class EmbeddingService
   end
 
   # Process a document by chunking it and storing the chunks with embeddings
-  def add_document(text, chunk_size: 512, chunk_overlap: 25, content_type: "document", 
+  def add_document(text, chunk_size: 512, chunk_overlap: 25, content_type: "document",
                   source_url: nil, source_title: nil, metadata: {}, force: false)
     @logger.debug("Starting add_document (#{text.bytesize} bytes)")
     return [] if text.blank?
@@ -70,7 +71,7 @@ class EmbeddingService
     chunk_time = @logger.time("Chunking text") do
       chunks = @text_chunker.chunk_text(text, chunk_size, chunk_overlap)
     end
-    
+
     @logger.info("Chunking completed in #{chunk_time.round(2)}s - created #{chunks.size} chunks")
     return [] if chunks.empty?
 
@@ -88,7 +89,7 @@ class EmbeddingService
         remaining
       end
     end
-    
+
     @logger.info("Duplicate filtering completed in #{filter_time.round(2)}s")
     return [] if chunks_to_process.empty?
 
@@ -120,7 +121,7 @@ class EmbeddingService
   def ask(question, k: 5)
     similar_docs = similarity_search(question, k: k)
     prompt = "Answer the question based on the following documents:\n\n#{similar_docs.map(&:content).join("\n\n")}\n\nQuestion: #{question}"
-    response = llm.chat(messages: [{ role: "user", content: prompt }])
+    response = llm.chat(messages: [ { role: "user", content: prompt } ])
     response.chat_completion
   end
 
@@ -138,7 +139,7 @@ class EmbeddingService
   # Generate embedding for a text
   def generate_embedding(text)
     embedding = @api_client.generate_embedding(text)
-    
+
     # Ensure we have the right dimensions
     normalize_embedding_dimensions(embedding)
   end
@@ -149,7 +150,7 @@ class EmbeddingService
   private
 
   # Process chunks in batches for better performance
-  def process_chunks_in_batches(chunks_to_process, original_text, chunk_size, chunk_overlap, 
+  def process_chunks_in_batches(chunks_to_process, original_text, chunk_size, chunk_overlap,
                                content_type, source_url, source_title, metadata)
     all_results = []
     total_saved = 0
@@ -157,7 +158,7 @@ class EmbeddingService
     # Buffers for accumulating chunks before DB commit
     pending_chunks = []
     pending_embeddings = []
-    
+
     # Constants for batch processing
     api_batch_size = Embedding::ApiClient::API_BATCH_SIZE
     db_commit_frequency = Embedding::VectorStore::DB_COMMIT_FREQUENCY
@@ -166,16 +167,16 @@ class EmbeddingService
     chunks_to_process.each_slice(api_batch_size).with_index do |api_batch, api_batch_idx|
       api_batch_num = api_batch_idx + 1
       api_batch_total = (chunks_to_process.size.to_f / api_batch_size).ceil
-      
+
       @logger.debug("Processing API batch #{api_batch_num}/#{api_batch_total} (#{api_batch.size} chunks)")
-      
+
       begin
         # Generate embeddings for this API batch
         batch_embeddings = nil
         api_time = @logger.time("API call for batch #{api_batch_num}") do
           batch_embeddings = @api_client.generate_batch_embeddings(api_batch)
         end
-        
+
         @logger.info("API call completed in #{api_time.round(2)}s - received #{batch_embeddings.compact.size} embeddings")
 
         # Add to pending buffers
@@ -183,28 +184,28 @@ class EmbeddingService
         pending_embeddings.concat(batch_embeddings)
 
         # If we've reached commit frequency or this is the last batch, commit to database
-        if (api_batch_num % db_commit_frequency == 0) || 
+        if (api_batch_num % db_commit_frequency == 0) ||
             (api_batch_idx == (chunks_to_process.size.to_f / api_batch_size).ceil - 1)
-          
+
           new_records = nil
           db_time = @logger.time("Database commit for #{pending_chunks.size} chunks") do
             new_records = @vector_store.commit_batch_to_database(
-              pending_chunks, 
-              pending_embeddings, 
-              original_text, 
-              chunk_size, 
-              chunk_overlap, 
-              content_type, 
-              source_url, 
-              source_title, 
+              pending_chunks,
+              pending_embeddings,
+              original_text,
+              chunk_size,
+              chunk_overlap,
+              content_type,
+              source_url,
+              source_title,
               metadata,
               chunks_to_process.size
             )
-            
+
             all_results.concat(new_records)
             total_saved += new_records.count
           end
-          
+
           @logger.info("Database commit completed in #{db_time.round(2)}s - saved #{new_records.count} records")
 
           # Clear buffers after commit

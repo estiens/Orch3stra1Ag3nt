@@ -1,10 +1,10 @@
 class HumanInputRequestsController < ApplicationController
-  before_action :set_human_input_request, only: [:show, :respond, :submit_response, :ignore]
-  
+  before_action :set_human_input_request, only: [ :show, :respond, :submit_response, :ignore ]
+
   def show
     # Show details of a specific human input request
   end
-  
+
   def respond
     # Show form to respond to the input request
     respond_to do |format|
@@ -12,7 +12,7 @@ class HumanInputRequestsController < ApplicationController
       format.turbo_stream
     end
   end
-  
+
   def submit_response
     if @human_input_request.answer!(params[:response])
       respond_to do |format|
@@ -26,7 +26,7 @@ class HumanInputRequestsController < ApplicationController
       end
     end
   end
-  
+
   def ignore
     if @human_input_request.ignore!(params[:reason])
       respond_to do |format|
@@ -40,9 +40,9 @@ class HumanInputRequestsController < ApplicationController
       end
     end
   end
-  
+
   private
-  
+
   def set_human_input_request
     @human_input_request = HumanInputRequest.find(params[:id])
   end

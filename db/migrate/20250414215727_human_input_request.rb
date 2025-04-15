@@ -19,6 +19,6 @@ class HumanInputRequest < ActiveRecord::Migration[8.0]
 
     # Add indexes for common lookups
     add_index :human_input_requests, :status
-    add_index :human_input_requests, [:task_id, :status]
+    add_index :human_input_requests, [ :task_id, :status ]
   end
 end

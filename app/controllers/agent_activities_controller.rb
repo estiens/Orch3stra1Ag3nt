@@ -1,20 +1,20 @@
 class AgentActivitiesController < ApplicationController
-  before_action :set_agent_activity, only: [:show, :pause, :resume]
-  
+  before_action :set_agent_activity, only: [ :show, :pause, :resume ]
+
   def show
     # Load related data for the agent activity
     @llm_calls = @agent_activity.llm_calls.order(created_at: :desc)
     @events = @agent_activity.events.order(created_at: :desc)
-    
+
     # Check for ancestry
     if @agent_activity.ancestry.present?
       @ancestors = @agent_activity.ancestors
     end
-    
+
     # Get children
     @children = @agent_activity.children
   end
-  
+
   def pause
     if @agent_activity.pause!
       respond_to do |format|
@@ -28,7 +28,7 @@ class AgentActivitiesController < ApplicationController
       end
     end
   end
-  
+
   def resume
     if @agent_activity.resume!
       respond_to do |format|
@@ -42,9 +42,9 @@ class AgentActivitiesController < ApplicationController
       end
     end
   end
-  
+
   private
-  
+
   def set_agent_activity
     @agent_activity = AgentActivity.find(params[:id])
   end

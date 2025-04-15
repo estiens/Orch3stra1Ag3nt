@@ -9,7 +9,7 @@ class WebScraperTool
     property :selector, type: "string", description: "CSS selector to target specific elements (optional)", required: false
     property :extract_type, type: "string", description: "Content type to extract: 'text', 'html', or 'links'", required: false
   end
-  
+
   # Add call method for compatibility with tests
   def call(url:, extract_type: "text")
     scrape(url: url, extract_type: extract_type)

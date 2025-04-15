@@ -32,11 +32,11 @@ class VectorEmbedding < ApplicationRecord
     query = query.in_collection(collection) if collection.present?
     query = query.for_task(task_id) if task_id.present?
     query = query.for_project(project_id) if project_id.present?
-    
+
     begin
       # Log the embedding format to help with debugging
       Rails.logger.debug("Query embedding format: #{query_embedding.class}, dimensions: #{query_embedding.size}")
-      
+
       # Use raw SQL operators directly to avoid AS clause conflicts
       case distance
       when "cosine"
@@ -46,12 +46,12 @@ class VectorEmbedding < ApplicationRecord
       else # euclidean
         query = query.order(Arel.sql("embedding <-> ARRAY[#{query_embedding.join(',')}]::vector"))
       end
-      
+
       query.limit(limit)
     rescue => e
       Rails.logger.error("Error in find_similar: #{e.message}")
       Rails.logger.error("Embedding format that caused error: #{query_embedding.class}, #{query_embedding.inspect[0..100]}")
-      
+
       # Fallback to a simpler approach if the query fails
       filtered_ids = query.pluck(:id)
       VectorEmbedding.where(id: filtered_ids).limit(limit)
@@ -77,7 +77,7 @@ class VectorEmbedding < ApplicationRecord
     begin
       # Use raw SQL operators directly to avoid AS clause conflicts
       base_query = VectorEmbedding.in_collection(self.collection).where.not(id: self.id)
-      
+
       case distance
       when "cosine"
         base_query = base_query.order(Arel.sql("embedding <=> ARRAY[#{self.embedding.join(',')}]::vector"))
@@ -86,7 +86,7 @@ class VectorEmbedding < ApplicationRecord
       else # euclidean
         base_query = base_query.order(Arel.sql("embedding <-> ARRAY[#{self.embedding.join(',')}]::vector"))
       end
-      
+
       base_query.limit(limit)
     rescue => e
       Rails.logger.error("Error in similar_to_me: #{e.message}")

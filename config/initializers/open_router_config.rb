@@ -122,11 +122,11 @@ module Langchain
         if model_str.include?("/")
           provider_name = model_str.split("/").first
           return "OpenAI" if provider_name.downcase == "openai"
-          return provider_name
+          provider_name
         else
           provider_name = raw_response["provider"] || "openrouter"
           return "OpenAI" if provider_name.downcase == "openai"
-          return provider_name
+          provider_name
         end
       end
 

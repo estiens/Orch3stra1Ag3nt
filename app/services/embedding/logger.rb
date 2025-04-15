@@ -56,7 +56,7 @@ module Embedding
 
       # Format the log message with component name
       formatted_message = "[Embedding::#{@component_name}] #{message}"
-      
+
       # Use Rails logger with appropriate level
       case level
       when :debug

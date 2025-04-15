@@ -12,7 +12,8 @@ class WebResearcherAgent < BaseAgent
   end
 
   def self.custom_tool_objects
-    [PerplexitySearchTool, WebScraperTool]
+    [ PerplexitySearchTool, WebScraperTool ]
+  end
 
   # Placeholder for Vector DB tool
   tool :semantic_memory, "Store and retrieve information using vector embeddings (Not Implemented)" do |query|
@@ -31,7 +32,7 @@ class WebResearcherAgent < BaseAgent
   # --- Core Logic ---
   def run(input = nil) # Input should be the research topic/question
     before_run(input)
-    
+
     # Extract a clean research topic from input or task
     research_topic = if input.present?
       # If input is provided directly, use it
@@ -60,28 +61,28 @@ class WebResearcherAgent < BaseAgent
       if search_results_text.include?("No search results found") || search_results_text.include?("Error performing Perplexity search")
         # If Perplexity search failed, try an alternative approach
         Rails.logger.warn "[WebResearcherAgent-#{task&.id || 'no-task'}] Perplexity search failed, using alternative research approach"
-        
+
         # Record the failure
         execute_tool(:take_notes, "Perplexity search failed. Using alternative research approach.")
-        
+
         # Try a different approach - for example, we could use a different search tool here
         # For now, we'll just continue with what we have
         alternative_research = "Based on the research topic '#{research_topic}', here's what I can determine without external search:\n\n" +
                               "This is a placeholder for alternative research methods when external search fails. " +
                               "In a production environment, this would use backup search providers or other information sources."
-        
+
         execute_tool(:take_notes, "Alternative Research:\n#{alternative_research}")
       else
         # Parse search results to find promising URLs/Snippets
         urls = search_results_text.scan(/URL:\s*(https?:\/\/\S+)/i).flatten.uniq
-        
+
         if urls.any?
           # Step 2: Browse/Scrape promising source (first URL)
           first_url = urls.first
           Rails.logger.info "[WebResearcherAgent-#{task&.id || 'no-task'}] Browsing first URL: #{first_url}"
           browsed_content = execute_tool(:browse_url, first_url)
           execute_tool(:take_notes, "Content from #{first_url}:\n#{browsed_content.truncate(1000)}")
-          
+
           # If we have more URLs, make a note of them for potential future use
           if urls.size > 1
             additional_urls = urls[1..3].join("\n- ")
@@ -114,12 +115,12 @@ class WebResearcherAgent < BaseAgent
   def search_with_perplexity(query, focus = "web")
     # Ensure query is a string
     query = query.to_s.strip
-    
+
     # Validate query
     if query.empty?
       return "Error: Search query cannot be empty"
     end
-    
+
     search_tool = PerplexitySearchTool.new # Consider dependency injection
     # Use call method for test compatibility
     search_results = search_tool.call(query: query, focus: focus)
@@ -137,7 +138,7 @@ class WebResearcherAgent < BaseAgent
     if search_results[:citations].present?
       formatted_results += "Sources:\n"
       search_results[:citations].each_with_index do |citation, index|
-        title = citation[:title] || citation[:url].to_s.split('/').last.to_s.gsub('-', ' ').capitalize
+        title = citation[:title] || citation[:url].to_s.split("/").last.to_s.gsub("-", " ").capitalize
         formatted_results += "#{index + 1}. #{title} - URL: #{citation[:url]}\n"
       end
     end
@@ -181,8 +182,7 @@ class WebResearcherAgent < BaseAgent
 
     response = "Title: #{result[:title]}\nURL: #{url}\nSelector: #{selector || 'None'}\nExtract type: #{extract_type}\n\n"
     if extract_type == "links"
-      response += "Links found:
-"
+      response += "Links found:\n"
       result[:links].each_with_index { |link, i| response += "#{i + 1}. #{link[:text] || '[No text]'} - #{link[:href]}\n" }
     else
       content = result[:content].to_s
@@ -190,7 +190,6 @@ class WebResearcherAgent < BaseAgent
     end
 
     # Logging handled by AgentActivityCallbackHandler
-
     response
   rescue => e
     Rails.logger.error "[WebResearcherAgent] Error in scrape_webpage for '#{url}': #{e.message}"

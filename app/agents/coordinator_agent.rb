@@ -32,7 +32,7 @@ class CoordinatorAgent < BaseAgent
   tool :assign_subtask, "Delegate a subtask to the most suitable agent type. Takes (subtask_id: <ID number>, agent_type: <agent class name>, purpose: <optional context>)" do |subtask_id:, agent_type:, purpose: nil|
     assign_subtask(subtask_id, agent_type, purpose)
   end
-  
+
   tool :create_sub_coordinator, "Create another coordinator agent to handle a complex subtask that needs further decomposition. Takes (subtask_id: <ID number>, purpose: <optional context>)" do |subtask_id:, purpose: nil|
     create_sub_coordinator(subtask_id, purpose)
   end
@@ -52,7 +52,7 @@ class CoordinatorAgent < BaseAgent
   tool :mark_task_complete, "Finalize task when all objectives are met. Takes (summary: <optional final report>)" do |summary: nil|
     mark_task_complete(summary)
   end
-  
+
   tool :recoordinate_project, "Analyze project progress, evaluate completed tasks, and determine next steps. Takes (project_id: <ID number>)" do |project_id:|
     recoordinate_project(project_id)
   end
@@ -247,7 +247,7 @@ class CoordinatorAgent < BaseAgent
       # If task is waiting on human input, try to activate it
       if task.waiting_on_human? && task.may_activate?
         task.activate!
-        
+
         # Create a temporary agent activity to update task status
         temp_activity = AgentActivity.create!(
           task: task,
@@ -255,7 +255,7 @@ class CoordinatorAgent < BaseAgent
           status: "completed",
           metadata: { purpose: "Update task status after human input" }
         )
-        
+
         # Use the task model directly to update status
         task.update!(
           notes: "#{task.notes}\n[#{Time.current.strftime("%Y-%m-%d %H:%M")} Coordinator Update]: Resuming task after human input: #{response&.truncate(50)}".strip
@@ -398,7 +398,7 @@ class CoordinatorAgent < BaseAgent
     rescue ActiveRecord::RecordNotFound
       return "Error: Subtask with ID #{subtask_id} not found or does not belong to task #{task.id}."
     end
-    
+
     # Check if the project is paused
     if task.project && task.project.status == "paused"
       return "Cannot assign subtask #{subtask_id} - Project #{task.project.id} (#{task.project.name}) is currently paused."
@@ -457,7 +457,7 @@ class CoordinatorAgent < BaseAgent
       "Error assigning subtask #{subtask_id}: #{e.message}"
     end
   end
-  
+
   # Create a sub-coordinator agent to handle a complex subtask that needs further decomposition
   def create_sub_coordinator(subtask_id, purpose = nil)
     unless task
@@ -469,7 +469,7 @@ class CoordinatorAgent < BaseAgent
     rescue ActiveRecord::RecordNotFound
       return "Error: Subtask with ID #{subtask_id} not found or does not belong to task #{task.id}."
     end
-    
+
     # Check if the project is paused
     if task.project && task.project.status == "paused"
       return "Cannot create sub-coordinator for subtask #{subtask_id} - Project #{task.project.id} (#{task.project.name}) is currently paused."
@@ -514,8 +514,8 @@ class CoordinatorAgent < BaseAgent
       # Create event for tracking
       agent_activity&.events.create!(
         event_type: "sub_coordinator_created",
-        data: { 
-          subtask_id: subtask.id, 
+        data: {
+          subtask_id: subtask.id,
           purpose: meaningful_purpose,
           parent_coordinator_id: agent_activity&.id
         }
@@ -524,8 +524,8 @@ class CoordinatorAgent < BaseAgent
       # Publish event for the system
       Event.publish(
         "sub_coordinator_created",
-        { 
-          subtask_id: subtask.id, 
+        {
+          subtask_id: subtask.id,
           parent_task_id: task.id,
           parent_coordinator_id: agent_activity&.id
         },
@@ -763,13 +763,13 @@ class CoordinatorAgent < BaseAgent
       "Task completed successfully. Error generating detailed summary: #{e.message}"
     end
   end
-  
+
   # Re-coordinate a project by analyzing progress and determining next steps
   def recoordinate_project(project_id)
     begin
       # Find the project
       project = Project.find(project_id)
-      
+
       # Get all tasks for this project
       all_tasks = project.tasks
       completed_tasks = all_tasks.where(state: "completed")
@@ -777,10 +777,10 @@ class CoordinatorAgent < BaseAgent
       pending_tasks = all_tasks.where(state: "pending")
       failed_tasks = all_tasks.where(state: "failed")
       waiting_tasks = all_tasks.where(state: "waiting_on_human")
-      
+
       # Get the root task(s)
       root_tasks = project.root_tasks
-      
+
       # Collect results from completed tasks
       completed_results = completed_tasks.map do |t|
         {
@@ -789,7 +789,7 @@ class CoordinatorAgent < BaseAgent
           result: t.result.present? ? t.result.truncate(500) : "No detailed result available"
         }
       end
-      
+
       # Collect information about failed tasks
       failed_info = failed_tasks.map do |t|
         {
@@ -798,7 +798,7 @@ class CoordinatorAgent < BaseAgent
           error: t.metadata&.dig("error_message") || "Unknown error"
         }
       end
-      
+
       # Collect information about tasks waiting on human input
       waiting_info = waiting_tasks.map do |t|
         input_requests = HumanInputRequest.where(task_id: t.id, status: "pending")
@@ -808,7 +808,7 @@ class CoordinatorAgent < BaseAgent
           questions: input_requests.map(&:question)
         }
       end
-      
+
       # Create a comprehensive project status report
       project_status = {
         project_name: project.name,
@@ -822,7 +822,7 @@ class CoordinatorAgent < BaseAgent
         completion_percentage: all_tasks.count > 0 ? ((completed_tasks.count.to_f / all_tasks.count) * 100).round : 0,
         root_tasks: root_tasks.map { |t| { id: t.id, title: t.title, state: t.state } }
       }
-      
+
       # Use LLM to analyze the project status and recommend next steps
       prompt = <<~PROMPT
         # PROJECT RE-COORDINATION ANALYSIS
@@ -868,10 +868,10 @@ class CoordinatorAgent < BaseAgent
       response = @llm.chat(messages: [ { role: "user", content: prompt } ])
       log_direct_llm_call(prompt, response)
       analysis = response.chat_completion
-      
+
       # Parse the LLM response to determine the recommended action
       recommended_action = analysis.match(/RECOMMENDED_ACTION:\s*(CONTINUE|NEW_COORDINATOR|HUMAN_ESCALATION|REPLAN)/)&.[](1)
-      
+
       # Take action based on the recommendation
       action_result = case recommended_action
       when "CONTINUE"
@@ -879,7 +879,7 @@ class CoordinatorAgent < BaseAgent
       when "NEW_COORDINATOR"
         # Find a suitable task to assign a new coordinator to
         target_task = active_tasks.first || pending_tasks.first || root_tasks.first
-        
+
         if target_task
           # Create a new coordinator for this task
           coordinator_options = {
@@ -891,12 +891,12 @@ class CoordinatorAgent < BaseAgent
               project_id: project.id
             }
           }
-          
+
           CoordinatorAgent.enqueue(
             "Re-coordinate task execution for: #{target_task.title}\n#{target_task.description}",
             coordinator_options
           )
-          
+
           "Created new coordinator for task #{target_task.id} (#{target_task.title}) to improve project coordination."
         else
           "Recommended creating a new coordinator, but couldn't find a suitable task to assign it to."
@@ -904,7 +904,7 @@ class CoordinatorAgent < BaseAgent
       when "HUMAN_ESCALATION"
         # Extract the justification for escalation
         justification = analysis.match(/JUSTIFICATION:\s*(.*?)(?=\n\n|\z)/m)&.[](1)&.strip || "Project requires human intervention based on analysis."
-        
+
         # Create a human intervention request
         intervention = HumanIntervention.create!(
           description: "PROJECT ESCALATION: #{project.name}\n\n#{justification}",
@@ -912,18 +912,18 @@ class CoordinatorAgent < BaseAgent
           status: "pending",
           agent_activity_id: agent_activity&.id
         )
-        
+
         Event.publish(
           "human_intervention_requested",
-          { 
-            intervention_id: intervention.id, 
-            description: "Project escalation: #{project.name}", 
+          {
+            intervention_id: intervention.id,
+            description: "Project escalation: #{project.name}",
             urgency: "high",
             project_id: project.id
           },
           { priority: Event::HIGH_PRIORITY }
         )
-        
+
         "Escalated project #{project.name} to human operators. Intervention ID: #{intervention.id}"
       when "REPLAN"
         # Create a human input request for replanning
@@ -934,28 +934,28 @@ class CoordinatorAgent < BaseAgent
           status: "pending",
           agent_activity: agent_activity
         )
-        
+
         Event.publish(
           "human_input_requested",
-          { 
-            request_id: input_request.id, 
-            task_id: task&.id || root_tasks.first&.id, 
-            question: "Project needs replanning", 
+          {
+            request_id: input_request.id,
+            task_id: task&.id || root_tasks.first&.id,
+            question: "Project needs replanning",
             required: true,
             project_id: project.id
           },
           { agent_activity_id: agent_activity&.id, priority: Event::HIGH_PRIORITY }
         )
-        
+
         "Project #{project.name} needs replanning. Human input requested (ID: #{input_request.id})."
       else
         # Default action if parsing fails
         "Analyzed project #{project.name} (#{completed_tasks.count}/#{all_tasks.count} tasks completed). Unable to determine specific action from analysis."
       end
-      
+
       # Return the full analysis and the action taken
       "#{analysis}\n\nACTION TAKEN: #{action_result}"
-      
+
     rescue ActiveRecord::RecordNotFound
       "Error: Project with ID #{project_id} not found."
     rescue => e
@@ -1106,11 +1106,11 @@ class CoordinatorAgent < BaseAgent
     # Get the completed subtask
     subtask = Task.find_by(id: subtask_id)
     return "Error: Completed subtask #{subtask_id} not found" unless subtask
-    
+
     # Check if this was a subtask handled by a sub-coordinator
     was_sub_coordinated = subtask.metadata&.dig("assigned_agent") == "CoordinatorAgent" &&
                           subtask.metadata&.dig("requires_decomposition") == true
-    
+
     # Log completion with appropriate context
     if was_sub_coordinated
       update_task_status("Subtask #{subtask_id} (#{subtask.title}) completed by sub-coordinator with further decomposition.")
@@ -1131,17 +1131,17 @@ class CoordinatorAgent < BaseAgent
     if eligible_subtasks.any?
       # Assign the highest priority eligible subtask
       next_subtask = select_next_subtask_to_assign(eligible_subtasks)
-      
+
       # Determine if this subtask needs a sub-coordinator or a regular agent
       agent_type = next_subtask.metadata&.dig("suggested_agent") || determine_best_agent_for_subtask(next_subtask)
-      
+
       # If the LLM suggested a CoordinatorAgent, use create_sub_coordinator instead of assign_subtask
       if agent_type == "CoordinatorAgent"
         assign_result = create_sub_coordinator(next_subtask.id, "Complex subtask requiring further decomposition")
       else
         assign_result = assign_subtask(next_subtask.id, agent_type, "Assigning next eligible subtask")
       end
-      
+
       return "#{status_report}\\n\\n#{assign_result}"
     end
 
@@ -1238,7 +1238,7 @@ class CoordinatorAgent < BaseAgent
       # Assign potentially multiple initially eligible tasks (those with no deps)
       eligible_subtasks.each do |subtask_to_assign|
          agent_type = subtask_to_assign.metadata&.dig("suggested_agent") || determine_best_agent_for_subtask(subtask_to_assign)
-         
+
          # If the LLM suggested a CoordinatorAgent, use create_sub_coordinator instead of assign_subtask
          if agent_type == "CoordinatorAgent"
            create_sub_coordinator(subtask_to_assign.id, "Complex subtask requiring further decomposition")

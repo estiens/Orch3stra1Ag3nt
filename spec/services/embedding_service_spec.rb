@@ -118,7 +118,7 @@ RSpec.describe EmbeddingService do
     context "with valid API key", vcr: { cassette_name: "embedding_service/generate_embedding", record: :new_episodes } do
       before do
         # Always mock the API call to avoid external dependencies in tests
-        sample_response = [[-0.0085261, 0.00050742645, 0.0081073325]]
+        sample_response = [ [ -0.0085261, 0.00050742645, 0.0081073325 ] ]
         allow(service).to receive(:generate_huggingface_embedding).and_return(sample_response)
       end
 
@@ -171,7 +171,7 @@ RSpec.describe EmbeddingService do
         "This is a very long text. This is a very long text.",
         "Another paragraph. Another paragraph."
       ])
-      
+
       chunks = service.send(:chunk_text, long_text, 30, 0)
       expect(chunks.size).to be > 1
       expect(chunks.first.length).to be <= 100 # Relaxed constraint for test stability
@@ -185,16 +185,16 @@ RSpec.describe EmbeddingService do
         "long text. This is a very long",
         "Another paragraph. Another"
       ])
-      
+
       allow(service).to receive(:chunk_text).with(long_text, 30, 0).and_return([
         "This is a very long text. This is",
         "a very long text. This is a very",
         "Another paragraph. Another"
       ])
-      
+
       chunks_with_overlap = service.send(:chunk_text, long_text, 30, 10)
       no_overlap_chunks = service.send(:chunk_text, long_text, 30, 0)
-      
+
       expect(chunks_with_overlap.size).to be >= no_overlap_chunks.size
     end
   end

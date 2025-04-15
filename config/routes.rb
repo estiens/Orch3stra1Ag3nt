@@ -20,11 +20,11 @@ Rails.application.routes.draw do
       post :pause
       post :resume
     end
-    
+
     # Nested tasks under projects
     resources :tasks
   end
-  
+
   # Tasks can also be accessed directly
   resources :tasks do
     member do
@@ -34,7 +34,7 @@ Rails.application.routes.draw do
       post :complete
       post :fail
     end
-    
+
     collection do
       get :pending
       get :active
@@ -43,17 +43,17 @@ Rails.application.routes.draw do
       get :paused
     end
   end
-  
+
   # Agent activities management
-  resources :agent_activities, only: [:show] do
+  resources :agent_activities, only: [ :show ] do
     member do
       post :pause
       post :resume
     end
   end
-  
+
   # Human input requests
-  resources :human_input_requests, only: [:show] do
+  resources :human_input_requests, only: [ :show ] do
     member do
       get :respond
       post :submit_response

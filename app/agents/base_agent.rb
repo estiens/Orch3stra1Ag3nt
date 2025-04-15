@@ -187,7 +187,7 @@ class BaseAgent
       Rails.logger.error("[#{self.name}] Cannot enqueue agent job without task_id")
       return nil
     end
-    
+
     task_priority_string = options.delete(:task_priority) # Get priority string if passed
     numeric_priority = map_priority_string_to_numeric(task_priority_string) # Implement this mapping
 

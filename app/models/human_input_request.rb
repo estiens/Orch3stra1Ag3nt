@@ -3,7 +3,7 @@
 class HumanInputRequest < ApplicationRecord
   include EventPublisher
   include DashboardBroadcaster
-  
+
   belongs_to :task
   belongs_to :agent_activity, optional: true
 
@@ -41,7 +41,7 @@ class HumanInputRequest < ApplicationRecord
       responded_at: Time.current,
       answered_by: user_id
     )
-    
+
     # Log the update to verify it happened
     Rails.logger.info "HumanInputRequest #{id} answered: status=#{status}, response=#{response ? response[0..20] + '...' : 'nil'}"
 
@@ -59,8 +59,8 @@ class HumanInputRequest < ApplicationRecord
 
     # Resume task if it was waiting for this input
     resume_task if required && task.waiting_on_human?
-    
-    return result
+
+    result
   end
 
   # Mark this input request as ignored (for optional requests)

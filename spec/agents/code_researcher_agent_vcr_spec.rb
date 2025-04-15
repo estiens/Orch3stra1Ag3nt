@@ -71,12 +71,10 @@ RSpec.describe CodeResearcherAgent, :vcr do
       code_sample = <<~'RUBY'
         class User
           attr_accessor :name, :email
-          
           def initialize(name, email)
             @name = name
             @email = email
           end
-          
           def to_s
             "#{@name} <#{@email}>"
           end

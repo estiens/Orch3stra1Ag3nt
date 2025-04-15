@@ -6,8 +6,7 @@ class AddFieldsToLlmCalls < ActiveRecord::Migration[8.0]
     # add_column :llm_calls, :prompt, :text
     # add_column :llm_calls, :response, :text
     # add_column :llm_calls, :tokens_used, :integer, default: 0
-    
+
     # Add any new columns here if needed
-    
   end
 end

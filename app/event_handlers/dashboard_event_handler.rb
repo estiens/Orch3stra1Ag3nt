@@ -14,22 +14,22 @@ class DashboardEventHandler
     when "llm_call_completed"
       broadcast_llm_calls_update
     end
-    
+
     # Log the event for debugging
     Rails.logger.info "DashboardEventHandler processed event: #{event.event_type}"
   end
-  
+
   private
-  
+
   def broadcast_tasks_update
     Turbo::StreamsChannel.broadcast_replace_to(
       "dashboard",
       target: "tasks-container",
       partial: "dashboard/tasks",
-      locals: { tasks: Task.where(state: ["active", "pending", "waiting_on_human", "paused"]).order(created_at: :desc).limit(10) }
+      locals: { tasks: Task.where(state: [ "active", "pending", "waiting_on_human", "paused" ]).order(created_at: :desc).limit(10) }
     )
   end
-  
+
   def broadcast_projects_update
     Turbo::StreamsChannel.broadcast_replace_to(
       "dashboard",
@@ -38,7 +38,7 @@ class DashboardEventHandler
       locals: { projects: Project.order(created_at: :desc).limit(10) }
     )
   end
-  
+
   def broadcast_human_input_requests_update
     Turbo::StreamsChannel.broadcast_replace_to(
       "dashboard",
@@ -47,7 +47,7 @@ class DashboardEventHandler
       locals: { human_input_requests: HumanInputRequest.where(status: "pending").order(created_at: :desc).limit(10) }
     )
   end
-  
+
   def broadcast_agent_activities_update
     Turbo::StreamsChannel.broadcast_replace_to(
       "dashboard",
@@ -56,7 +56,7 @@ class DashboardEventHandler
       locals: { agent_activities: AgentActivity.order(created_at: :desc).limit(20) }
     )
   end
-  
+
   def broadcast_llm_calls_update
     Turbo::StreamsChannel.broadcast_replace_to(
       "dashboard",

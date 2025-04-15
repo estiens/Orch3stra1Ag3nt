@@ -10,7 +10,7 @@ class EmbeddingTool
   # Constants for default values
   DEFAULT_COLLECTION = "default"
   DEFAULT_CONTENT_TYPE = "text"
-  DEFAULT_LIMIT = 5
+  DEFAULT_LIMIT = 10
   DEFAULT_DISTANCE = "euclidean"
   DEFAULT_CHUNK_SIZE = 500
   DEFAULT_CHUNK_OVERLAP = 25
@@ -197,11 +197,11 @@ class EmbeddingTool
 
       begin
         service = EmbeddingService.new(collection: collection)
-        
+
         # Use the service's similarity_search method which properly handles the embedding format
         # and uses the Neighbor gem's methods correctly
         results = service.similarity_search(query, k: limit, distance: distance)
-        
+
         Rails.logger.info("Found #{results.count} similar documents")
 
         {

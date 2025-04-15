@@ -4,10 +4,10 @@ module Embedding
   # Handles database operations for vector embeddings
   class VectorStore
     attr_reader :collection, :task, :project, :logger
-    
+
     # Constants for batch processing
     DB_COMMIT_FREQUENCY = 10
-    
+
     def initialize(collection: nil, task: nil, project: nil)
       @task = task
       @project = project || task&.project
@@ -61,10 +61,10 @@ module Embedding
       begin
         # Log the embedding format to help with debugging
         @logger.debug("Embedding format: #{embedding.class}, dimensions: #{embedding.size}")
-        
+
         # Use raw SQL operators directly to avoid AS clause conflicts
         base_query = VectorEmbedding.in_collection(@collection)
-        
+
         # Apply the appropriate distance operator based on the distance metric
         case distance
         when "cosine"
@@ -74,13 +74,13 @@ module Embedding
         else # euclidean
           base_query = base_query.order(Arel.sql("embedding <-> ARRAY[#{embedding.join(',')}]::vector"))
         end
-        
+
         # Apply limit and return results
         base_query.limit(k)
       rescue => e
         @logger.error("Error in similarity_search_by_vector: #{e.message}")
         @logger.error("Embedding format that caused error: #{embedding.class}, #{embedding.inspect[0..100]}")
-        
+
         # Fallback to a simpler approach if the query fails
         ids = VectorEmbedding.in_collection(@collection).limit(k).pluck(:id)
         VectorEmbedding.where(id: ids)

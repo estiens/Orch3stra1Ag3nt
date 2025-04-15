@@ -47,13 +47,13 @@ RSpec.describe VectorEmbedding, type: :model do
       @project1 = create(:project, name: "Test Project 1")
       @project2 = create(:project, name: "Test Project 2")
       @task1 = create(:task, project: @project1)
-      
+
       # Create embeddings with different collections and content types
-      @embedding1 = create(:vector_embedding, collection: "collection1", content_type: "text", 
+      @embedding1 = create(:vector_embedding, collection: "collection1", content_type: "text",
                           project: @project1, task: @task1, embedding: mock_embedding)
-      @embedding2 = create(:vector_embedding, collection: "collection2", content_type: "document", 
+      @embedding2 = create(:vector_embedding, collection: "collection2", content_type: "document",
                           project: @project2, embedding: mock_embedding)
-      @embedding3 = create(:vector_embedding, collection: "collection1", content_type: "code", 
+      @embedding3 = create(:vector_embedding, collection: "collection1", content_type: "code",
                           project: @project1, embedding: mock_embedding)
     end
 
@@ -87,7 +87,7 @@ RSpec.describe VectorEmbedding, type: :model do
       allow(@mock_relation).to receive(:for_project).and_return(@mock_relation)
       allow(@mock_relation).to receive(:limit).and_return(@mock_relation)
       allow(@mock_relation).to receive(:count).and_return(3)
-      
+
       allow(VectorEmbedding).to receive(:nearest_neighbors).and_return(@mock_relation)
     end
 
@@ -128,7 +128,7 @@ RSpec.describe VectorEmbedding, type: :model do
       embedding_service = instance_double(EmbeddingService)
       expect(EmbeddingService).to receive(:new).and_return(embedding_service)
       expect(embedding_service).to receive(:generate_embedding).with("test text").and_return(mock_embedding)
-      
+
       result = VectorEmbedding.generate_embedding("test text")
       expect(result).to eq(mock_embedding)
     end
@@ -136,16 +136,16 @@ RSpec.describe VectorEmbedding, type: :model do
 
   describe "#similarity" do
     it "calculates cosine similarity correctly" do
-      embedding = VectorEmbedding.new(embedding: [1.0, 0.0, 0.0])
-      
+      embedding = VectorEmbedding.new(embedding: [ 1.0, 0.0, 0.0 ])
+
       # Same vector should have similarity 1.0
-      expect(embedding.similarity([1.0, 0.0, 0.0])).to be_within(0.001).of(1.0)
-      
+      expect(embedding.similarity([ 1.0, 0.0, 0.0 ])).to be_within(0.001).of(1.0)
+
       # Orthogonal vector should have similarity 0.0
-      expect(embedding.similarity([0.0, 1.0, 0.0])).to be_within(0.001).of(0.0)
-      
+      expect(embedding.similarity([ 0.0, 1.0, 0.0 ])).to be_within(0.001).of(0.0)
+
       # 45-degree vector should have similarity 0.707
-      expect(embedding.similarity([1.0, 1.0, 0.0])).to be_within(0.001).of(0.707)
+      expect(embedding.similarity([ 1.0, 1.0, 0.0 ])).to be_within(0.001).of(0.707)
     end
   end
 end

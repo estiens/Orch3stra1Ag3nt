@@ -7,8 +7,8 @@ class Project < ApplicationRecord
 
   # Validations
   validates :name, presence: true
-# Settings and metadata are already jsonb columns in PostgreSQL
-# No need to serialize them as they're handled natively
+  # Settings and metadata are already jsonb columns in PostgreSQL
+  # No need to serialize them as they're handled natively
 
   # Scopes
   scope :active, -> { where(status: "active") }
@@ -98,12 +98,12 @@ class Project < ApplicationRecord
     task_ids = tasks.pluck(:id)
     AgentActivity.where(task_id: task_ids)
   end
-  
+
   # Get LLM call statistics for all tasks in this project
   def llm_call_stats
     activity_ids = all_agent_activities.pluck(:id)
     calls = LlmCall.where(agent_activity_id: activity_ids)
-    
+
     {
       count: calls.count,
       total_cost: calls.sum(:cost).round(4),
@@ -266,8 +266,8 @@ class Project < ApplicationRecord
       # Trigger project re-coordination
       Event.publish(
         "project_recoordination_requested",
-        { 
-          project_id: id, 
+        {
+          project_id: id,
           project_name: name,
           reason: "Project resumed after being paused"
         },
