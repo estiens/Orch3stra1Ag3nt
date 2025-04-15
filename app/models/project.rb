@@ -1,4 +1,6 @@
 class Project < ApplicationRecord
+  include TaskStatusHelper
+  
   # Associations
   has_many :tasks, dependent: :destroy
   has_many :vector_embeddings, dependent: :destroy
