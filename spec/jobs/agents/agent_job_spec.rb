@@ -13,6 +13,10 @@ RSpec.describe Agents::AgentJob, type: :job do
 
     before do
       allow(BaseAgent).to receive(:new).and_return(agent_instance)
+      
+      # Stub the AgentSpawningService to avoid actual spawning
+      allow(AgentSpawningService).to receive(:spawn_for_task).and_return(true)
+      allow(AgentSpawningService).to receive(:spawn_for_event).and_return(true)
     end
 
     it "raises an error if task_id is not provided" do

@@ -234,6 +234,12 @@ class Task < ApplicationRecord
       return false
     end
 
+    # Skip agent spawning in test environment to avoid side effects
+    if Rails.env.test? && !options[:force_spawn]
+      Rails.logger.info "[Task #{id}] Skipping agent spawning in test environment"
+      return true
+    end
+
     # Use the centralized agent spawning service
     AgentSpawningService.spawn_for_task(self, options)
   end

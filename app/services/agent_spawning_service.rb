@@ -39,14 +39,20 @@ class AgentSpawningService
     }.merge(options)
     
     # Enqueue the agent job
-    agent_activity = agent_class.enqueue(
+    result = agent_class.enqueue(
       "Process task: #{task.title}",
       agent_options
     )
     
-    logger.info("Spawned #{agent_class.name} for task: #{task.id}, agent activity: #{agent_activity&.id}")
+    # The result could be an AgentActivity or an AgentJob depending on the environment
+    if result.is_a?(AgentActivity)
+      agent_activity = result
+      logger.info("Spawned #{agent_class.name} for task: #{task.id}, agent activity: #{agent_activity.id}")
+    else
+      logger.info("Enqueued #{agent_class.name} for task: #{task.id}")
+    end
     
-    agent_activity
+    result
   end
   
   # Spawn an appropriate agent for a project
@@ -67,14 +73,20 @@ class AgentSpawningService
     }.merge(options)
     
     # Enqueue the agent job
-    agent_activity = agent_class.enqueue(
+    result = agent_class.enqueue(
       "Orchestrate project: #{project.title}",
       agent_options
     )
     
-    logger.info("Spawned #{agent_class.name} for project: #{project.id}, agent activity: #{agent_activity&.id}")
+    # The result could be an AgentActivity or an AgentJob depending on the environment
+    if result.is_a?(AgentActivity)
+      agent_activity = result
+      logger.info("Spawned #{agent_class.name} for project: #{project.id}, agent activity: #{agent_activity.id}")
+    else
+      logger.info("Enqueued #{agent_class.name} for project: #{project.id}")
+    end
     
-    agent_activity
+    result
   end
   
   # Spawn an agent in response to an event
@@ -94,14 +106,20 @@ class AgentSpawningService
     }.merge(options)
     
     # Enqueue the agent job
-    agent_activity = agent_class.enqueue(
+    result = agent_class.enqueue(
       "Process event: #{event.event_type}",
       agent_options
     )
     
-    logger.info("Spawned #{agent_class.name} for event: #{event.id}, agent activity: #{agent_activity&.id}")
+    # The result could be an AgentActivity or an AgentJob depending on the environment
+    if result.is_a?(AgentActivity)
+      agent_activity = result
+      logger.info("Spawned #{agent_class.name} for event: #{event.id}, agent activity: #{agent_activity.id}")
+    else
+      logger.info("Enqueued #{agent_class.name} for event: #{event.id}")
+    end
     
-    agent_activity
+    result
   end
   
   private
