@@ -35,7 +35,7 @@ module EventSubscriber
     # This allows for both class-level and instance-level handling
     def self.process(event)
       # Get the callback for this event type
-      callback = self.subscriptions[event.event_type]
+      callback = self.subscriptions[event.event_type.to_s]
 
       return unless callback
 
@@ -51,7 +51,7 @@ module EventSubscriber
 
   # Instance method to process an event
   def handle_event(event)
-    event_name = event.event_type
+    event_name = event.event_type.to_s
     callback = self.class.subscriptions[event_name]
 
     return unless callback

@@ -77,7 +77,7 @@ class Agents::AgentJob < ApplicationJob
         # The after_run hook will be called by the agent
 
         # Update agent activity status to completed
-        agent_activity.update!(status: "completed")
+        agent_activity.update!(status: "completed", completed_at: Time.current)
         
         # Emit event for completed agent activity
         agent_activity.events.create!(

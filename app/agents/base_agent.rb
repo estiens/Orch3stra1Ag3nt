@@ -147,7 +147,7 @@ class BaseAgent
 
   def after_run(result)
     Rails.logger.info("[#{self.class.name}] Completed run [Activity ID: #{@agent_activity&.id}] [Output preview: #{result.to_s.truncate(100)}]")
-    @agent_activity&.update(status: "finished")
+    @agent_activity&.update(status: "completed", result: result.to_s, completed_at: Time.current)
     persist_tool_executions
   end
   def handle_run_error(e)
@@ -182,6 +182,12 @@ class BaseAgent
   end
 
   def self.enqueue(prompt, options = {})
+    # Ensure task_id is present
+    unless options[:task_id].present?
+      Rails.logger.error("[#{self.name}] Cannot enqueue agent job without task_id")
+      return nil
+    end
+    
     task_priority_string = options.delete(:task_priority) # Get priority string if passed
     numeric_priority = map_priority_string_to_numeric(task_priority_string) # Implement this mapping
 
@@ -265,7 +271,6 @@ class BaseAgent
       cost = calculate_llm_cost(model_name, prompt_tokens, completion_tokens)
 
       # Create the LLM call record with all fields
-      # Make sure to use the exact field names and values expected by the test
       @agent_activity.llm_calls.create!(
         provider: provider,
         model: model_name,
@@ -276,8 +281,8 @@ class BaseAgent
         tokens_used: total_tokens,
         request_payload: request_payload || "null",
         response_payload: response_payload,
-        duration: 0.5, # Fixed value for tests
-        cost: 0.0006 # Fixed value for tests
+        duration: duration, # Use actual duration
+        cost: cost # Use calculated cost
       )
     rescue => e
       Rails.logger.error "[BaseAgent] Failed to log direct LLM call: #{e.message}"
