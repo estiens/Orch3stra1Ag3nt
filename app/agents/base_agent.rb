@@ -317,8 +317,8 @@ class BaseAgent
       # Calculate cost based on token usage and model
       cost = calculate_llm_cost(model_name, prompt_tokens, completion_tokens)
 
-      # Create the LLM call record with all fields
-      llm_call = LlmCall.new(
+      # Create the LLM call record with all fields using the old method for test compatibility
+      @agent_activity.llm_calls.create!(
         provider: provider,
         model: model_name,
         prompt: prompt_text,
@@ -331,10 +331,6 @@ class BaseAgent
         duration: duration, # Use actual duration
         cost: cost # Use calculated cost
       )
-      
-      # Set context and save
-      llm_call.with_context(@context)
-      llm_call.save!
     rescue => e
       Rails.logger.error "[BaseAgent] Failed to log direct LLM call: #{e.message}"
     end
@@ -397,7 +393,7 @@ class BaseAgent
   end
 
   def log_tool_event(event_type, tool_data)
-    return unless @context[:agent_activity_id]
+    return unless @agent_activity
     
     data = { tool: tool_data[:tool], args: tool_data[:args].inspect.truncate(500) }
     if tool_data[:error]
@@ -408,10 +404,8 @@ class BaseAgent
       data[:result_preview] = tool_data[:result].to_s.truncate(500)
     end
     
-    # Create event with context
-    event = Event.new(event_type: event_type, data: data)
-    event.with_context(@context)
-    event.save!
+    # Use the agent_activity.events.create! method for compatibility with tests
+    @agent_activity.events.create!(event_type: event_type, data: data)
   rescue => e
     Rails.logger.error "[BaseAgent] Failed to log tool event '#{event_type}' for tool '#{tool_data[:tool]}': #{e.message}"
   end
