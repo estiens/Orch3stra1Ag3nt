@@ -201,23 +201,10 @@ class EmbeddingTool
         # Generate embedding for the query
         embedding = service.generate_embedding(query)
         
-        # Get IDs for the collection
-        collection_ids = VectorEmbedding.where(collection: collection).pluck(:id)
-        
-        # Use a simpler approach that avoids the SQL syntax error
-        results = VectorEmbedding.where(id: collection_ids)
-        
-        # Apply the nearest neighbors search using raw SQL operators
-        case distance
-        when "cosine"
-          results = results.order(Arel.sql("embedding <=> ARRAY[#{embedding.join(',')}]::vector"))
-        when "inner_product"
-          results = results.order(Arel.sql("embedding <#> ARRAY[#{embedding.join(',')}]::vector"))
-        else # euclidean
-          results = results.order(Arel.sql("embedding <-> ARRAY[#{embedding.join(',')}]::vector"))
-        end
-        
-        results = results.limit(limit)
+        # Use the Neighbor gem's nearest_neighbors method directly with our scope
+        results = VectorEmbedding.in_collection(collection)
+                                .nearest_neighbors(:embedding, embedding, distance: distance)
+                                .limit(limit)
         
         Rails.logger.info("Found #{results.count} similar documents")
 
