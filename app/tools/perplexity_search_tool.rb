@@ -14,7 +14,7 @@ class PerplexitySearchTool
     @api_key = ENV.fetch("PERPLEXITY_API_KEY", nil)
     raise "PERPLEXITY_API_KEY is not set cannot use PerplexitySearchTool" unless @api_key
   end
-  
+
   # Add call method for compatibility with tests
   def call(query:, focus: "web")
     search(query: query, focus: focus)
@@ -25,18 +25,24 @@ class PerplexitySearchTool
     @focus = validate_focus(focus)
 
     begin
+      # Log the request for debugging
+      Rails.logger.info("Perplexity API request to: #{base_url}")
+      Rails.logger.info("Perplexity API headers: #{headers.to_json}")
+      Rails.logger.info("Perplexity API request body: #{request_body.to_json}")
+
       response = HTTParty.post(
         base_url,
         headers: headers,
         body: request_body.to_json,
-        timeout: 30
+        timeout: 30,
+        debug_output: $stderr
       )
 
       # Handle API response
       if response.success?
         data = JSON.parse(response.body)
 
-        # Format the response
+        # Format the response based on the updated API response structure
         result = {
           query: @query,
           response: data["choices"][0]["message"]["content"],
@@ -44,30 +50,39 @@ class PerplexitySearchTool
         }
 
         # Add citation information if available
-        if data["choices"][0]["message"]["context"] &&
-           data["choices"][0]["message"]["context"]["citations"]
-          citations = data["choices"][0]["message"]["context"]["citations"]
-          result[:citations] = citations.map do |citation|
-            {
-              title: citation["title"],
-              url: citation["url"],
-              text: citation["text"]
-            }
-          end
+        if data["citations"]
+          result[:citations] = data["citations"]
         end
 
         result
       else
-        # Handle error response
-        error_message = begin
-                          response.parsed_response.dig("error", "message") || "Error details not available"
-                        rescue StandardError
-                          "Unknown error"
-                        end
-        {
-          error: "Perplexity API error: #{response.code}",
-          message: error_message
-        }
+        # Enhanced error handling to provide more diagnostic information
+        begin
+          error_data = JSON.parse(response.body)
+          error_message = error_data.dig("error", "message") ||
+                          error_data["error"] ||
+                          error_data["message"] ||
+                          "Error details not available"
+
+          Rails.logger.error("Perplexity API error: #{response.code} - #{error_message}")
+          Rails.logger.error("Request body: #{request_body.to_json}")
+
+          {
+            error: "Perplexity API error: #{response.code}",
+            message: error_message,
+            request: request_body,
+            response_body: error_data
+          }
+        rescue StandardError => e
+          Rails.logger.error("Failed to parse error response: #{e.message}")
+          Rails.logger.error("Raw response: #{response.body}")
+
+          {
+            error: "Perplexity API error: #{response.code}",
+            message: "Failed to parse error response: #{response.body[0..200]}...",
+            raw_response: response.body[0..500]
+          }
+        end
       end
     rescue => e
       { error: "Error executing Perplexity search: #{e.message}" }
@@ -88,6 +103,7 @@ class PerplexitySearchTool
   end
 
   def base_url
+    # Ensure the URL is exactly as specified in the documentation
     "https://api.perplexity.ai/chat/completions"
   end
 
@@ -97,25 +113,30 @@ class PerplexitySearchTool
       "Content-Type" => "application/json"
     }
   end
-
   def request_body
-    {
-      model: "sonar-medium-online",
+    # Ensure exact format matches the curl command example
+    body = {
+      model: "sonar-pro",
       messages: [
-        {
-          role: "system",
-          content: "You are a helpful research assistant. Please search the web and provide comprehensive, accurate information."
-        },
         {
           role: "user",
           content: @query
         }
       ],
-      max_tokens: 1024,
-      temperature: 0.2,
-      options: {
-        search_focus: @focus
-      }
+      max_tokens: 300
     }
+
+    # Add focus-specific system message if focus is specified
+    if @focus && @focus != "web"
+      body[:messages].unshift({
+        role: "system",
+        content: "Focus on #{@focus} content for this search."
+      })
+    end
+
+    # Add optional parameters that might be required by the API
+    body[:temperature] = 0.7 unless body.key?(:temperature)
+
+    body
   end
 end
