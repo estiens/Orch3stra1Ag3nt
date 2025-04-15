@@ -100,6 +100,20 @@ serialize :metadata, coder: JSON
     task_ids = tasks.pluck(:id)
     AgentActivity.where(task_id: task_ids)
   end
+  
+  # Get LLM call statistics for all tasks in this project
+  def llm_call_stats
+    activity_ids = all_agent_activities.pluck(:id)
+    calls = LlmCall.where(agent_activity_id: activity_ids)
+    
+    {
+      count: calls.count,
+      total_cost: calls.sum(:cost).round(4),
+      total_tokens: calls.sum(:total_tokens),
+      models: calls.group(:model).count,
+      providers: calls.group(:provider).count
+    }
+  end
 
   # Simple search across project's embeddings
   def search_knowledge(query, limit = 5)

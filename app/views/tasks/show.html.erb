@@ -57,6 +57,34 @@
           </div>
         <% end %>
         
+        <% llm_stats = @task.llm_call_stats %>
+        <% if llm_stats[:count] > 0 %>
+          <div class="mb-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-2">LLM Usage</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="bg-indigo-50 p-4 rounded text-center">
+                <div class="text-xl font-bold text-indigo-700"><%= llm_stats[:count] %></div>
+                <div class="text-sm text-gray-600">Total Calls</div>
+              </div>
+              
+              <div class="bg-indigo-50 p-4 rounded text-center">
+                <div class="text-xl font-bold text-indigo-700">$<%= sprintf('%.4f', llm_stats[:total_cost]) %></div>
+                <div class="text-sm text-gray-600">Total Cost</div>
+              </div>
+              
+              <div class="bg-indigo-50 p-4 rounded text-center">
+                <div class="text-xl font-bold text-indigo-700"><%= number_to_human(llm_stats[:total_tokens]) %></div>
+                <div class="text-sm text-gray-600">Total Tokens</div>
+              </div>
+              
+              <div class="bg-indigo-50 p-4 rounded text-center">
+                <div class="text-xl font-bold text-indigo-700"><%= llm_stats[:models].keys.first&.split('/')&.last || 'N/A' %></div>
+                <div class="text-sm text-gray-600">Primary Model</div>
+              </div>
+            </div>
+          </div>
+        <% end %>
+        
         <div class="flex flex-wrap gap-3 border-t border-gray-200 pt-5">
           <% if @task.pending? %>
             <%= button_to "Start Task", activate_task_path(@task), method: :post, 

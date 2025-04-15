@@ -186,5 +186,33 @@
         <div class="text-gray-600">Waiting</div>
       </div>
     </div>
+    
+    <% llm_stats = @project.llm_call_stats %>
+    <% if llm_stats[:count] > 0 %>
+      <div class="mt-6">
+        <h3 class="text-lg font-medium mb-3">LLM Usage</h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="bg-indigo-50 p-4 rounded text-center">
+            <div class="text-2xl font-bold text-indigo-700"><%= llm_stats[:count] %></div>
+            <div class="text-gray-600">Total Calls</div>
+          </div>
+          
+          <div class="bg-indigo-50 p-4 rounded text-center">
+            <div class="text-2xl font-bold text-indigo-700">$<%= sprintf('%.4f', llm_stats[:total_cost]) %></div>
+            <div class="text-gray-600">Total Cost</div>
+          </div>
+          
+          <div class="bg-indigo-50 p-4 rounded text-center">
+            <div class="text-2xl font-bold text-indigo-700"><%= number_to_human(llm_stats[:total_tokens]) %></div>
+            <div class="text-gray-600">Total Tokens</div>
+          </div>
+          
+          <div class="bg-indigo-50 p-4 rounded text-center">
+            <div class="text-2xl font-bold text-indigo-700"><%= llm_stats[:models].keys.first&.split('/')&.last || 'N/A' %></div>
+            <div class="text-gray-600">Primary Model</div>
+          </div>
+        </div>
+      </div>
+    <% end %>
   </div>
 </div>

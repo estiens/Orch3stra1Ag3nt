@@ -189,6 +189,19 @@ class Task < ApplicationRecord
   def events
     Event.where(agent_activity_id: agent_activities.pluck(:id))
   end
+  
+  # Get LLM call statistics for this task
+  def llm_call_stats
+    activity_ids = agent_activities.pluck(:id)
+    calls = LlmCall.where(agent_activity_id: activity_ids)
+    
+    {
+      count: calls.count,
+      total_cost: calls.sum(:cost).round(4),
+      total_tokens: calls.sum(:total_tokens),
+      models: calls.group(:model).count
+    }
+  end
 
   # Task dependencies methods
   def depends_on_task_ids

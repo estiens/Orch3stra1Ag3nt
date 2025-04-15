@@ -10,6 +10,7 @@ class ProjectsController < ApplicationController
   def show
     @tasks = @project.tasks.order(created_at: :desc)
     @stats = @project.task_status_counts
+    @llm_stats = @project.llm_call_stats
   end
 
   # GET /projects/new
