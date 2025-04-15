@@ -42,7 +42,7 @@ class TasksController < ApplicationController
     @task.update(state: 'active')
     
     respond_to do |format|
-      format.html { redirect_to @task, notice: 'Task was activated.' }
+      format.html { redirect_back(fallback_location: @task, notice: 'Task was activated.') }
       format.turbo_stream { 
         @tasks = Task.where(state: ["active", "pending", "waiting_on_human"]).order(created_at: :desc).limit(10)
         render turbo_stream: turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks })
@@ -54,7 +54,7 @@ class TasksController < ApplicationController
     @task.update(state: 'paused')
     
     respond_to do |format|
-      format.html { redirect_to @task, notice: 'Task was paused.' }
+      format.html { redirect_back(fallback_location: @task, notice: 'Task was paused.') }
       format.turbo_stream { 
         @tasks = Task.where(state: ["active", "pending", "waiting_on_human"]).order(created_at: :desc).limit(10)
         render turbo_stream: turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks })
@@ -66,7 +66,31 @@ class TasksController < ApplicationController
     @task.update(state: 'active')
     
     respond_to do |format|
-      format.html { redirect_to @task, notice: 'Task was resumed.' }
+      format.html { redirect_back(fallback_location: @task, notice: 'Task was resumed.') }
+      format.turbo_stream { 
+        @tasks = Task.where(state: ["active", "pending", "waiting_on_human"]).order(created_at: :desc).limit(10)
+        render turbo_stream: turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks })
+      }
+    end
+  end
+  
+  def complete
+    @task.update(state: 'completed')
+    
+    respond_to do |format|
+      format.html { redirect_back(fallback_location: @task, notice: 'Task was marked as completed.') }
+      format.turbo_stream { 
+        @tasks = Task.where(state: ["active", "pending", "waiting_on_human"]).order(created_at: :desc).limit(10)
+        render turbo_stream: turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks })
+      }
+    end
+  end
+  
+  def fail
+    @task.update(state: 'failed')
+    
+    respond_to do |format|
+      format.html { redirect_back(fallback_location: @task, notice: 'Task was marked as failed.') }
       format.turbo_stream { 
         @tasks = Task.where(state: ["active", "pending", "waiting_on_human"]).order(created_at: :desc).limit(10)
         render turbo_stream: turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks })

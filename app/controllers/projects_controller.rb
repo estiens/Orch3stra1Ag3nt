@@ -72,6 +72,38 @@ class ProjectsController < ApplicationController
     if @project.status == "active"
       @project.update(status: "paused")
       respond_to do |format|
+        format.html { redirect_to @project, notice: "Project was successfully paused." }
+        format.turbo_stream { redirect_to @project, notice: "Project was successfully paused." }
+      end
+    else
+      respond_to do |format|
+        format.html { redirect_to @project, alert: "Project can only be paused when active." }
+        format.turbo_stream { redirect_to @project, alert: "Project can only be paused when active." }
+      end
+    end
+  end
+  
+  # POST /projects/1/resume
+  def resume
+    if @project.status == "paused"
+      @project.update(status: "active")
+      respond_to do |format|
+        format.html { redirect_to @project, notice: "Project was successfully resumed." }
+        format.turbo_stream { redirect_to @project, notice: "Project was successfully resumed." }
+      end
+    else
+      respond_to do |format|
+        format.html { redirect_to @project, alert: "Project can only be resumed when paused." }
+        format.turbo_stream { redirect_to @project, alert: "Project can only be resumed when paused." }
+      end
+    end
+  end
+  
+  # POST /projects/1/pause
+  def pause
+    if @project.status == "active"
+      @project.update(status: "paused")
+      respond_to do |format|
         format.html { redirect_back(fallback_location: dashboard_path, notice: "Project paused successfully.") }
         format.turbo_stream { flash.now[:notice] = "Project paused successfully." }
       end
