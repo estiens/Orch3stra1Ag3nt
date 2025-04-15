@@ -9,13 +9,7 @@ class ProjectsController < ApplicationController
   # GET /projects/1
   def show
     @root_tasks = @project.root_tasks.order(created_at: :desc)
-    @stats = {
-      total_tasks: @project.tasks.count,
-      pending_tasks: @project.tasks.where(state: :pending).count,
-      active_tasks: @project.tasks.where(state: :active).count,
-      completed_tasks: @project.tasks.where(state: :completed).count,
-      waiting_on_human_tasks: @project.tasks.where(state: :waiting_on_human).count
-    }
+    @stats = @project.task_status_counts
   end
 
   # GET /projects/new
