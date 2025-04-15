@@ -52,6 +52,32 @@ class EmbeddingTool
     )
   end
 
+    def fetch_directory_files(directory, pattern)
+      files = []
+
+      # Use Dir.glob to get all files recursively
+      Dir.glob(File.join(directory, "**", "*")).each do |file|
+        # Check if it's a file
+        if File.file?(file)
+          # If there's a pattern, match it; otherwise, add all files
+          if pattern.nil? || File.fnmatch(pattern, File.basename(file))
+            files << file
+          end
+        end
+      end
+
+      files
+    end
+
+  def add_directory(directory, pattern: nil, content_type: nil, collection: DEFAULT_COLLECTION)
+    # Validate directory
+    raise ArgumentError, "Directory not found: #{directory}" unless File.directory?(directory)
+    raise ArgumentError, "Directory is not readable: #{directory}" unless File.readable?(directory)
+    files = fetch_directory_files(directory, pattern)
+    raise ArgumentError, "No files found in directory: #{directory}" if files.empty?
+    add_files(files: files, content_type: content_type, collection: collection)
+  end
+
   # Add files to the vector database
   def add_files(
     files:,
@@ -76,36 +102,36 @@ class EmbeddingTool
     files_array.each do |file|
       file_obj = validate_and_open_file(file)
       file_path = file_obj.respond_to?(:path) ? file_obj.path : "unknown"
-      
+
       # Determine content type if not provided
       detected_content_type = content_type
       if detected_content_type.nil? && file_obj.respond_to?(:path)
         ext = File.extname(file_obj.path).downcase
         detected_content_type = case ext
-                               when '.md', '.txt', '.text' then 'text'
-                               when '.html', '.htm' then 'html'
-                               when '.pdf' then 'pdf'
-                               when '.doc', '.docx' then 'document'
-                               when '.rb', '.py', '.js', '.java', '.c', '.cpp' then 'code'
-                               when '.json', '.xml', '.yaml', '.yml' then 'data'
-                               else DEFAULT_CONTENT_TYPE
-                               end
+        when ".md", ".txt", ".text" then "text"
+        when ".html", ".htm" then "html"
+        when ".pdf" then "pdf"
+        when ".doc", ".docx" then "document"
+        when ".rb", ".py", ".js", ".java", ".c", ".cpp" then "code"
+        when ".json", ".xml", ".yaml", ".yml" then "data"
+        else DEFAULT_CONTENT_TYPE
+        end
       end
 
       # Prepare file-specific metadata
       file_metadata = build_file_metadata(
-        file_obj, 
-        merge: metadata, 
-        content_type: detected_content_type, 
-        source_url: source_url, 
+        file_obj,
+        merge: metadata,
+        content_type: detected_content_type,
+        source_url: source_url,
         source_title: source_title
       )
-      
+
       # Log file processing
       Rails.logger.tagged("EmbeddingTool") do
         Rails.logger.info("Processing file: #{file_path} (#{file_obj.size} bytes, type: #{detected_content_type})")
       end
-      
+
       # Read file content
       begin
         file_content = file_obj.read
@@ -118,7 +144,7 @@ class EmbeddingTool
         }
         next
       end
-      
+
       # Add document to embedding service
       result = service.add_document(
         file_content,
@@ -299,7 +325,7 @@ class EmbeddingTool
         path = file.path
         raise ArgumentError, "File not found: #{path}" unless File.exist?(path)
         raise ArgumentError, "File is not readable: #{path}" unless File.readable?(path)
-        
+
         # Check if file is at beginning
         if file.respond_to?(:pos) && file.pos > 0
           file.rewind rescue nil
@@ -327,7 +353,7 @@ def build_file_metadata(file_obj, merge: {}, content_type: nil, source_url: nil,
   metadata = {}
   metadata[:source_title]   = source_title if source_title
   metadata[:source_url]     = source_url if source_url
-  
+
   # Extract file path information
   if file_obj.respond_to?(:path)
     file_path = file_obj.path
@@ -336,28 +362,28 @@ def build_file_metadata(file_obj, merge: {}, content_type: nil, source_url: nil,
     metadata[:file_name]      = File.basename(file_path) rescue nil
     metadata[:file_ext]       = File.extname(file_path).downcase rescue nil
     metadata[:file_dir]       = File.dirname(file_path) rescue nil
-    
+
     # Try to determine content type from extension if not provided
     if content_type.nil? && metadata[:file_ext]
       ext = metadata[:file_ext].downcase
       content_type = case ext
-                     when '.md', '.txt', '.text' then 'text'
-                     when '.html', '.htm' then 'html'
-                     when '.pdf' then 'pdf'
-                     when '.doc', '.docx' then 'document'
-                     when '.rb', '.py', '.js', '.java', '.c', '.cpp' then 'code'
-                     when '.json', '.xml', '.yaml', '.yml' then 'data'
-                     else 'unknown'
-                     end
+      when ".md", ".txt", ".text" then "text"
+      when ".html", ".htm" then "html"
+      when ".pdf" then "pdf"
+      when ".doc", ".docx" then "document"
+      when ".rb", ".py", ".js", ".java", ".c", ".cpp" then "code"
+      when ".json", ".xml", ".yaml", ".yml" then "data"
+      else "unknown"
+      end
     end
   end
-  
+
   metadata[:file_size]        = file_obj.size if file_obj.respond_to?(:size)
   metadata[:content_type]     = content_type ||
     (file_obj.respond_to?(:content_type) && file_obj.content_type) ||
     DEFAULT_CONTENT_TYPE
   metadata[:timestamp]        = Time.now.iso8601
-  
+
   # Merge any additional metadata
   metadata.merge!(file_obj.metadata) if file_obj.respond_to?(:metadata)
   metadata.merge!(merge || {})
