@@ -1,16 +1,33 @@
-<div class="container mx-auto px-4 py-8">
-  <div class="flex justify-between items-center mb-8">
-    <h1 class="text-3xl font-bold">AI Agent Dashboard</h1>
+<div class="container mx-auto px-4 py-6" 
+     data-controller="dashboard-refresh" 
+     data-dashboard-refresh-interval-value="10000"
+     data-dashboard-refresh-url-value="<%= dashboard_path(format: :turbo_stream) %>">
+  
+  <!-- Dashboard Header -->
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <div class="flex items-center">
+      <h1 class="text-3xl font-bold">AI Agent Dashboard</h1>
+      <!-- Refresh indicator -->
+      <div data-dashboard-refresh-target="indicator" class="ml-3 hidden">
+        <div class="loading loading-spinner loading-sm text-primary"></div>
+      </div>
+      <!-- Manual refresh button -->
+      <button class="btn btn-ghost btn-sm ml-2" data-action="dashboard-refresh#manualRefresh">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      </button>
+    </div>
     
-    <div class="flex space-x-3">
-      <%= link_to new_project_path, class: "btn btn-primary btn-md" do %>
+    <div class="flex flex-wrap gap-3">
+      <%= link_to new_project_path, class: "btn btn-primary" do %>
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
         </svg>
         New Project
       <% end %>
       
-      <%= link_to projects_path, class: "btn btn-outline btn-md" do %>
+      <%= link_to projects_path, class: "btn btn-outline" do %>
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
@@ -20,7 +37,7 @@
   </div>
   
   <!-- Dashboard Overview Stats -->
-  <div class="stats stats-vertical lg:stats-horizontal shadow mb-8 w-full">
+  <div class="stats stats-vertical md:stats-horizontal shadow mb-8 w-full bg-base-200">
     <div class="stat">
       <div class="stat-figure text-primary">
         <svg class="h-8 w-8" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -49,6 +66,9 @@
       </div>
       <div class="stat-title">Pending Input</div>
       <div class="stat-value text-warning"><%= @human_input_requests.count %></div>
+      <% if @human_input_requests.any? %>
+        <div class="stat-desc text-warning">Requires attention</div>
+      <% end %>
     </div>
     
     <div class="stat">
@@ -64,86 +84,54 @@
   
   <!-- Main Dashboard Content -->
   <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+    <!-- Priority Section - Human Input Requests (Spans full width if there are pending requests) -->
+    <% if @human_input_requests.any? %>
+      <div class="col-span-1 lg:col-span-2 xl:col-span-3">
+        <%= dashboard_section_card("Pending Human Input", "human-input-requests-container", nil, @human_input_requests.count) do %>
+          <%= render partial: "human_input_requests", locals: { human_input_requests: @human_input_requests } %>
+        <% end %>
+      </div>
+    <% end %>
+    
     <!-- Left Column -->
     <div class="space-y-6 col-span-1">
       <!-- Projects Section -->
-      <div class="card bg-base-100 shadow-xl">
-        <div class="card-body">
-          <div class="flex justify-between items-center">
-            <h2 class="card-title">Active Projects</h2>
-            <%= link_to "View All", projects_path, class: "link link-primary" %>
-          </div>
-          <div id="projects-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
-            <%= render partial: "projects", locals: { projects: @projects } %>
-          </div>
-        </div>
-      </div>
+      <%= dashboard_section_card("Active Projects", "projects-container", projects_path) do %>
+        <%= render partial: "projects", locals: { projects: @projects } %>
+      <% end %>
       
-      <!-- Human Input Requests Section -->
-      <div class="card bg-base-100 shadow-xl">
-        <div class="card-body">
-          <div class="flex items-center">
-            <h2 class="card-title">Pending Human Input</h2>
-            <% if @human_input_requests.any? %>
-              <span class="badge badge-error ml-2">
-                <%= @human_input_requests.count %>
-              </span>
-            <% end %>
-          </div>
-          <div id="human-input-requests-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
-            <%= render partial: "human_input_requests", locals: { human_input_requests: @human_input_requests } %>
-          </div>
-        </div>
-      </div>
+      <% if @human_input_requests.empty? %>
+        <!-- Human Input Requests Section (only shown here if empty) -->
+        <%= dashboard_section_card("Pending Human Input", "human-input-requests-container") do %>
+          <%= render partial: "human_input_requests", locals: { human_input_requests: @human_input_requests } %>
+        <% end %>
+      <% end %>
     </div>
     
     <!-- Middle Column -->
     <div class="space-y-6 col-span-1">
       <!-- Tasks Section -->
-      <div class="card bg-base-100 shadow-xl">
-        <div class="card-body">
-          <div class="flex justify-between items-center">
-            <h2 class="card-title">Active Tasks</h2>
-            <%= link_to "View All", tasks_path, class: "link link-primary" %>
-          </div>
-          <div id="tasks-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
-            <%= render partial: "tasks", locals: { tasks: @tasks } %>
-          </div>
-        </div>
-      </div>
+      <%= dashboard_section_card("Active Tasks", "tasks-container", tasks_path) do %>
+        <%= render partial: "tasks", locals: { tasks: @tasks } %>
+      <% end %>
       
       <!-- Agent Activities Section -->
-      <div class="card bg-base-100 shadow-xl">
-        <div class="card-body">
-          <h2 class="card-title">Recent Agent Activities</h2>
-          <div id="agent-activities-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
-            <%= render partial: "agent_activities", locals: { agent_activities: @agent_activities } %>
-          </div>
-        </div>
-      </div>
+      <%= dashboard_section_card("Recent Agent Activities", "agent-activities-container") do %>
+        <%= render partial: "agent_activities", locals: { agent_activities: @agent_activities } %>
+      <% end %>
     </div>
     
     <!-- Right Column -->
     <div class="space-y-6 col-span-1">
       <!-- LLM Calls Section -->
-      <div class="card bg-base-100 shadow-xl">
-        <div class="card-body">
-          <h2 class="card-title">Recent LLM Calls</h2>
-          <div id="llm-calls-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
-            <%= render partial: "llm_calls", locals: { llm_calls: @llm_calls } %>
-          </div>
-        </div>
-      </div>
+      <%= dashboard_section_card("Recent LLM Calls", "llm-calls-container") do %>
+        <%= render partial: "llm_calls", locals: { llm_calls: @llm_calls } %>
+      <% end %>
       
       <!-- Events Section -->
-      <div class="card bg-base-100 shadow-xl">
-        <div class="card-body">
-          <h2 class="card-title">Latest Events</h2>
-          <div id="events-container" class="divide-y divide-gray-200 max-h-[500px] overflow-y-auto">
-            <%= render partial: "events", locals: { events: @events } %>
-          </div>
-        </div>
-      </div>
+      <%= dashboard_section_card("Latest Events", "events-container") do %>
+        <%= render partial: "events", locals: { events: @events } %>
+      <% end %>
     </div>
   </div>
 </div>
@@ -152,8 +140,3 @@
 
 <!-- Turbo frame for modal dialogs -->
 <%= turbo_frame_tag "modal" %>
-
-<div data-controller="dashboard-refresh" 
-     data-dashboard-refresh-interval-value="5000"
-     data-dashboard-refresh-url-value="<%= dashboard_path(format: :turbo_stream) %>">
-</div>

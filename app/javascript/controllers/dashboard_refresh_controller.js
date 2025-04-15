@@ -6,6 +6,8 @@ export default class extends Controller {
     url: String
   }
   
+  static targets = ["indicator"]
+  
   connect() {
     this.startRefreshing()
   }
@@ -17,7 +19,7 @@ export default class extends Controller {
   startRefreshing() {
     this.refreshTimer = setInterval(() => {
       this.refresh()
-    }, this.intervalValue)
+    }, this.intervalValue || 5000) // Default to 5 seconds if not specified
   }
   
   stopRefreshing() {
@@ -27,6 +29,11 @@ export default class extends Controller {
   }
   
   refresh() {
+    // Show refresh indicator if it exists
+    if (this.hasIndicatorTarget) {
+      this.indicatorTarget.classList.remove('hidden')
+    }
+    
     fetch(this.urlValue, {
       headers: {
         Accept: "text/vnd.turbo-stream.html"
@@ -35,6 +42,23 @@ export default class extends Controller {
     .then(response => response.text())
     .then(html => {
       Turbo.renderStreamMessage(html)
+      // Hide refresh indicator
+      if (this.hasIndicatorTarget) {
+        this.indicatorTarget.classList.add('hidden')
+      }
     })
+    .catch(error => {
+      console.error("Dashboard refresh error:", error)
+      // Hide refresh indicator even on error
+      if (this.hasIndicatorTarget) {
+        this.indicatorTarget.classList.add('hidden')
+      }
+    })
+  }
+  
+  // Manual refresh button handler
+  manualRefresh(event) {
+    event.preventDefault()
+    this.refresh()
   }
 }
