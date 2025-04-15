@@ -83,9 +83,8 @@
                 
                 <div class="mt-2">
                   <button class="text-blue-600 text-sm flex items-center" 
-                          data-action="click->collapsible#toggle" 
-                          data-collapsible-target="trigger"
-                          data-id="llm-<%= llm_call.id %>">
+                          onclick="toggleLlmDetails('<%= llm_call.id %>')"
+                          id="llm-button-<%= llm_call.id %>">
                     <span>View Prompt & Response</span>
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -257,3 +256,31 @@
     </div>
   </div>
 </div>
+
+<script>
+  function toggleEventDetails(eventId) {
+    const detailsElement = document.getElementById(`event-${eventId}`);
+    const buttonElement = document.getElementById(`event-button-${eventId}`);
+    
+    if (detailsElement.classList.contains('hidden')) {
+      detailsElement.classList.remove('hidden');
+      buttonElement.querySelector('svg').classList.add('transform', 'rotate-180');
+    } else {
+      detailsElement.classList.add('hidden');
+      buttonElement.querySelector('svg').classList.remove('transform', 'rotate-180');
+    }
+  }
+  
+  function toggleLlmDetails(llmId) {
+    const detailsElement = document.getElementById(`llm-${llmId}`);
+    const buttonElement = document.getElementById(`llm-button-${llmId}`);
+    
+    if (detailsElement.classList.contains('hidden')) {
+      detailsElement.classList.remove('hidden');
+      buttonElement.querySelector('svg').classList.add('transform', 'rotate-180');
+    } else {
+      detailsElement.classList.add('hidden');
+      buttonElement.querySelector('svg').classList.remove('transform', 'rotate-180');
+    }
+  }
+</script>
