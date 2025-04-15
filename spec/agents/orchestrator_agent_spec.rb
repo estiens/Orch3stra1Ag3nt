@@ -246,7 +246,7 @@ RSpec.describe OrchestratorAgent do
         allow(Task).to receive(:find).with(2).and_return(task2)
       end
 
-      xit "adjusts priorities for multiple tasks" do
+      it "adjusts priorities for multiple tasks" do
         expect(task1).to receive(:update!).with(priority: "high")
         expect(task1.events).to receive(:create!).with(
           hash_including(
