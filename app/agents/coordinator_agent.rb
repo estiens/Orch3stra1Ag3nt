@@ -244,9 +244,10 @@ class CoordinatorAgent < BaseAgent
       # Check if the task is waiting on human input
       is_waiting = task.waiting_on_human?
       
-      # Always activate the task if it's waiting on human input
+      # Only activate the task if it's waiting on human input
       if is_waiting
-        task.activate!
+        # The task should be in waiting_on_human state, so activate it to resume processing
+        task.activate! if task.may_activate?
 
         # Create a temporary agent activity to update task status
         temp_activity = AgentActivity.create!(
