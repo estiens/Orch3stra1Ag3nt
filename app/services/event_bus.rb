@@ -6,7 +6,8 @@ class EventBus
 
   # Class methods - delegates to instance
   class << self
-    delegate :publish, :register_handler, :handlers_for, :clear_handlers!, to: :instance
+    delegate :publish, :register_handler, :handlers_for, :clear_handlers!,
+             :register_standard_handlers, :handler_registry, to: :instance
 
     # Alias for register_handler to maintain backward compatibility with tests
     def subscribe(event_type, handler, method_name = :process)
@@ -16,15 +17,28 @@ class EventBus
 
   def initialize
     @handlers = Hash.new { |hash, key| hash[key] = [] }
+    @handler_metadata = {}
     @mutex = Mutex.new
   end
 
   # Register a handler for a specific event type
   # @param event_type [String] the event type to subscribe to
   # @param handler [Class] the class that will handle this event
-  def register_handler(event_type, handler)
+  # @param description [String] optional description of what this handler does
+  # @param priority [Integer] optional priority (higher numbers run first)
+  def register_handler(event_type, handler, description: nil, priority: 10)
     @mutex.synchronize do
-      @handlers[event_type.to_s] << handler unless @handlers[event_type.to_s].include?(handler)
+      # Only add the handler if it's not already registered for this event type
+      unless @handlers[event_type.to_s].include?(handler)
+        @handlers[event_type.to_s] << handler
+
+        # Store metadata about this handler
+        @handler_metadata["#{event_type}:#{handler}"] = {
+          description: description || "No description provided",
+          priority: priority,
+          registered_at: Time.current
+        }
+      end
     end
   end
 
@@ -33,7 +47,29 @@ class EventBus
   # @return [Array] array of handler classes
   def handlers_for(event_type)
     @mutex.synchronize do
-      @handlers[event_type.to_s].dup
+      # Sort handlers by priority (higher numbers first)
+      @handlers[event_type.to_s].sort_by do |handler|
+        -(@handler_metadata["#{event_type}:#{handler}"][:priority] || 0)
+      end
+    end
+  end
+
+  # Get the full handler registry with metadata
+  # @return [Hash] the handler registry
+  def handler_registry
+    @mutex.synchronize do
+      result = {}
+
+      @handlers.each do |event_type, handlers|
+        result[event_type] = handlers.map do |handler|
+          {
+            handler: handler,
+            metadata: @handler_metadata["#{event_type}:#{handler}"]
+          }
+        end
+      end
+
+      result
     end
   end
 
@@ -41,6 +77,35 @@ class EventBus
   def clear_handlers!
     @mutex.synchronize do
       @handlers.clear
+      @handler_metadata.clear
+    end
+  end
+
+  # Register standard handlers for common events
+  def register_standard_handlers
+    # This method registers system-level handlers that should always be present
+    # These are handlers for core functionality, not business logic
+    Rails.logger.info("Registering standard event handlers")
+
+    # Register a logging handler for all events if available
+    if defined?(EventLoggingHandler)
+      register_handler("*", EventLoggingHandler,
+                      description: "Logs all events to the database",
+                      priority: 100)
+    end
+
+    # Register a metrics/monitoring handler if available
+    if defined?(EventMetricsHandler)
+      register_handler("*", EventMetricsHandler,
+                      description: "Collects metrics for all events",
+                      priority: 90)
+    end
+
+    # Register a debugging handler in development environment
+    if Rails.env.development? && defined?(EventDebugHandler)
+      register_handler("*", EventDebugHandler,
+                      description: "Provides debug information for events in development",
+                      priority: 110)
     end
   end
 
@@ -97,13 +162,11 @@ class EventBus
           handler_class.process(event)
         elsif handler_class.respond_to?(:handle_event)
           # Use the handle_event method if available (for instance methods)
-          if handler_class.is_a?(Class)
-            handler = handler_class.new
-            handler.handle_event(event)
-          else
-            # For test doubles or instances
-            handler_class.handle_event(event)
-          end
+          handler_class.handle_event(event)
+        elsif handler_class.is_a?(Class) && handler_class.instance_methods.include?(:handle_event)
+          # For classes with instance method handle_event
+          handler = handler_class.new
+          handler.handle_event(event)
         else
           Rails.logger.warn("Handler #{handler_class} does not respond to process or handle_event")
         end

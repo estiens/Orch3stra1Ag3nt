@@ -1,5 +1,6 @@
 class LlmCall < ApplicationRecord
   include DashboardBroadcaster if defined?(DashboardBroadcaster)
+  include Contextable
 
   belongs_to :agent_activity
 

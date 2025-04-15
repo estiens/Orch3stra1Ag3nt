@@ -42,8 +42,14 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_15_045810) do
     t.integer "processing_attempts", default: 0
     t.string "processing_error"
     t.integer "priority", default: 0
+    t.bigint "task_id"
+    t.bigint "project_id"
     t.index ["agent_activity_id"], name: "index_events_on_agent_activity_id"
+    t.index ["event_type", "project_id"], name: "index_events_on_event_type_and_project_id"
+    t.index ["event_type", "task_id"], name: "index_events_on_event_type_and_task_id"
     t.index ["event_type"], name: "index_events_on_event_type"
+    t.index ["project_id"], name: "index_events_on_project_id"
+    t.index ["task_id"], name: "index_events_on_task_id"
   end
 
   create_table "human_input_requests", force: :cascade do |t|
@@ -282,6 +288,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_15_045810) do
 
   add_foreign_key "agent_activities", "tasks"
   add_foreign_key "events", "agent_activities"
+  add_foreign_key "events", "projects"
+  add_foreign_key "events", "tasks"
   add_foreign_key "human_input_requests", "agent_activities"
   add_foreign_key "human_input_requests", "tasks"
   add_foreign_key "human_interventions", "agent_activities"

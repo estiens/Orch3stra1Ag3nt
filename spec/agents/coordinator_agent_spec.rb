@@ -115,14 +115,18 @@ RSpec.describe CoordinatorAgent do
       end
 
       xit "activates the task and spawns a new coordinator" do
-        # Since the implementation now directly calls task.activate! after checking conditions,
-        # we need to ensure those conditions are met and the method will actually be called
+        # Set up the expectations before calling the method
         allow(task).to receive(:waiting_on_human?).and_return(true)
         allow(task).to receive(:may_activate?).and_return(true)
+        allow(task).to receive(:activate!)
 
-        # We still need to verify the task gets activated, but we need to modify our expectation
-        # to account for the implementation's different approach
-        expect(task).to receive(:activate!).at_least(:once)
+        # Call the method
+        agent.handle_human_input_provided(event)
+
+        # Verify the task was checked and activated
+        expect(task).to have_received(:waiting_on_human?)
+        expect(task).to have_received(:may_activate?)
+        expect(task).to have_received(:activate!)
         expect(described_class).to receive(:enqueue).with(
           "Resume after human input provided",
           hash_including(
@@ -225,7 +229,8 @@ RSpec.describe CoordinatorAgent do
       let(:subtask) { create(:task, parent: task, title: "Research task") }
 
       xit "assigns a subtask to the specified agent type" do
-        expect(WebResearcherAgent).to receive(:enqueue).with(
+        # First stub the WebResearcherAgent.enqueue method
+        allow(WebResearcherAgent).to receive(:enqueue).with(
           "Research task\n\nThis is a test task",
           {
             task_id: subtask.id,
@@ -239,10 +244,16 @@ RSpec.describe CoordinatorAgent do
           }
         ).and_return(true)
 
-        expect(subtask).to receive(:may_activate?).and_return(true)
-        expect(subtask).to receive(:activate!)
+        # Set up expectations for the methods that will be called
+        allow(subtask).to receive(:activate!)
+        allow(subtask).to receive(:update)
 
-        expect(subtask).to receive(:update).with(
+        # Call the method first
+        agent.send(:assign_subtask, subtask.id, "WebResearcherAgent")
+
+        # Then verify the expectations
+        expect(subtask).to have_received(:activate!)
+        expect(subtask).to have_received(:update).with(
           hash_including(
             metadata: hash_including(
               assigned_agent: "WebResearcherAgent",

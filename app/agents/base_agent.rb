@@ -2,7 +2,7 @@ class BaseAgent
   include SolidQueueManagement
   # Optionally include EventSubscriber or pass to subclasses
 
-  attr_reader :llm, :tools, :purpose, :session_data, :task, :agent_activity
+  attr_reader :llm, :tools, :purpose, :session_data, :task, :agent_activity, :context
   # Removed :chain, :retriever
 
   def initialize(
@@ -11,11 +11,21 @@ class BaseAgent
     tools: nil,
     task: nil,
     agent_activity: nil,
+    context: nil,
     **options # Allow arbitrary options for subclasses
   )
     @purpose = purpose
-    @task = task
-    @agent_activity = agent_activity
+
+    # Set up context
+    @context = context || {}
+    @task = task || (context && Task.find_by(id: context[:task_id]))
+    @agent_activity = agent_activity || (context && AgentActivity.find_by(id: context[:agent_activity_id]))
+
+    # Update context with task and agent_activity if provided
+    @context[:task_id] = @task.id if @task && !@context[:task_id]
+    @context[:agent_activity_id] = @agent_activity.id if @agent_activity && !@context[:agent_activity_id]
+    @context[:project_id] = @task.project_id if @task&.project_id && !@context[:project_id]
+
     # Tools are stored internally as an array of hashes (for blocks) or objects
     @tools = Array.wrap(tools || self.class.registered_tools)
     @llm = llm || self.class.default_llm
@@ -182,8 +192,15 @@ class BaseAgent
   end
 
   def self.enqueue(prompt, options = {})
+    # Extract context from options
+    context = {
+      task_id: options[:task_id],
+      agent_activity_id: options[:agent_activity_id],
+      project_id: options[:project_id]
+    }.compact
+
     # Ensure task_id is present
-    unless options[:task_id].present?
+    unless context[:task_id].present?
       Rails.logger.error("[#{self.name}] Cannot enqueue agent job without task_id")
       return nil
     end
@@ -198,6 +215,9 @@ class BaseAgent
       job_options[:priority] = numeric_priority if numeric_priority.present?
       # Allow overriding via passed-in job_options as well
       job_options.merge!(options.delete(:job_options) || {})
+
+      # Add context to options
+      options[:context] = context
 
       Agents::AgentJob.set(**job_options).perform_later(agent_class_name, prompt, options)
     end
@@ -217,6 +237,33 @@ class BaseAgent
 
   # --- Protected Logging Helpers ---
   protected
+
+  # Helper method to publish events with context
+  def publish_event(event_type, data = {}, options = {})
+    # Ensure context exists
+    @context ||= {}
+
+    # Merge context with options
+    merged_options = @context.dup.merge(options)
+
+    # Ensure we have agent_activity_id
+    if merged_options[:agent_activity_id].blank? && @agent_activity.present?
+      merged_options[:agent_activity_id] = @agent_activity.id
+    end
+
+    # Ensure we have task_id
+    if merged_options[:task_id].blank? && @task.present?
+      merged_options[:task_id] = @task.id
+    end
+
+    # Ensure we have project_id
+    if merged_options[:project_id].blank? && @task&.project_id.present?
+      merged_options[:project_id] = @task.project_id
+    end
+
+    # Publish event through the EventBus
+    Event.publish(event_type, data, merged_options)
+  end
 
   # Use this in subclasses when making direct LLM calls to log them
   def log_direct_llm_call(prompt, llm_response)
@@ -270,7 +317,7 @@ class BaseAgent
       # Calculate cost based on token usage and model
       cost = calculate_llm_cost(model_name, prompt_tokens, completion_tokens)
 
-      # Create the LLM call record with all fields
+      # Create the LLM call record with all fields using the old method for test compatibility
       @agent_activity.llm_calls.create!(
         provider: provider,
         model: model_name,
@@ -347,6 +394,7 @@ class BaseAgent
 
   def log_tool_event(event_type, tool_data)
     return unless @agent_activity
+
     data = { tool: tool_data[:tool], args: tool_data[:args].inspect.truncate(500) }
     if tool_data[:error]
       data[:error] = tool_data[:error].message
@@ -355,6 +403,8 @@ class BaseAgent
     else
       data[:result_preview] = tool_data[:result].to_s.truncate(500)
     end
+
+    # Use the agent_activity.events.create! method for compatibility with tests
     @agent_activity.events.create!(event_type: event_type, data: data)
   rescue => e
     Rails.logger.error "[BaseAgent] Failed to log tool event '#{event_type}' for tool '#{tool_data[:tool]}': #{e.message}"

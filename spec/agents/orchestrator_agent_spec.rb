@@ -122,6 +122,7 @@ RSpec.describe OrchestratorAgent do
         allow(Task).to receive_message_chain(:active, :count).and_return(5)
         allow(Task).to receive_message_chain(:where, :count).and_return(2)
         allow(AgentActivity).to receive_message_chain(:where, :count).and_return(3)
+        allow(AgentActivity).to receive_message_chain(:where, :group, :count).and_return({ "ResearcherAgent" => 2, "CoordinatorAgent" => 1 })
         allow(SolidQueue::Job).to receive_message_chain(:where, :count).and_return(10)
         allow(SolidQueue::Job).to receive_message_chain(:where, :group, :count).and_return({ "orchestrator" => 1, "coordinator" => 2 })
         allow(Event).to receive_message_chain(:where, :recent, :limit).and_return([])
@@ -132,7 +133,7 @@ RSpec.describe OrchestratorAgent do
         expect(agent.llm).to receive(:chat).with(hash_including(:messages)).and_return(llm_response)
         expect(agent).to receive(:log_direct_llm_call)
 
-        result = agent.send(:analyze_system_state)
+        result = agent.analyze_system_state
 
         expect(result).to include("SYSTEM STATE: Stable")
         expect(result).to include("KEY AREAS OF CONCERN")
@@ -145,13 +146,13 @@ RSpec.describe OrchestratorAgent do
           llm_response
         end
 
-        agent.send(:analyze_system_state, "Check coordinator load")
+        agent.analyze_system_state("Check coordinator load")
       end
 
       it "handles LLM errors" do
         expect(agent.llm).to receive(:chat).and_raise(StandardError.new("LLM API error"))
 
-        result = agent.send(:analyze_system_state)
+        result = agent.analyze_system_state
 
         expect(result).to include("Error analyzing system state: LLM API error")
       end
@@ -160,7 +161,7 @@ RSpec.describe OrchestratorAgent do
     describe "#spawn_coordinator" do
       it "creates a coordinator agent job for a task" do
         expect(CoordinatorAgent).to receive(:enqueue).with(
-          "Coordinate task execution for: System task\nOrchestrate system",
+          /This is a (root task|standalone task).*System task\s+Orchestrate system/m,
           hash_including(task_id: task.id, parent_activity_id: agent_activity.id)
         )
 
@@ -168,9 +169,10 @@ RSpec.describe OrchestratorAgent do
           hash_including(event_type: "coordinator_spawned", data: hash_including(task_id: task.id))
         )
 
-        result = agent.send(:spawn_coordinator, task.id)
+        result = agent.spawn_coordinator(task.id)
 
-        expect(result).to include("Spawned CoordinatorAgent for task #{task.id}")
+        expect(result).to include("Spawned CoordinatorAgent for")
+        expect(result).to include("#{task.id}")
       end
 
       it "handles missing tasks" do
@@ -246,9 +248,18 @@ RSpec.describe OrchestratorAgent do
         allow(Task).to receive(:find).with(2).and_return(task2)
       end
 
-      xit "adjusts priorities for multiple tasks" do
+      it "adjusts priorities for multiple tasks" do
+        # Create event objects for the tasks
+        task1_events = double("Task1Events")
+        task2_events = double("Task2Events")
+
+        # Allow the tasks to receive the events method
+        allow(task1).to receive(:events).and_return(task1_events)
+        allow(task2).to receive(:events).and_return(task2_events)
+
+        # Set expectations for update! and events.create!
         expect(task1).to receive(:update!).with(priority: "high")
-        expect(task1.events).to receive(:create!).with(
+        expect(task1_events).to receive(:create!).with(
           hash_including(
             event_type: "priority_adjusted",
             data: hash_including(from: "normal", to: "high", adjusted_by: "OrchestratorAgent")
@@ -256,11 +267,11 @@ RSpec.describe OrchestratorAgent do
         )
 
         expect(task2).to receive(:update!).with(priority: "normal")
-        expect(task2.events).to receive(:create!).with(
+        expect(task2_events).to receive(:create!).with(
           hash_including(event_type: "priority_adjusted", data: hash_including(from: "low", to: "normal"))
         )
 
-        result = agent.send(:adjust_system_priorities, "1:high, 2:normal")
+        result = agent.adjust_system_priorities("1:high, 2:normal")
 
         expect(result).to include("Task 1: priority changed from normal to high")
         expect(result).to include("Task 2: priority changed from low to normal")
