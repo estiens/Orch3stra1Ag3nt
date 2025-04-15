@@ -1,94 +1,8 @@
 # frozen_string_literal: true
 require 'concurrent'
 
-# Module for Linux CPU affinity (defined outside class to avoid syntax errors)
-module LinuxScheduler
-  # Flag to track if initialized
-  @initialized = false
-  
-  # Constants for CPU affinity - defined at module level
-  CPU_SETSIZE = 1024 if !defined?(CPU_SETSIZE)
-  
-  # Setup method to initialize FFI
-  def self.setup
-    return unless RUBY_PLATFORM =~ /linux/
-    return @initialized if @initialized
-    
-    begin
-      require 'ffi'
-      
-      extend FFI::Library
-      ffi_lib 'c'
-      
-      # Define FFI structures and functions only if not already defined
-      unless @ffi_initialized
-        # Function prototypes
-        attach_function :sched_getaffinity, [:pid_t, :size_t, :pointer], :int
-        attach_function :sched_setaffinity, [:pid_t, :size_t, :pointer], :int
-        
-        @ffi_initialized = true
-      end
-      
-      # Set initialized flag
-      @initialized = true
-      true
-    rescue LoadError, StandardError => e
-      Rails.logger.debug("CPU affinity not available: #{e.message}")
-      false
-    end
-  end
-  
-  # Struct definition needs to be at module level, not in a method
-  if RUBY_PLATFORM =~ /linux/
-    begin
-      require 'ffi'
-      class CpuSetT < FFI::Struct
-        layout :bits, [:long, CPU_SETSIZE / (8 * FFI.type_size(:long))]
-      end
-    rescue LoadError, StandardError
-      # Ignore errors, we'll handle them in setup
-    end
-  end
-  
-  def self.initialized?
-    @initialized || false
-  end
-  
-  # Helper methods
-  def self.set_affinity(pid, cpu_id)
-    return false unless initialized?
-    
-    begin
-      mask = CpuSetT.new
-      # Clear the CPU set
-      cpu_set_size = CPU_SETSIZE / 8
-      FFI::MemoryPointer.new(:char, cpu_set_size) do |p|
-        p.write_bytes("\0" * cpu_set_size)
-        mask[:bits].pointer.write_bytes(p.read_bytes(cpu_set_size))
-      end
-      
-      # Set the bit for the specified CPU
-      bit_offset = cpu_id % CPU_SETSIZE
-      long_offset = bit_offset / (8 * FFI.type_size(:long))
-      bit_num = bit_offset % (8 * FFI.type_size(:long))
-      mask[:bits][long_offset] |= (1 << bit_num)
-      
-      # Apply the affinity mask
-      sched_setaffinity(pid, mask.size, mask.pointer)
-    rescue => e
-      Rails.logger.debug("Failed to set CPU affinity: #{e.message}")
-      false
-    end
-  end
-end
-
-# Try to initialize the LinuxScheduler if we're on Linux
-# (But don't fail if it doesn't work)
-begin
-  LinuxScheduler.setup if RUBY_PLATFORM =~ /linux/
-rescue
-  # Ignore errors during initialization
-end
+# frozen_string_literal: true
+require 'concurrent'
 
 # Service for managing vector embeddings and RAG functionality
 class EmbeddingService
@@ -134,24 +48,24 @@ class EmbeddingService
     Rails.logger.debug("EmbeddingService: Starting add_document (#{text.bytesize} bytes)")
     return [] if text.blank?
 
-    # Generate chunks using parallel processing
+    # Generate chunks using optimized parallel processing
     chunk_start = Time.now
-    Rails.logger.debug("EmbeddingService: Starting parallel chunking of text")
+    Rails.logger.debug("EmbeddingService: Starting chunking of text")
     chunks = parallel_chunk_text(text, chunk_size, chunk_overlap)
     chunk_time = Time.now - chunk_start
-    Rails.logger.debug("EmbeddingService: Parallel chunking completed in #{chunk_time.round(2)}s - created #{chunks.size} chunks")
+    Rails.logger.debug("EmbeddingService: Chunking completed in #{chunk_time.round(2)}s - created #{chunks.size} chunks")
     return [] if chunks.empty?
 
-    # Filter out existing chunks if not forced
+    # Filter out existing chunks if not forced - use a more efficient approach
     filter_start = Time.now
     chunks_to_process = if force
       Rails.logger.debug("EmbeddingService: Forced processing - skipping duplicate check")
       chunks
     else
+      # Use a more efficient query approach with batching for large chunk sets
       Rails.logger.debug("EmbeddingService: Checking for existing chunks")
-      existing_chunks = VectorEmbedding.where(collection: @collection, content: chunks).pluck(:content)
-      remaining = chunks - existing_chunks
-      Rails.logger.debug("EmbeddingService: Found #{existing_chunks.size} existing chunks, will process #{remaining.size} new chunks")
+      remaining = filter_existing_chunks(chunks)
+      Rails.logger.debug("EmbeddingService: Will process #{remaining.size} new chunks")
       remaining
     end
     filter_time = Time.now - filter_start
@@ -171,6 +85,30 @@ class EmbeddingService
       source_title,
       metadata
     )
+  end
+  
+  # More efficient filtering of existing chunks
+  def filter_existing_chunks(chunks)
+    return chunks if chunks.empty?
+    
+    # For large chunk sets, process in batches to avoid memory issues
+    if chunks.size > 1000
+      # Process in batches of 1000
+      result = []
+      chunks.each_slice(1000) do |batch|
+        existing = VectorEmbedding.where(collection: @collection)
+                                  .where(content: batch)
+                                  .pluck(:content)
+        result.concat(batch - existing)
+      end
+      return result
+    else
+      # For smaller sets, process all at once
+      existing_chunks = VectorEmbedding.where(collection: @collection)
+                                       .where(content: chunks)
+                                       .pluck(:content)
+      return chunks - existing_chunks
+    end
   end
 
   # Remove all embeddings in collection
@@ -600,44 +538,58 @@ class EmbeddingService
     end
   end
 
-  # Parallel chunking of text using multiple processors
+  # Efficiently chunk text using a simpler parallel approach
   def parallel_chunk_text(text, chunk_size, chunk_overlap)
-    # For very small texts, just return the whole thing without parallelization
+    # For small texts, just return the whole thing or process sequentially
     return [text.strip] if text.length <= chunk_size
-
-    # For medium texts (under 1MB), don't use parallelization at all - overhead isn't worth it
+    
+    # For medium texts, use sequential processing - parallelism overhead isn't worth it
     if text.length < 1_000_000
       Rails.logger.debug("EmbeddingService: Text too small for parallel chunking, using sequential chunking")
       return chunk_text_segment(text, chunk_size, chunk_overlap)
     end
     
-    # Determine the number of parallel workers based on CPU cores
+    # For larger texts, use a simpler and more efficient parallel approach
     processor_count = [Concurrent.processor_count, 1].max
-    Rails.logger.debug("EmbeddingService: Using #{processor_count} CPU cores for parallel chunking")
+    Rails.logger.debug("EmbeddingService: Using #{processor_count} threads for parallel chunking")
     
-    # Split the text into preliminary large segments
-    # Use a segment size of ~500KB or 100x chunk_size, whichever is larger
-    segment_size = [500_000, chunk_size * 100].max
-    segment_overlap = chunk_size * 2  # Ensure overlap between segments
+    # Divide text into segments more efficiently
+    segments = split_text_into_segments(text, processor_count, chunk_size, chunk_overlap)
+    Rails.logger.debug("EmbeddingService: Split text into #{segments.size} segments for processing")
     
-    Rails.logger.debug("EmbeddingService: Splitting text into segments (size: #{segment_size}, overlap: #{segment_overlap})")
+    # Use a simple thread pool for processing
+    all_chunks = process_segments_with_threads(segments, chunk_size, chunk_overlap)
     
-    # Split into initial segments (this is fast)
+    # Remove duplicates that might have been created in overlap regions
+    Rails.logger.debug("EmbeddingService: Parallel chunking completed - generated #{all_chunks.size} chunks")
+    all_chunks.uniq
+  end
+  
+  # Split text into segments for parallel processing
+  def split_text_into_segments(text, processor_count, chunk_size, chunk_overlap)
+    # Calculate optimal segment size based on text length and processor count
+    # Aim for segments that are roughly equal in size
+    target_segment_count = processor_count * 2  # Create 2x segments as processors for better load balancing
+    base_segment_size = text.length / target_segment_count
+    
+    # Ensure segment size is reasonable (not too small)
+    segment_size = [base_segment_size, chunk_size * 10].max
+    segment_overlap = chunk_size  # Smaller overlap is sufficient
+    
     segments = []
     position = 0
     
     while position < text.length
       end_pos = [position + segment_size, text.length].min
       
-      # Extend to the end of the text or find a good breakpoint if not at the end
+      # Find a natural breakpoint if not at the end
       if end_pos < text.length
-        # Look for paragraph breaks or other natural boundaries
-        # Search only in the last 1000 chars of the segment to keep it fast
-        search_window = 1000
+        # Look for paragraph or line breaks near the end position
+        search_window = [500, segment_size / 10].min  # Smaller search window
         search_start = [end_pos - search_window, position].max
         search_text = text[search_start...end_pos]
         
-        # Try to find a paragraph break
+        # Try to find a paragraph or line break
         if search_text.include?("\n\n")
           offset = search_text.rindex("\n\n")
           end_pos = search_start + offset + 2 if offset
@@ -647,7 +599,7 @@ class EmbeddingService
         end
       end
       
-      # Extract segment with contextual overlap
+      # Extract segment
       segment = text[position...end_pos]
       segments << segment if segment.length > 0
       
@@ -655,203 +607,52 @@ class EmbeddingService
       position = [end_pos - segment_overlap, position + 1].max
     end
     
-    Rails.logger.debug("EmbeddingService: Created #{segments.size} preliminary segments for parallel processing")
-
-    # If we only have a few segments, don't fork - not worth the overhead
-    if segments.size <= 2
-      Rails.logger.debug("EmbeddingService: Only #{segments.size} segments, using thread pool instead of forking")
-      return parallel_chunk_with_threads(segments, chunk_size, chunk_overlap, processor_count)
-    end
-
-    # Use forking for true parallelism if supported, otherwise use an optimized thread pool
-    if Process.respond_to?(:fork) && !Rails.env.test?
-      return parallel_chunk_with_forking(segments, chunk_size, chunk_overlap)
-    else
-      return parallel_chunk_with_threads(segments, chunk_size, chunk_overlap, processor_count)
-    end
+    segments
   end
-
-  # Process chunks using separate processes (bypasses GIL)
-  def parallel_chunk_with_forking(segments, chunk_size, chunk_overlap)
-    # Limit processes to CPU count, not segment count
-    processor_count = [Concurrent.processor_count, 1].max
-    max_processes = [processor_count, 4].max  # Limit to 4 processes max to avoid overwhelming system
+  
+  # Process segments using a simple thread pool
+  def process_segments_with_threads(segments, chunk_size, chunk_overlap)
+    return [] if segments.empty?
     
-    Rails.logger.info("EmbeddingService: Using process forking for parallel chunking with #{max_processes} processes")
+    # Use a thread pool with a reasonable size
+    pool_size = [Concurrent.processor_count, segments.size].min
     
-    # Distribute segments across available processes
-    segment_groups = []
-    max_processes.times { segment_groups << [] }
+    # Create a thread pool
+    pool = Concurrent::FixedThreadPool.new(pool_size)
     
-    # Distribute segments evenly across process groups
+    # Process segments in parallel
+    mutex = Mutex.new
+    all_chunks = []
+    
+    # Create and submit tasks
     segments.each_with_index do |segment, idx|
-      group_idx = idx % max_processes
-      segment_groups[group_idx] << segment
-    end
-    
-    # Pipe for IPC
-    readers = []
-    writers = []
-    
-    # Create a pipe for each process
-    max_processes.times do
-      reader, writer = IO.pipe
-      readers << reader
-      writers << writer
-    end
-    
-    # Track child processes
-    pids = []
-    
-    # Fork a limited number of processes
-    segment_groups.each_with_index do |group_segments, i|
-      # Skip empty groups
-      next if group_segments.empty?
-      
-      pid = Process.fork do
+      pool.post do
         begin
-          # Close all pipes except the one we need to write to
-          readers.each(&:close)
-          writers.each_with_index do |w, idx|
-            w.close unless idx == i
+          # Process the segment
+          start_time = Time.now
+          chunks = chunk_text_segment(segment, chunk_size, chunk_overlap)
+          duration = Time.now - start_time
+          
+          # Thread-safe append to results
+          mutex.synchronize do
+            all_chunks.concat(chunks)
           end
           
-          # Process all segments in this group
-          all_group_chunks = []
-          
-          group_segments.each do |segment|
-            chunks = chunk_text_segment(segment, chunk_size, chunk_overlap)
-            all_group_chunks.concat(chunks)
-          end
-          
-          # Serialize and send the result through the pipe
-          Marshal.dump(all_group_chunks, writers[i])
+          Rails.logger.debug("EmbeddingService: Thread processed segment #{idx+1}/#{segments.size} in #{duration.round(2)}s - #{chunks.size} chunks")
         rescue => e
-          Rails.logger.error("EmbeddingService: Error in process #{i}: #{e.message}")
-          # Send error info in case of failure
-          Marshal.dump([], writers[i])
-          exit(1)
-        ensure
-          writers[i].close
-          exit(0)
+          Rails.logger.error("EmbeddingService: Error processing segment #{idx+1}: #{e.message}")
         end
       end
-      
-      pids << pid if pid
     end
     
-    # Close all writers in the parent process
-    writers.each(&:close)
+    # Wait for all tasks to complete
+    pool.shutdown
+    pool.wait_for_termination(60)  # 60 second timeout
     
-    # Collect results from all child processes
-    all_chunks = []
-    readers.each do |reader|
-      begin
-        chunks = Marshal.load(reader)
-        all_chunks.concat(chunks)
-      rescue EOFError, IOError => e
-        # Handle case where a process didn't write anything
-        Rails.logger.error("EmbeddingService: Error reading from pipe: #{e.message}")
-      ensure
-        reader.close
-      end
-    end
-    
-    # Wait for all child processes to finish
-    pids.each do |pid|
-      begin
-        Process.waitpid(pid)
-      rescue Errno::ECHILD => e
-        # Process already exited, that's fine
-        Rails.logger.debug("EmbeddingService: Process #{pid} already exited")
-      end
-    end
-    
-    Rails.logger.debug("EmbeddingService: Parallel chunking with forking completed - generated #{all_chunks.size} chunks")
-    
-    # Remove potential duplicates from segment overlaps
-    all_chunks.uniq
+    all_chunks
   end
 
-  # Process chunks using an optimized thread pool (limited by GIL)
-  def parallel_chunk_with_threads(segments, chunk_size, chunk_overlap, processor_count)
-    Rails.logger.debug("EmbeddingService: Using thread pool for chunking with #{processor_count} workers")
-    
-    # Configure thread pool for optimal concurrency
-    pool_options = {
-      min_threads: [processor_count, 2].max,
-      max_threads: [processor_count * 2, 8].max,
-      max_queue: 1000,
-      idletime: 60,
-      fallback_policy: :caller_runs
-    }
-    
-    # Create a properly sized thread pool with explicit backend
-    pool = Concurrent::ThreadPoolExecutor.new(pool_options)
-    
-    # Now chunk each segment in parallel and combine results
-    futures = segments.map.with_index do |segment, idx|
-      Concurrent::Promise.execute(executor: pool) do
-        # Add thread CPU affinity if possible (Linux only)
-        set_thread_affinity(idx % processor_count) if respond_to?(:set_thread_affinity, true)
-        
-        # Log thread activity
-        thread_id = Thread.current.object_id
-        Rails.logger.debug("EmbeddingService: Thread #{thread_id} processing segment #{idx+1}/#{segments.size}")
-        
-        # Process the segment
-        start_time = Time.now
-        chunks = chunk_text_segment(segment, chunk_size, chunk_overlap)
-        duration = Time.now - start_time
-        
-        Rails.logger.debug("EmbeddingService: Thread #{thread_id} completed segment #{idx+1} in #{duration.round(2)}s - generated #{chunks.size} chunks")
-        
-        chunks
-      end
-    end
-    
-    # Collect all chunks and remove duplicates that might have been created in overlap regions
-    all_chunks = []
-    futures.each_with_index do |future, idx|
-      begin
-        result = future.value(60)  # 60 second timeout
-        all_chunks.concat(result)
-      rescue => e
-        Rails.logger.error("EmbeddingService: Error processing segment #{idx+1}: #{e.message}")
-      end
-    end
-    
-    # Ensure we shut down the pool properly
-    begin
-      pool.shutdown
-      unless pool.wait_for_termination(30)
-        Rails.logger.warn("EmbeddingService: Force shutting down thread pool")
-        pool.kill
-      end
-    rescue => e
-      Rails.logger.error("EmbeddingService: Error shutting down thread pool: #{e.message}")
-    end
-    
-    Rails.logger.debug("EmbeddingService: Parallel chunking with threads completed - generated #{all_chunks.size} chunks")
-    
-    # Remove potential duplicates from segment overlaps
-    all_chunks.uniq
-  end
-
-  # Set CPU affinity for a thread (Linux only, no-op on other platforms)
-  def set_thread_affinity(cpu_id)
-    return unless RUBY_PLATFORM =~ /linux/
-    
-    # Use the LinuxScheduler module that's defined at the top level
-    if LinuxScheduler.initialized?
-      result = LinuxScheduler.set_affinity(Process.pid, cpu_id)
-      Rails.logger.debug("EmbeddingService: Set CPU affinity for thread to CPU #{cpu_id}: #{result ? 'success' : 'failed'}")
-    else
-      Rails.logger.debug("EmbeddingService: CPU affinity not available")
-    end
-  end
-
-  # Chunk a single text segment (used by parallel chunking)
+  # Optimized chunking algorithm for a single text segment
   def chunk_text_segment(text, chunk_size, chunk_overlap)
     # For very small texts, just return the whole thing
     return [text.strip] if text.length <= chunk_size
@@ -859,54 +660,47 @@ class EmbeddingService
     chunks = []
     position = 0
     text_length = text.length
-
+    
+    # Pre-calculate breakpoint patterns for faster matching
+    paragraph_break = "\n\n"
+    line_break = "\n"
+    sentence_end = ". "
+    
     while position < text_length
       # Find end position
       end_pos = [position + chunk_size, text_length].min
-
+      
       # Find a natural breakpoint if not at the end
       if end_pos < text_length
-        # Search window - look back up to 100 chars
-        search_start = [position + chunk_size - 100, position].max
+        # Use a more efficient approach to find breakpoints
+        # Start with a smaller search window
+        search_window = [80, chunk_size / 10].min
+        search_start = [end_pos - search_window, position].max
         search_text = text[search_start...end_pos]
-
-        # Try to find a good breakpoint in priority order
-        break_pos = find_breakpoint(search_text, search_start)
-        end_pos = break_pos if break_pos
+        
+        # Check for breakpoints in order of preference
+        if (pos = search_text.rindex(paragraph_break))
+          end_pos = search_start + pos + 2
+        elsif (pos = search_text.rindex(line_break))
+          end_pos = search_start + pos + 1
+        elsif (pos = search_text.rindex(sentence_end))
+          end_pos = search_start + pos + 2
+        elsif (pos = search_text.rindex(" "))
+          end_pos = search_start + pos + 1
+        end
       end
-
-      # Extract chunk
+      
+      # Extract chunk and add if not empty
       chunk = text[position...end_pos].strip
       chunks << chunk if chunk.length > 0
-
-      # Move position with overlap
-      position = end_pos - chunk_overlap
-      position = position + 1 if position <= end_pos - chunk_size  # Ensure progress
+      
+      # Move position with overlap, ensuring forward progress
+      new_position = end_pos - chunk_overlap
+      # Ensure we make progress even with large overlaps
+      position = new_position > position ? new_position : position + 1
     end
-
+    
     chunks
-  end
-
-  # Find a natural breakpoint in text
-  def find_breakpoint(search_text, search_start)
-    # Try different delimiters in priority order
-    breakpoints = [
-      ["\n\n", 2],  # Paragraph break
-      ["\n", 1],    # Line break
-      [". ", 2],    # Sentence end
-      ["; ", 2],    # Semicolon
-      [", ", 2],    # Comma
-      [" ", 1]      # Any space
-    ]
-
-    breakpoints.each do |delimiter, offset|
-      if search_text.include?(delimiter)
-        pos = search_text.rindex(delimiter)
-        return search_start + pos + offset if pos
-      end
-    end
-
-    nil
   end
 
   # LLM provider - lazily initialized
