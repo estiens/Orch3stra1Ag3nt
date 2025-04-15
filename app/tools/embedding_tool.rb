@@ -116,8 +116,8 @@ class EmbeddingTool
         
         Rails.logger.info("Processing batch #{batch_num}/#{total_batches} with #{batch_size} files")
         
-        # Process each file in the batch
-        batch_results = batch.map do |file|
+        # Prepare file data for parallel processing
+        file_data = batch.map do |file|
           begin
             file_obj = validate_and_open_file(file)
             file_path = file_obj.respond_to?(:path) ? file_obj.path : "unknown"
@@ -146,12 +146,20 @@ class EmbeddingTool
               source_title: source_title
             )
 
-            # Log file processing
-            Rails.logger.info("Processing file: #{file_path} (#{file_obj.size} bytes, type: #{detected_content_type})")
-
             # Read file content
             begin
               file_content = file_obj.read
+              
+              # Return a hash with all the data needed for processing
+              {
+                content: file_content,
+                path: file_path,
+                size: file_obj.size,
+                content_type: detected_content_type,
+                metadata: file_metadata,
+                source_url: source_url || file_path,
+                source_title: source_title || File.basename(file_path)
+              }
             rescue => e
               Rails.logger.error("Error reading file #{file_path}: #{e.message}")
               {
@@ -159,35 +167,69 @@ class EmbeddingTool
                 error: "Failed to read file: #{e.message}",
                 status: "error"
               }
-            else
-              # Add document to embedding service
-              result = service.add_document(
-                file_content,
-                chunk_size: chunk_size,
-                chunk_overlap: chunk_overlap,
-                content_type: detected_content_type,
-                source_url: source_url || file_path,
-                source_title: source_title || File.basename(file_path),
-                metadata: file_metadata
-              )
-
-              {
-                path: file_path,
-                size: file_obj.size,
-                content_type: detected_content_type,
-                chunk_preview: result.first&.content&.first(40),
-                chunks: result.count,
-                status: "success"
-              }
             end
           rescue => e
-            Rails.logger.error("Error processing file: #{e.message}")
+            Rails.logger.error("Error preparing file: #{e.message}")
             {
               path: file.respond_to?(:path) ? file.path : file.to_s,
               error: "Processing error: #{e.message}",
               status: "error"
             }
           end
+        end
+        
+        # Filter out files with errors
+        valid_files = file_data.select { |f| !f[:error] }
+        error_files = file_data.select { |f| f[:error] }
+        
+        # Process valid files in parallel using threads
+        batch_results = []
+        batch_results.concat(error_files) # Add error files to results
+        
+        if valid_files.any?
+          # Log the files we're about to process
+          valid_files.each do |file|
+            Rails.logger.info("Processing file: #{file[:path]} (#{file[:size]} bytes, type: #{file[:content_type]})")
+          end
+          
+          # Use threads for parallel processing
+          threads = valid_files.map do |file|
+            Thread.new do
+              begin
+                # Process the file with the embedding service
+                result = service.add_document(
+                  file[:content],
+                  chunk_size: chunk_size,
+                  chunk_overlap: chunk_overlap,
+                  content_type: file[:content_type],
+                  source_url: file[:source_url],
+                  source_title: file[:source_title],
+                  metadata: file[:metadata]
+                )
+                
+                # Return the result
+                {
+                  path: file[:path],
+                  size: file[:size],
+                  content_type: file[:content_type],
+                  chunk_preview: result.first&.content&.first(40),
+                  chunks: result.count,
+                  status: "success"
+                }
+              rescue => e
+                Rails.logger.error("Error processing file #{file[:path]}: #{e.message}")
+                {
+                  path: file[:path],
+                  error: "Processing error: #{e.message}",
+                  status: "error"
+                }
+              end
+            end
+          end
+          
+          # Wait for all threads to complete and collect results
+          thread_results = threads.map(&:value)
+          batch_results.concat(thread_results)
         end
         
         # Add batch results to overall results

@@ -334,81 +334,66 @@ class EmbeddingService
   private
 
   def fast_chunk_text(text, chunk_size, chunk_overlap)
-    return [ text ] if text.length <= chunk_size
+    return [text] if text.length <= chunk_size
 
-    # Precompute paragraph breaks for faster chunking
-    paragraph_breaks = []
-    line_breaks = []
-    sentence_breaks = []
-
-    # Find all paragraph breaks (more efficient than regex)
-    start_idx = 0
-    while (idx = text.index("\n\n", start_idx))
-      paragraph_breaks << idx
-      start_idx = idx + 2
-    end
-
-    # Find single line breaks if needed
-    start_idx = 0
-    while (idx = text.index("\n", start_idx))
-      next if paragraph_breaks.include?(idx)
-      line_breaks << idx
-      start_idx = idx + 1
-    end
-
-    # Find sentence breaks if needed (only find periods followed by space)
-    start_idx = 0
-    while (idx = text.index(". ", start_idx))
-      sentence_breaks << idx
-      start_idx = idx + 2
-    end
-
-    # Create chunks using precomputed break points
+    # Simple and fast chunking approach - split by newlines first, then recombine
+    lines = text.split(/\n/)
+    
     chunks = []
-    start_pos = 0
-
-    while start_pos < text.length
-      # Determine end position
-      end_pos = start_pos + chunk_size
-
-      # If we're at the end of text, just add the final chunk
-      if end_pos >= text.length
-        chunk = text[start_pos..-1].strip
-        chunks << chunk if chunk.length >= 50
-        break
+    current_chunk = ""
+    
+    lines.each do |line|
+      line = line.strip
+      next if line.empty?
+      
+      # If adding this line would exceed chunk size, start a new chunk
+      if current_chunk.length + line.length + 1 > chunk_size && !current_chunk.empty?
+        chunks << current_chunk.strip
+        # Start new chunk with overlap
+        if chunk_overlap > 0 && current_chunk.length > chunk_overlap
+          # Take the last part of the previous chunk for overlap
+          overlap_text = current_chunk[-chunk_overlap..-1] || ""
+          current_chunk = overlap_text
+        else
+          current_chunk = ""
+        end
       end
-
-      # Find best break point using precomputed arrays
-      best_break = nil
-
-      # Look for paragraph breaks
-      best_break = paragraph_breaks.find { |pos| pos >= start_pos && pos <= end_pos }
-
-      # If no paragraph break, try line breaks
-      if best_break.nil?
-        best_break = line_breaks.find { |pos| pos >= start_pos && pos <= end_pos }
-      end
-
-      # If no line break, try sentence breaks
-      if best_break.nil?
-        best_break = sentence_breaks.find { |pos| pos >= start_pos && pos <= end_pos }
-      end
-
-      # If no good breaks found, just use the chunk size
-      if best_break.nil?
-        best_break = end_pos
-      end
-
-      # Extract the chunk
-      chunk = text[start_pos..best_break].strip
-      chunks << chunk if chunk.length >= 50
-
-      # Move to next position with overlap
-      start_pos = best_break + 1 - chunk_overlap
-      start_pos = [ start_pos, start_pos + 1 ].max # Ensure we make progress
+      
+      # Add the line to the current chunk
+      current_chunk += (current_chunk.empty? ? "" : "\n") + line
     end
-
-    chunks
+    
+    # Add the last chunk if it's not empty
+    chunks << current_chunk.strip if !current_chunk.empty?
+    
+    # If we couldn't create any chunks, fall back to simple splitting
+    if chunks.empty?
+      # Simple character-based chunking as fallback
+      chunks = []
+      start_pos = 0
+      
+      while start_pos < text.length
+        end_pos = [start_pos + chunk_size, text.length].min
+        
+        # Try to find a good break point
+        if end_pos < text.length
+          # Try to find a space to break at
+          if (break_pos = text.rindex(/\s/, end_pos)) && break_pos > start_pos
+            end_pos = break_pos
+          end
+        end
+        
+        chunk = text[start_pos...end_pos].strip
+        chunks << chunk if !chunk.empty?
+        
+        # Move to next position with overlap
+        start_pos = end_pos - chunk_overlap
+        start_pos = [start_pos, end_pos].min # Ensure we make progress
+      end
+    end
+    
+    # Filter out any empty chunks and ensure minimum size
+    chunks.select { |chunk| chunk.length >= 10 }
   end
 
 
@@ -652,12 +637,17 @@ class EmbeddingService
     chunk_overlap = [0, chunk_overlap].max
     chunk_overlap = [chunk_overlap, chunk_size - 1].min
 
+    # Use a faster chunking approach for large texts
+    if text.bytesize > 10_000
+      return fast_chunk_text(text, chunk_size, chunk_overlap)
+    end
+
     chunks = []
     current_pos = 0
     text_length = text.length
 
-    # Set a timeout to prevent hanging
-    timeout_seconds = 30
+    # Set a higher timeout for larger texts
+    timeout_seconds = [60, text.bytesize / 5000].max
 
     begin
       while current_pos < text_length
@@ -666,22 +656,26 @@ class EmbeddingService
         if elapsed > timeout_seconds
           remaining_bytes = text_length - current_pos
           Rails.logger.error("Chunking timeout after #{elapsed.round}s. Processed #{current_pos}/#{text_length} bytes, #{chunks.size} chunks created, #{remaining_bytes} bytes remaining")
+          # Instead of breaking, just return what we have so far plus the remaining text as one chunk
+          if remaining_bytes > 0
+            chunks << text[current_pos..-1].strip
+          end
           break
         end
 
         # Calculate end position
-        end_pos = [ current_pos + chunk_size, text_length ].min
+        end_pos = [current_pos + chunk_size, text_length].min
 
         # Find a good break point
         if end_pos < text_length
           # Quick search for paragraph breaks (fastest option)
-          if (break_pos = text.index("\n\n", [ current_pos, end_pos - 100 ].max)) && break_pos < end_pos
+          if (break_pos = text.index("\n\n", [current_pos, end_pos - 100].max)) && break_pos < end_pos
             end_pos = break_pos + 2
           # Try single line breaks
-          elsif (break_pos = text.index("\n", [ current_pos, end_pos - 100 ].max)) && break_pos < end_pos
+          elsif (break_pos = text.index("\n", [current_pos, end_pos - 100].max)) && break_pos < end_pos
             end_pos = break_pos + 1
           # Try sentence endings
-          elsif (break_pos = text.index(". ", [ current_pos, end_pos - 100 ].max)) && break_pos < end_pos
+          elsif (break_pos = text.index(". ", [current_pos, end_pos - 100].max)) && break_pos < end_pos
             end_pos = break_pos + 2
           # Last resort: find a space
           elsif (break_pos = text.rindex(" ", end_pos)) && break_pos > current_pos
@@ -691,19 +685,21 @@ class EmbeddingService
 
         # Extract chunk and validate
         chunk = text[current_pos...end_pos].strip
-        if chunk.length >= 50
+        if chunk.length >= 10 # Lower minimum size to avoid losing content
           chunks << chunk
         end
 
         # Move position with overlap
         current_pos = end_pos - chunk_overlap
-        current_pos = [ current_pos, end_pos ].min  # Ensure we make progress
+        current_pos = [current_pos, end_pos].min  # Ensure we make progress
       end
 
       # Log performance metrics
       duration = Time.now - start_time
       if chunks.empty?
         Rails.logger.warn("No chunks generated after #{duration.round(2)}s")
+        # Return the original text as a single chunk if we couldn't create any chunks
+        return [text]
       else
         Rails.logger.info("Chunking completed: #{chunks.size} chunks in #{duration.round(2)}s (#{(duration/chunks.size).round(3)}s per chunk)")
       end
@@ -713,7 +709,7 @@ class EmbeddingService
       Rails.logger.error("Chunking error: #{e.message}")
       Rails.logger.error(e.backtrace.join("\n"))
       # Return whatever chunks we have so far
-      chunks.empty? ? [ text ] : chunks
+      chunks.empty? ? [text] : chunks
     end
   end
 
