@@ -91,7 +91,7 @@ class WebResearcherAgent < BaseAgent
 
   def search_with_perplexity(query, focus = "web")
     search_tool = PerplexitySearchTool.new # Consider dependency injection
-    search_results = search_tool.search(query: query, focus: focus)
+    search_results = search_tool.call(query: query, focus: focus)
 
     # Handle error response from the API
     if search_results.is_a?(Hash) && search_results[:error].present?
@@ -116,7 +116,7 @@ class WebResearcherAgent < BaseAgent
 
   def browse_url(url)
     scraper = WebScraperTool.new # Consider dependency injection
-    result = scraper.scrape(url: url, extract_type: "text")
+    result = scraper.call(url: url, extract_type: "text")
 
     # Handle error response from the scraper
     if result.is_a?(Hash) && result[:error].present?
