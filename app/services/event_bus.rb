@@ -6,7 +6,8 @@ class EventBus
 
   # Class methods - delegates to instance
   class << self
-    delegate :publish, :register_handler, :handlers_for, :clear_handlers!, to: :instance
+    delegate :publish, :register_handler, :handlers_for, :clear_handlers!, 
+             :register_standard_handlers, :handler_registry, to: :instance
 
     # Alias for register_handler to maintain backward compatibility with tests
     def subscribe(event_type, handler, method_name = :process)
@@ -16,15 +17,31 @@ class EventBus
 
   def initialize
     @handlers = Hash.new { |hash, key| hash[key] = [] }
+    @handler_metadata = {}
     @mutex = Mutex.new
+    
+    # Initialize the event schema registry
+    EventSchemaRegistry.register_standard_schemas
   end
 
   # Register a handler for a specific event type
   # @param event_type [String] the event type to subscribe to
   # @param handler [Class] the class that will handle this event
-  def register_handler(event_type, handler)
+  # @param description [String] optional description of what this handler does
+  # @param priority [Integer] optional priority (higher numbers run first)
+  def register_handler(event_type, handler, description: nil, priority: 10)
     @mutex.synchronize do
-      @handlers[event_type.to_s] << handler unless @handlers[event_type.to_s].include?(handler)
+      # Only add the handler if it's not already registered for this event type
+      unless @handlers[event_type.to_s].include?(handler)
+        @handlers[event_type.to_s] << handler
+        
+        # Store metadata about this handler
+        @handler_metadata["#{event_type}:#{handler}"] = {
+          description: description || "No description provided",
+          priority: priority,
+          registered_at: Time.current
+        }
+      end
     end
   end
 
@@ -33,7 +50,29 @@ class EventBus
   # @return [Array] array of handler classes
   def handlers_for(event_type)
     @mutex.synchronize do
-      @handlers[event_type.to_s].dup
+      # Sort handlers by priority (higher numbers first)
+      @handlers[event_type.to_s].sort_by do |handler|
+        -(@handler_metadata["#{event_type}:#{handler}"][:priority] || 0)
+      end
+    end
+  end
+
+  # Get the full handler registry with metadata
+  # @return [Hash] the handler registry
+  def handler_registry
+    @mutex.synchronize do
+      result = {}
+      
+      @handlers.each do |event_type, handlers|
+        result[event_type] = handlers.map do |handler|
+          {
+            handler: handler,
+            metadata: @handler_metadata["#{event_type}:#{handler}"]
+          }
+        end
+      end
+      
+      result
     end
   end
 
@@ -41,6 +80,21 @@ class EventBus
   def clear_handlers!
     @mutex.synchronize do
       @handlers.clear
+      @handler_metadata.clear
+    end
+  end
+  
+  # Register standard handlers for common events
+  def register_standard_handlers
+    # This method can be used to register default handlers for standard events
+    # For example, logging handlers, monitoring handlers, etc.
+    Rails.logger.info("Registering standard event handlers")
+    
+    # Example: Register a logging handler for all events
+    if defined?(EventLoggingHandler)
+      register_handler("*", EventLoggingHandler, 
+                      description: "Logs all events to the database", 
+                      priority: 100)
     end
   end
 

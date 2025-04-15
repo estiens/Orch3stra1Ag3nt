@@ -41,9 +41,27 @@ module EventPublisher
     end
 
     # Validate that we have an agent_activity_id before attempting to publish
-    if merged_options[:agent_activity_id].blank?
+    if merged_options[:agent_activity_id].blank? && !options[:system_event]
       Rails.logger.warn("#{self.class.name}#publish_event: Cannot publish event '#{event_type}' without agent_activity_id")
       return nil
+    end
+    
+    # Check if schema exists and validate data against it
+    if EventSchemaRegistry.schema_exists?(event_type)
+      schema = EventSchemaRegistry.schema_for(event_type)
+      
+      # Check required fields
+      missing_fields = []
+      schema[:required].each do |field|
+        if data[field.to_s].nil? && data[field.to_sym].nil?
+          missing_fields << field
+        end
+      end
+      
+      if missing_fields.any?
+        Rails.logger.error("#{self.class.name}#publish_event: Missing required fields for '#{event_type}': #{missing_fields.join(', ')}")
+        return nil
+      end
     end
 
     # Publish event through the EventBus

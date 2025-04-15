@@ -18,6 +18,9 @@ class Event < ApplicationRecord
   # Use Rails 7's serialized_hash attribute for cleaner data handling
   serialize :data, coder: JSON
 
+  # Schema validation
+  validate :validate_against_schema, if: -> { event_type.present? }
+
   # Ensure data is always a hash
   def data
     super || {}
@@ -58,6 +61,26 @@ class Event < ApplicationRecord
     if options[:agent_activity_id].blank? && !is_system_event
       Rails.logger.warn("Event.publish: Cannot publish event '#{event_type}' without agent_activity_id")
       return nil
+    end
+
+    # Check if schema exists and validate data against it
+    if EventSchemaRegistry.schema_exists?(event_type)
+      schema = EventSchemaRegistry.schema_for(event_type)
+      
+      # Check required fields
+      missing_fields = []
+      schema[:required].each do |field|
+        if data[field.to_s].nil? && data[field.to_sym].nil?
+          missing_fields << field
+        end
+      end
+      
+      if missing_fields.any?
+        Rails.logger.error("Event.publish: Missing required fields for '#{event_type}': #{missing_fields.join(', ')}")
+        return nil
+      end
+    else
+      Rails.logger.warn("Event.publish: No schema registered for event type '#{event_type}'")
     end
 
     begin
@@ -149,6 +172,26 @@ class Event < ApplicationRecord
 
     # Queue the agent job
     agent_class.enqueue("Process event: #{event_type}", agent_options)
+  end
+
+  # Get the schema for this event type
+  def schema
+    EventSchemaRegistry.schema_for(event_type)
+  end
+
+  # Check if this event type has a registered schema
+  def has_schema?
+    EventSchemaRegistry.schema_exists?(event_type)
+  end
+
+  # Validate this event against its schema
+  def validate_against_schema
+    return unless has_schema?
+    
+    errors = EventSchemaRegistry.validate_event(self)
+    errors.each do |error|
+      self.errors.add(:data, error)
+    end
   end
 
   private
