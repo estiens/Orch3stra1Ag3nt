@@ -80,7 +80,7 @@
     <div class="flex justify-between items-center mb-4">
       <h2 class="text-xl font-semibold">Tasks</h2>
       <% if @project.status == "active" %>
-        <%= link_to "#", class: "btn btn-primary" do %>
+        <%= link_to new_task_path(project_id: @project.id), class: "btn btn-primary" do %>
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
@@ -89,9 +89,9 @@
       <% end %>
     </div>
     
-    <% if @root_tasks.any? %>
+    <% if @tasks.any? %>
       <div class="divide-y divide-gray-200">
-        <% @root_tasks.each do |task| %>
+        <% @tasks.each do |task| %>
           <div class="py-4">
             <div class="flex justify-between items-center">
               <div>
@@ -145,6 +145,14 @@
     <% else %>
       <div class="text-center py-8 text-gray-500">
         <p>No tasks yet. Tasks will be created when the project is kicked off.</p>
+      </div>
+    <% end %>
+    
+    <% if @tasks.count > 10 %>
+      <div class="mt-4 text-center">
+        <%= link_to tasks_path(project_id: @project.id), class: "text-indigo-600 hover:text-indigo-900" do %>
+          View all <%= @tasks.count %> tasks
+        <% end %>
       </div>
     <% end %>
   </div>

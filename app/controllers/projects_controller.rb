@@ -8,7 +8,7 @@ class ProjectsController < ApplicationController
 
   # GET /projects/1
   def show
-    @root_tasks = @project.root_tasks.order(created_at: :desc)
+    @tasks = @project.tasks.order(created_at: :desc)
     @stats = @project.task_status_counts
   end
 

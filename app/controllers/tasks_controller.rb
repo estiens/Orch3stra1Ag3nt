@@ -3,6 +3,12 @@ class TasksController < ApplicationController
 
   def index
     @tasks = Task.includes(:project).order(created_at: :desc)
+    
+    # Filter by project if project_id is provided
+    if params[:project_id].present?
+      @project = Project.find_by(id: params[:project_id])
+      @tasks = @tasks.where(project_id: params[:project_id]) if @project
+    end
   end
 
   def show
