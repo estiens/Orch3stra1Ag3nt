@@ -1,6 +1,6 @@
 class Task < ApplicationRecord
   include DashboardBroadcaster
-  
+
   validates :title, presence: true
 
   has_many :agent_activities, dependent: :destroy
@@ -15,7 +15,7 @@ class Task < ApplicationRecord
   has_many :subtasks, class_name: "Task", foreign_key: "parent_id", dependent: :destroy
 
   # Task types
-  TASK_TYPES = %w[general research code analysis review orchestration].freeze
+  TASK_TYPES = %w[general research code analysis review search orchestration].freeze
 
   # Store metadata as JSON
   # serialize :metadata, JSON
@@ -39,7 +39,7 @@ class Task < ApplicationRecord
     state :failed
 
     event :activate do
-      transitions from: [:pending, :paused], to: :active
+      transitions from: [ :pending, :paused ], to: :active
       after do
         # Publish event for dashboard updates
         if agent_activities.any?
@@ -49,12 +49,12 @@ class Task < ApplicationRecord
           temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
           temp_activity.publish_event("task_activated", { task_id: id, task_title: title })
         end
-        
+
         # Enqueue the task for processing if it was activated
         enqueue_for_processing
       end
     end
-    
+
     event :pause do
       transitions from: :active, to: :paused
       after do
@@ -74,7 +74,7 @@ class Task < ApplicationRecord
     end
 
     event :complete do
-      transitions from: [:active, :waiting_on_human, :paused], to: :completed
+      transitions from: [ :active, :waiting_on_human, :paused ], to: :completed
       after do
         # Publish event for dashboard updates
         if agent_activities.any?
@@ -88,7 +88,7 @@ class Task < ApplicationRecord
     end
 
     event :fail do
-      transitions from: [:pending, :active, :waiting_on_human, :paused], to: :failed
+      transitions from: [ :pending, :active, :waiting_on_human, :paused ], to: :failed
       after do
         # Publish event for dashboard updates
         if agent_activities.any?
@@ -100,7 +100,7 @@ class Task < ApplicationRecord
         end
       end
     end
-    
+
     event :resume do
       transitions from: :paused, to: :active
       after do
@@ -112,7 +112,7 @@ class Task < ApplicationRecord
           temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
           temp_activity.publish_event("task_resumed", { task_id: id, task_title: title })
         end
-        
+
         # Enqueue the task for processing when resumed
         enqueue_for_processing
       end
@@ -189,12 +189,12 @@ class Task < ApplicationRecord
   def events
     Event.where(agent_activity_id: agent_activities.pluck(:id))
   end
-  
+
   # Get LLM call statistics for this task
   def llm_call_stats
     activity_ids = agent_activities.pluck(:id)
     calls = LlmCall.where(agent_activity_id: activity_ids)
-    
+
     {
       count: calls.count,
       total_cost: calls.sum(:cost).round(4),
@@ -207,25 +207,25 @@ class Task < ApplicationRecord
   def depends_on_task_ids
     metadata&.dig("depends_on_task_ids") || []
   end
-  
+
   def depends_on_task_ids=(ids)
     self.metadata ||= {}
     self.metadata["depends_on_task_ids"] = Array(ids).map(&:to_i)
     save if persisted?
   end
-  
+
   # Check if all dependencies are satisfied
   def dependencies_satisfied?
     return true if depends_on_task_ids.empty?
-    
-    completed_ids = Task.where(id: depends_on_task_ids, state: 'completed').pluck(:id)
+
+    completed_ids = Task.where(id: depends_on_task_ids, state: "completed").pluck(:id)
     depends_on_task_ids.all? { |id| completed_ids.include?(id) }
   end
 
   # Enqueue this task for processing based on its type
   def enqueue_for_processing
     return unless active?
-    
+
     case task_type
     when "research"
       ResearchCoordinatorAgent.enqueue("Process research task", { task_id: id })
@@ -235,6 +235,8 @@ class Task < ApplicationRecord
       OrchestratorAgent.enqueue("Process orchestration task", { task_id: id })
     when "analysis"
       WebResearcherAgent.enqueue("Process analysis task", { task_id: id })
+    when "search"
+      WebResearcherAgent.enqueue("Process search task", { task_id: id })
     when "review"
       SummarizerAgent.enqueue("Process review task", { task_id: id })
     else
@@ -242,7 +244,7 @@ class Task < ApplicationRecord
       CoordinatorAgent.enqueue("Process general task", { task_id: id })
     end
   end
-  
+
   private
 
   # Ensure a subtask belongs to the same project as its parent
