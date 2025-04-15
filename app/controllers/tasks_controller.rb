@@ -39,60 +39,90 @@ class TasksController < ApplicationController
   end
 
   def activate
-    @task.update(state: 'active')
+    if @task.may_activate?
+      @task.activate!
+      notice = 'Task was activated.'
+    else
+      notice = 'Task could not be activated.'
+    end
     
     respond_to do |format|
-      format.html { redirect_back(fallback_location: @task, notice: 'Task was activated.') }
+      format.html { redirect_back(fallback_location: @task, notice: notice) }
       format.turbo_stream { 
-        @tasks = Task.where(state: ["active", "pending", "waiting_on_human"]).order(created_at: :desc).limit(10)
+        flash.now[:notice] = notice
+        @tasks = Task.where(state: ["active", "pending", "waiting_on_human", "paused"]).order(created_at: :desc).limit(10)
         render turbo_stream: turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks })
       }
     end
   end
 
   def pause
-    @task.update(state: 'paused')
+    if @task.may_pause?
+      @task.pause!
+      notice = 'Task was paused.'
+    else
+      notice = 'Task could not be paused.'
+    end
     
     respond_to do |format|
-      format.html { redirect_back(fallback_location: @task, notice: 'Task was paused.') }
+      format.html { redirect_back(fallback_location: @task, notice: notice) }
       format.turbo_stream { 
-        @tasks = Task.where(state: ["active", "pending", "waiting_on_human"]).order(created_at: :desc).limit(10)
+        flash.now[:notice] = notice
+        @tasks = Task.where(state: ["active", "pending", "waiting_on_human", "paused"]).order(created_at: :desc).limit(10)
         render turbo_stream: turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks })
       }
     end
   end
 
   def resume
-    @task.update(state: 'active')
+    if @task.may_resume?
+      @task.resume!
+      notice = 'Task was resumed.'
+    else
+      notice = 'Task could not be resumed.'
+    end
     
     respond_to do |format|
-      format.html { redirect_back(fallback_location: @task, notice: 'Task was resumed.') }
+      format.html { redirect_back(fallback_location: @task, notice: notice) }
       format.turbo_stream { 
-        @tasks = Task.where(state: ["active", "pending", "waiting_on_human"]).order(created_at: :desc).limit(10)
+        flash.now[:notice] = notice
+        @tasks = Task.where(state: ["active", "pending", "waiting_on_human", "paused"]).order(created_at: :desc).limit(10)
         render turbo_stream: turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks })
       }
     end
   end
   
   def complete
-    @task.update(state: 'completed')
+    if @task.may_complete?
+      @task.complete!
+      notice = 'Task was marked as completed.'
+    else
+      notice = 'Task could not be completed.'
+    end
     
     respond_to do |format|
-      format.html { redirect_back(fallback_location: @task, notice: 'Task was marked as completed.') }
+      format.html { redirect_back(fallback_location: @task, notice: notice) }
       format.turbo_stream { 
-        @tasks = Task.where(state: ["active", "pending", "waiting_on_human"]).order(created_at: :desc).limit(10)
+        flash.now[:notice] = notice
+        @tasks = Task.where(state: ["active", "pending", "waiting_on_human", "paused"]).order(created_at: :desc).limit(10)
         render turbo_stream: turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks })
       }
     end
   end
   
   def fail
-    @task.update(state: 'failed')
+    if @task.may_fail?
+      @task.fail!
+      notice = 'Task was marked as failed.'
+    else
+      notice = 'Task could not be marked as failed.'
+    end
     
     respond_to do |format|
-      format.html { redirect_back(fallback_location: @task, notice: 'Task was marked as failed.') }
+      format.html { redirect_back(fallback_location: @task, notice: notice) }
       format.turbo_stream { 
-        @tasks = Task.where(state: ["active", "pending", "waiting_on_human"]).order(created_at: :desc).limit(10)
+        flash.now[:notice] = notice
+        @tasks = Task.where(state: ["active", "pending", "waiting_on_human", "paused"]).order(created_at: :desc).limit(10)
         render turbo_stream: turbo_stream.replace("tasks-container", partial: "dashboard/tasks", locals: { tasks: @tasks })
       }
     end

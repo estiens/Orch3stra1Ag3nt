@@ -70,10 +70,15 @@ class ProjectsController < ApplicationController
   # POST /projects/1/pause
   def pause
     if @project.status == "active"
-      @project.update(status: "paused")
+      if @project.pause!
+        notice = "Project was successfully paused."
+      else
+        notice = "Failed to pause project."
+      end
+      
       respond_to do |format|
-        format.html { redirect_to @project, notice: "Project was successfully paused." }
-        format.turbo_stream { redirect_to @project, notice: "Project was successfully paused." }
+        format.html { redirect_to @project, notice: notice }
+        format.turbo_stream { redirect_to @project, notice: notice }
       end
     else
       respond_to do |format|
@@ -86,10 +91,15 @@ class ProjectsController < ApplicationController
   # POST /projects/1/resume
   def resume
     if @project.status == "paused"
-      @project.update(status: "active")
+      if @project.resume!
+        notice = "Project was successfully resumed."
+      else
+        notice = "Failed to resume project."
+      end
+      
       respond_to do |format|
-        format.html { redirect_to @project, notice: "Project was successfully resumed." }
-        format.turbo_stream { redirect_to @project, notice: "Project was successfully resumed." }
+        format.html { redirect_to @project, notice: notice }
+        format.turbo_stream { redirect_to @project, notice: notice }
       end
     else
       respond_to do |format|

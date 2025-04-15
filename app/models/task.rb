@@ -40,10 +40,18 @@ class Task < ApplicationRecord
 
     event :activate do
       transitions from: [:pending, :paused], to: :active
+      after do
+        DashboardTaskEvent.create(task: self, event_type: "activated")
+        # Enqueue the task for processing if it was activated
+        enqueue_for_processing
+      end
     end
     
     event :pause do
       transitions from: :active, to: :paused
+      after do
+        DashboardTaskEvent.create(task: self, event_type: "paused")
+      end
     end
 
     event :wait_on_human do
@@ -52,10 +60,25 @@ class Task < ApplicationRecord
 
     event :complete do
       transitions from: [:active, :waiting_on_human, :paused], to: :completed
+      after do
+        DashboardTaskEvent.create(task: self, event_type: "completed")
+      end
     end
 
     event :fail do
       transitions from: [:pending, :active, :waiting_on_human, :paused], to: :failed
+      after do
+        DashboardTaskEvent.create(task: self, event_type: "failed")
+      end
+    end
+    
+    event :resume do
+      transitions from: :paused, to: :active
+      after do
+        DashboardTaskEvent.create(task: self, event_type: "resumed")
+        # Enqueue the task for processing when resumed
+        enqueue_for_processing
+      end
     end
   end
 
@@ -149,6 +172,27 @@ class Task < ApplicationRecord
     depends_on_task_ids.all? { |id| completed_ids.include?(id) }
   end
 
+  # Enqueue this task for processing based on its type
+  def enqueue_for_processing
+    return unless active?
+    
+    case task_type
+    when "research"
+      ResearchCoordinatorAgent.enqueue("Process research task", { task_id: id })
+    when "code"
+      CodeResearcherAgent.enqueue("Process code task", { task_id: id })
+    when "orchestration"
+      OrchestratorAgent.enqueue("Process orchestration task", { task_id: id })
+    when "analysis"
+      WebResearcherAgent.enqueue("Process analysis task", { task_id: id })
+    when "review"
+      SummarizerAgent.enqueue("Process review task", { task_id: id })
+    else
+      # Default to coordinator for general tasks
+      CoordinatorAgent.enqueue("Process general task", { task_id: id })
+    end
+  end
+  
   private
 
   # Ensure a subtask belongs to the same project as its parent

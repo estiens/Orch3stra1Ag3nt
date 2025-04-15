@@ -47,6 +47,9 @@ class Project < ApplicationRecord
         project_settings: settings
       }
     )
+    
+    # Create dashboard event
+    DashboardProjectEvent.create(project: self, event_type: "activated")
 
     # Publish event to trigger OrchestratorAgent
     Event.publish(
@@ -58,6 +61,9 @@ class Project < ApplicationRecord
       },
       priority: Event::HIGH_PRIORITY
     )
+    
+    # Activate the task to start processing
+    orchestration_task.activate!
 
     # Return the orchestration task
     orchestration_task
@@ -98,10 +104,13 @@ class Project < ApplicationRecord
     
     # Pause all active tasks
     tasks.where(state: "active").each do |task|
-      task.update(state: "paused") if task.respond_to?(:state)
+      task.pause! if task.may_pause?
     end
     
-    # Publish event
+    # Create dashboard event
+    DashboardProjectEvent.create(project: self, event_type: "paused")
+    
+    # Publish event for other systems
     Event.publish(
       "project_paused",
       {
@@ -121,7 +130,10 @@ class Project < ApplicationRecord
     # Update project status
     update(status: "active")
     
-    # Publish event
+    # Create dashboard event
+    DashboardProjectEvent.create(project: self, event_type: "resumed")
+    
+    # Publish event for other systems
     Event.publish(
       "project_resumed",
       {
