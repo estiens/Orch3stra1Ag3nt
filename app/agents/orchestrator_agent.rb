@@ -124,12 +124,18 @@ class OrchestratorAgent < BaseAgent
     Rails.logger.info "[OrchestratorAgent] Received handle_project_activated for #{project.name}. Spawning coordinator."
     
     # Spawn a coordinator agent to handle the root task
-    spawn_coordinator(root_task.id, "high")
+    coordinator_result = spawn_coordinator(root_task.id, "high")
     
     # Update task status
     root_task.update!(
       notes: "Task initiated by OrchestratorAgent in response to project activation."
     )
+    
+    # Activate the task if it's not already active
+    if root_task.may_activate?
+      root_task.activate!
+      Rails.logger.info "[OrchestratorAgent] Activated root task #{root_task.id} for project #{project.name}"
+    end
     
     # Log the action
     agent_activity&.events.create!(
@@ -137,7 +143,8 @@ class OrchestratorAgent < BaseAgent
       data: { 
         project_id: project.id, 
         project_name: project.name,
-        task_id: root_task.id 
+        task_id: root_task.id,
+        coordinator_result: coordinator_result
       }
     )
   end
