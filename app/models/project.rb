@@ -47,7 +47,7 @@ class Project < ApplicationRecord
         project_settings: settings
       }
     )
-    
+
     # Event will be published by the orchestration task when it's activated
 
     # Publish event to trigger OrchestratorAgent
@@ -60,7 +60,7 @@ class Project < ApplicationRecord
       },
       priority: Event::HIGH_PRIORITY
     )
-    
+
     # Activate the task to start processing
     orchestration_task.activate!
 
@@ -93,22 +93,22 @@ class Project < ApplicationRecord
       metadata: metadata
     )
   end
-  
+
   # Pause this project and all its active tasks
   def pause!
     return false if status == "paused"
-    
+
     # Update project status
     update(status: "paused")
-    
+
     # Pause all active tasks
     tasks.where(state: "active").each do |task|
       task.pause! if task.may_pause?
     end
-    
+
     # Find a task to publish the event through, or create a temporary one
     publisher_task = tasks.first
-    
+
     if publisher_task&.agent_activities&.any?
       # Use the last agent activity to publish the event
       publisher_task.agent_activities.last.publish_event(
@@ -129,20 +129,20 @@ class Project < ApplicationRecord
         {}
       ) if defined?(Event)
     end
-    
+
     true
   end
-  
+
   # Resume this project
   def resume!
     return false unless status == "paused"
-    
+
     # Update project status
     update(status: "active")
-    
+
     # Find a task to publish the event through, or create a temporary one
     publisher_task = tasks.first
-    
+
     if publisher_task&.agent_activities&.any?
       # Use the last agent activity to publish the event
       publisher_task.agent_activities.last.publish_event(
@@ -163,7 +163,7 @@ class Project < ApplicationRecord
         {}
       ) if defined?(Event)
     end
-    
+
     true
   end
 
