@@ -246,11 +246,24 @@ class CoordinatorAgent < BaseAgent
 
   # --- Tool Implementations ---
   def analyze_task(task_description)
+    # Get project context if available
+    project_context = ""
+    if task&.project
+      project = task.project
+      project_context = <<~PROJECT
+        ## PROJECT CONTEXT
+        Project Name: #{project.name}
+        Project Description: #{project.description}
+        Project Goal: #{project.goal}
+      PROJECT
+    end
+
     prompt_content = <<~PROMPT
       # STRATEGIC TASK ANALYSIS
 
       As an expert project manager, analyze and decompose the following task into a strategic plan of subtasks:
 
+      #{project_context}
       ## TASK DESCRIPTION
       #{task_description}
 

@@ -19,6 +19,7 @@ class OrchestratorAgent < BaseAgent
   subscribe_to "task_stuck", :handle_stuck_task
   subscribe_to "system_resources_critical", :handle_resource_critical
   subscribe_to "project_created", :handle_new_project
+  subscribe_to "project_activated", :handle_project_activated
 
   # --- Tools ---
   # Use the new BaseAgent tool definition DSL
@@ -106,8 +107,39 @@ class OrchestratorAgent < BaseAgent
     task = Task.find(task_id) # Assuming this is the initial task
 
     Rails.logger.info "[OrchestratorAgent] Received handle_new_project for #{project.name}."
-    # Potentially trigger run:
-    # self.run(input: { purpose_override: "Plan new project: #{project.name}" })
+    # We'll let the project_activated event handle the actual kickoff
+  end
+  
+  # Event handler for project activation (kickoff)
+  def handle_project_activated(event)
+    project_id = event.data["project_id"]
+    return if project_id.blank?
+
+    project = Project.find(project_id)
+    
+    # Find the root task for this project
+    root_task = project.root_tasks.first
+    return unless root_task
+    
+    Rails.logger.info "[OrchestratorAgent] Received handle_project_activated for #{project.name}. Spawning coordinator."
+    
+    # Spawn a coordinator agent to handle the root task
+    spawn_coordinator(root_task.id, "high")
+    
+    # Update task status
+    root_task.update!(
+      notes: "Task initiated by OrchestratorAgent in response to project activation."
+    )
+    
+    # Log the action
+    agent_activity&.events.create!(
+      event_type: "coordinator_spawned_for_project",
+      data: { 
+        project_id: project.id, 
+        project_name: project.name,
+        task_id: root_task.id 
+      }
+    )
   end
 
   # --- Core Logic ---
@@ -227,7 +259,6 @@ class OrchestratorAgent < BaseAgent
 
   # Tool implementation: Spawn a coordinator agent for a task
   def spawn_coordinator(task_id, priority = nil)
-    # ... (Implementation remains the same) ...
     task = Task.find(task_id)
     options = {
       task_id: task.id,
@@ -236,11 +267,23 @@ class OrchestratorAgent < BaseAgent
     }
     options[:priority] = priority if priority.present?
 
+    # Add project context if available
+    if task.project_id
+      options[:metadata] = {
+        project_id: task.project_id,
+        project_name: task.project.name
+      }
+    end
+
     CoordinatorAgent.enqueue("Coordinate task execution for: #{task.title}\n#{task.description}", options)
 
     agent_activity&.events.create!(
       event_type: "coordinator_spawned",
-      data: { task_id: task.id, priority: priority || "default" }
+      data: { 
+        task_id: task.id, 
+        priority: priority || "default",
+        project_id: task.project_id
+      }
     )
     "Spawned CoordinatorAgent for task #{task_id} with #{priority || 'default'} priority"
 
