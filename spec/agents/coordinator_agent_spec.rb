@@ -117,12 +117,14 @@ RSpec.describe CoordinatorAgent do
       it "activates the task and spawns a new coordinator" do
         # Set up the expectations before calling the method
         allow(task).to receive(:waiting_on_human?).and_return(true)
+        allow(task).to receive(:activate!)
         
-        # Call the method first to avoid expectation issues
+        # Call the method
         agent.handle_human_input_provided(event)
         
-        # Verify the task was activated (using a spy approach instead of an expectation)
+        # Verify the task was checked and activated
         expect(task).to have_received(:waiting_on_human?)
+        expect(task).to have_received(:activate!)
         expect(described_class).to receive(:enqueue).with(
           "Resume after human input provided",
           hash_including(
@@ -240,12 +242,16 @@ RSpec.describe CoordinatorAgent do
           }
         ).and_return(true)
 
-        # Allow the activate! method to be called without expectations
+        # Set up expectations for the methods that will be called
         allow(subtask).to receive(:activate!)
-        
-        # Call the method
+        allow(subtask).to receive(:update)
 
-        expect(subtask).to receive(:update).with(
+        # Call the method first
+        agent.send(:assign_subtask, subtask.id, "WebResearcherAgent")
+        
+        # Then verify the expectations
+        expect(subtask).to have_received(:activate!)
+        expect(subtask).to have_received(:update).with(
           hash_including(
             metadata: hash_including(
               assigned_agent: "WebResearcherAgent",
