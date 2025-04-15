@@ -122,6 +122,7 @@ RSpec.describe OrchestratorAgent do
         allow(Task).to receive_message_chain(:active, :count).and_return(5)
         allow(Task).to receive_message_chain(:where, :count).and_return(2)
         allow(AgentActivity).to receive_message_chain(:where, :count).and_return(3)
+        allow(AgentActivity).to receive_message_chain(:where, :group, :count).and_return({ "ResearcherAgent" => 2, "CoordinatorAgent" => 1 })
         allow(SolidQueue::Job).to receive_message_chain(:where, :count).and_return(10)
         allow(SolidQueue::Job).to receive_message_chain(:where, :group, :count).and_return({ "orchestrator" => 1, "coordinator" => 2 })
         allow(Event).to receive_message_chain(:where, :recent, :limit).and_return([])
@@ -248,8 +249,17 @@ RSpec.describe OrchestratorAgent do
       end
 
       it "adjusts priorities for multiple tasks" do
+        # Create event objects for the tasks
+        task1_events = double("Task1Events")
+        task2_events = double("Task2Events")
+        
+        # Allow the tasks to receive the events method
+        allow(task1).to receive(:events).and_return(task1_events)
+        allow(task2).to receive(:events).and_return(task2_events)
+        
+        # Set expectations for update! and events.create!
         expect(task1).to receive(:update!).with(priority: "high")
-        expect(task1.events).to receive(:create!).with(
+        expect(task1_events).to receive(:create!).with(
           hash_including(
             event_type: "priority_adjusted",
             data: hash_including(from: "normal", to: "high", adjusted_by: "OrchestratorAgent")
@@ -257,7 +267,7 @@ RSpec.describe OrchestratorAgent do
         )
 
         expect(task2).to receive(:update!).with(priority: "normal")
-        expect(task2.events).to receive(:create!).with(
+        expect(task2_events).to receive(:create!).with(
           hash_including(event_type: "priority_adjusted", data: hash_including(from: "low", to: "normal"))
         )
 

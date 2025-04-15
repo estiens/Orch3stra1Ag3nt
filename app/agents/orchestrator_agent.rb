@@ -398,7 +398,13 @@ class OrchestratorAgent < BaseAgent
     
     # Get agent activity metrics
     active_agents = AgentActivity.where(status: "running").count
-    agent_types = AgentActivity.where(status: "running").group(:agent_type).count
+    agent_types = {}
+    begin
+      agent_types = AgentActivity.where(status: "running").group(:agent_type).count
+    rescue => e
+      Rails.logger.error "[OrchestratorAgent] Error getting agent types: #{e.message}"
+      agent_types = { error: "Failed to get agent types" }
+    end
     
     # Get queue metrics
     total_queued_jobs = SolidQueue::Job.where(finished_at: nil).count
