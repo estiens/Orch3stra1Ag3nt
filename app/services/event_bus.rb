@@ -19,9 +19,6 @@ class EventBus
     @handlers = Hash.new { |hash, key| hash[key] = [] }
     @handler_metadata = {}
     @mutex = Mutex.new
-    
-    # Initialize the event schema registry
-    EventSchemaRegistry.register_standard_schemas
   end
 
   # Register a handler for a specific event type
