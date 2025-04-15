@@ -175,53 +175,143 @@ Rails.application.config.after_initialize do
     # REGISTER EVENT SUBSCRIBERS
     # =========================================================================
     
+    # Helper method to register a handler for multiple event types
+    def register_for_events(handler_class, events, description: nil, priority: 10)
+      return unless defined?(handler_class)
+      
+      events.each do |event_type|
+        EventBus.register_handler(
+          event_type, 
+          handler_class, 
+          description: description || "Handles #{event_type} events",
+          priority: priority
+        )
+      end
+    end
+    
+    # -------------------------------------------------------------------------
     # Dashboard Event Handler - for real-time updates
+    # -------------------------------------------------------------------------
     if defined?(DashboardEventHandler)
-      EventBus.register_handler("task.activated", DashboardEventHandler, 
-                               description: "Updates dashboard with task status changes")
-      EventBus.register_handler("task.paused", DashboardEventHandler)
-      EventBus.register_handler("task.resumed", DashboardEventHandler)
-      EventBus.register_handler("task.completed", DashboardEventHandler)
-      EventBus.register_handler("task.failed", DashboardEventHandler)
+      # Task events
+      register_for_events(
+        DashboardEventHandler,
+        [
+          "task.activated", 
+          "task.paused", 
+          "task.resumed", 
+          "task.completed", 
+          "task.failed"
+        ],
+        description: "Updates dashboard with task status changes"
+      )
       
-      EventBus.register_handler("project.activated", DashboardEventHandler,
-                               description: "Updates dashboard with project status changes")
-      EventBus.register_handler("project.paused", DashboardEventHandler)
-      EventBus.register_handler("project.resumed", DashboardEventHandler)
-      EventBus.register_handler("project.completed", DashboardEventHandler)
+      # Project events
+      register_for_events(
+        DashboardEventHandler,
+        [
+          "project.activated", 
+          "project.paused", 
+          "project.resumed", 
+          "project.completed"
+        ],
+        description: "Updates dashboard with project status changes"
+      )
       
-      EventBus.register_handler("human_input.requested", DashboardEventHandler,
-                               description: "Updates dashboard with human input requests")
-      EventBus.register_handler("human_input.provided", DashboardEventHandler)
-      EventBus.register_handler("human_input.ignored", DashboardEventHandler)
+      # Human input events
+      register_for_events(
+        DashboardEventHandler,
+        [
+          "human_input.requested", 
+          "human_input.provided", 
+          "human_input.ignored"
+        ],
+        description: "Updates dashboard with human input requests"
+      )
       
-      EventBus.register_handler("agent_activity.created", DashboardEventHandler,
-                               description: "Updates dashboard with agent activities")
-      EventBus.register_handler("agent_activity.completed", DashboardEventHandler)
-      EventBus.register_handler("agent_activity.failed", DashboardEventHandler)
+      # Agent activity events
+      register_for_events(
+        DashboardEventHandler,
+        [
+          "agent_activity.created", 
+          "agent_activity.completed", 
+          "agent_activity.failed"
+        ],
+        description: "Updates dashboard with agent activities"
+      )
       
-      EventBus.register_handler("llm_call.completed", DashboardEventHandler,
-                               description: "Updates dashboard with LLM call statistics")
+      # LLM call events
+      register_for_events(
+        DashboardEventHandler,
+        ["llm_call.completed"],
+        description: "Updates dashboard with LLM call statistics"
+      )
     end
     
+    # -------------------------------------------------------------------------
     # Tool Execution Logger
+    # -------------------------------------------------------------------------
     if defined?(ToolExecutionLogger)
-      EventBus.register_handler("tool_execution.started", ToolExecutionLogger,
-                               description: "Logs tool execution start")
-      EventBus.register_handler("tool_execution.finished", ToolExecutionLogger,
-                               description: "Logs tool execution completion")
-      EventBus.register_handler("tool_execution.error", ToolExecutionLogger,
-                               description: "Logs tool execution errors")
+      register_for_events(
+        ToolExecutionLogger,
+        [
+          "tool_execution.started",
+          "tool_execution.finished",
+          "tool_execution.error"
+        ],
+        description: "Logs tool execution events",
+        priority: 90 # High priority for logging
+      )
     end
     
+    # -------------------------------------------------------------------------
     # Orchestrator Agent - responds to various system events
+    # -------------------------------------------------------------------------
     if defined?(OrchestratorAgent)
-      EventBus.register_handler("task.created", OrchestratorAgent,
-                               description: "Orchestrates task processing")
-      EventBus.register_handler("task.completed", OrchestratorAgent,
-                               description: "Updates task dependencies when tasks complete")
-      EventBus.register_handler("project.created", OrchestratorAgent,
-                               description: "Initializes project processing")
+      register_for_events(
+        OrchestratorAgent,
+        [
+          "task.created",
+          "task.completed",
+          "project.created"
+        ],
+        description: "Orchestrates workflow based on task and project events"
+      )
+    end
+    
+    # -------------------------------------------------------------------------
+    # EventSubscriber classes - automatically register all subscribers
+    # -------------------------------------------------------------------------
+    
+    # Find all classes that include EventSubscriber and register their subscriptions
+    Rails.application.eager_load! if Rails.env.development?
+    
+    # Get all classes that include EventSubscriber
+    event_subscriber_classes = ApplicationRecord.descendants.select do |klass|
+      klass.included_modules.include?(EventSubscriber)
+    end
+    
+    # Also check non-ActiveRecord classes if possible
+    if defined?(Rails::Engine)
+      ObjectSpace.each_object(Class).select do |klass|
+        klass.included_modules.include?(EventSubscriber) if klass.respond_to?(:included_modules)
+      end.each do |klass|
+        event_subscriber_classes << klass unless event_subscriber_classes.include?(klass)
+      end
+    end
+    
+    # Register all event subscriptions from these classes
+    event_subscriber_classes.each do |subscriber_class|
+      if subscriber_class.respond_to?(:event_subscriptions)
+        subscriber_class.event_subscriptions.each do |event_type, callback|
+          EventBus.register_handler(
+            event_type,
+            subscriber_class,
+            description: "Auto-registered from #{subscriber_class.name}"
+          )
+          Rails.logger.debug("Auto-registered #{subscriber_class.name} for event: #{event_type}")
+        end
+      end
     end
     
     # Log the number of registered schemas and handlers

@@ -83,15 +83,29 @@ class EventBus
   
   # Register standard handlers for common events
   def register_standard_handlers
-    # This method can be used to register default handlers for standard events
-    # For example, logging handlers, monitoring handlers, etc.
+    # This method registers system-level handlers that should always be present
+    # These are handlers for core functionality, not business logic
     Rails.logger.info("Registering standard event handlers")
     
-    # Example: Register a logging handler for all events
+    # Register a logging handler for all events if available
     if defined?(EventLoggingHandler)
       register_handler("*", EventLoggingHandler, 
                       description: "Logs all events to the database", 
                       priority: 100)
+    end
+    
+    # Register a metrics/monitoring handler if available
+    if defined?(EventMetricsHandler)
+      register_handler("*", EventMetricsHandler,
+                      description: "Collects metrics for all events",
+                      priority: 90)
+    end
+    
+    # Register a debugging handler in development environment
+    if Rails.env.development? && defined?(EventDebugHandler)
+      register_handler("*", EventDebugHandler,
+                      description: "Provides debug information for events in development",
+                      priority: 110)
     end
   end
 
