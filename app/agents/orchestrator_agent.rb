@@ -393,7 +393,8 @@ class OrchestratorAgent < BaseAgent
     
     # Get coordinator-specific metrics
     root_coordinators = Task.where(parent_id: nil).count
-    sub_coordinators = Task.joins(:metadata).where("metadata->>'is_sub_coordinator' = ?", "true").count
+    # Use where with JSON query instead of trying to join on metadata
+    sub_coordinators = Task.where("metadata->>'is_sub_coordinator' = ?", "true").count
     
     # Get agent activity metrics
     active_agents = AgentActivity.where(status: "running").count
