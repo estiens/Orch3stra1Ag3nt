@@ -173,10 +173,27 @@ module Embedding
       breakpoints = get_breakpoint_patterns(content_type)
       
       # Adjust chunk size for code to be more conservative
-      effective_chunk_size = content_type == :code ? (chunk_size * 0.9).to_i : chunk_size
+      # For code, we want smaller chunks to avoid breaking important structures
+      effective_chunk_size = if content_type == :code
+                              (chunk_size * 0.85).to_i  # More conservative for code
+                            else
+                              chunk_size
+                            end
 
       # Track the last few chunks to detect potential infinite loops
       last_positions = []
+      
+      # For code, try to start at logical boundaries when possible
+      if content_type == :code && position == 0
+        # Look for a good starting point like a class or method definition
+        first_100_chars = text[0...[100, text_length].min]
+        if first_100_chars.match?(/^(class|def|function|public|private|module)/)
+          # We're already at a good starting point
+        elsif (match = text.match(/\n(class|def|function|public|private|module)/))
+          # Jump to the first class/method definition if it exists
+          position = match.begin(0) + 1
+        end
+      end
       
       while position < text_length
         # Find end position
@@ -340,6 +357,11 @@ module Embedding
       if content_type == :code
         # For code, prioritize syntax and structural boundaries
         [
+          # Block and scope boundaries with comments
+          ["\n}\n\n", 4],        # End of block with paragraph break
+          ["\n} // ", 6],        # End of block with inline comment
+          ["\n} # ", 5],         # End of block with Ruby/Python comment
+          
           # Block and scope boundaries
           ["\n}\n", 3],          # End of block with newlines
           ["}\n", 2],            # End of block with newline
@@ -354,12 +376,24 @@ module Embedding
           ["\npublic ", 8],      # Public method (Java, C#)
           ["\nprivate ", 9],     # Private method (Java, C#)
           ["\nprotected ", 11],  # Protected method (Java, C#)
+          ["\nstatic ", 8],      # Static method (Java, C#)
+          ["\nasync ", 7],       # Async function (JavaScript)
+          
+          # Documentation and comment blocks
+          ["\n/**\n", 5],        # Start of JSDoc/JavaDoc comment
+          ["\n/*\n", 4],         # Start of block comment
+          ["\n */\n", 5],        # End of block comment
+          ["\n#\n", 3],          # Ruby/Python comment line
           
           # Common code block starters
           ["\nif ", 4],          # If statement
+          ["\nelse ", 6],        # Else statement
+          ["\nelif ", 6],        # Elif statement (Python)
           ["\nfor ", 5],         # For loop
           ["\nwhile ", 7],       # While loop
           ["\nswitch ", 8],      # Switch statement
+          ["\ncase ", 6],        # Case statement
+          ["\nreturn ", 8],      # Return statement
           
           # Indentation changes (often indicate logical blocks)
           ["\n    ", 5],         # 4-space indentation
@@ -370,6 +404,7 @@ module Embedding
           ["; ", 2],             # Semicolon with space
           ["} ", 2],             # Closing brace with space
           [") ", 2],             # Closing parenthesis with space
+          [";\n", 2],            # Semicolon with newline
           
           # Last resort - any newline
           ["\n", 1],             # Any newline
@@ -398,7 +433,7 @@ module Embedding
     end
     
     # Helper method for testing in console
-    def self.test_chunking(file_path, chunk_size = 512, chunk_overlap = 50, content_type = nil)
+    def self.test_chunking(file_path, chunk_size = 512, chunk_overlap = 50, content_type = nil, show_boundaries = false)
       begin
         text = File.read(file_path)
         chunker = new
@@ -410,6 +445,8 @@ module Embedding
           content_type = case File.extname(file_path).downcase
                          when '.rb', '.js', '.py', '.java', '.c', '.cpp', '.cs', '.php', '.go', '.ts', '.swift'
                            :code
+                         when '.md', '.txt', '.rst', '.adoc'
+                           :text
                          else
                            nil # Let the instance method detect it
                          end
@@ -430,6 +467,12 @@ module Embedding
         puts "Smallest chunk: #{chunks.map(&:length).min || 0} characters"
         puts "Largest chunk: #{chunks.map(&:length).max || 0} characters"
         
+        # Visualize chunk boundaries if requested
+        if show_boundaries && !chunks.empty?
+          puts "\nChunk boundaries visualization:"
+          visualize_chunks(text, chunks)
+        end
+        
         # Return the chunks for further inspection
         chunks
       rescue => e
@@ -437,6 +480,57 @@ module Embedding
         puts e.backtrace.join("\n")
         []
       end
+    end
+    
+    # Visualize where chunks start and end in the original text
+    def self.visualize_chunks(text, chunks)
+      # Create a map of positions where chunks start and end
+      boundaries = {}
+      
+      chunks.each_with_index do |chunk, i|
+        # Find the start position of this chunk in the original text
+        start_pos = text.index(chunk.strip)
+        next unless start_pos # Skip if we can't find the chunk
+        
+        end_pos = start_pos + chunk.length
+        
+        # Mark the start and end in our boundaries hash
+        boundaries[start_pos] = { type: :start, index: i }
+        boundaries[end_pos] = { type: :end, index: i }
+      end
+      
+      # Sort the boundaries by position
+      sorted_positions = boundaries.keys.sort
+      
+      # Print the text with boundary markers
+      last_pos = 0
+      active_chunks = []
+      
+      sorted_positions.each do |pos|
+        # Print the text between the last position and this one
+        if pos > last_pos
+          print text[last_pos...pos].gsub(/\n/, "↵")
+        end
+        
+        # Print the boundary marker
+        boundary = boundaries[pos]
+        if boundary[:type] == :start
+          active_chunks << boundary[:index]
+          print "【#{boundary[:index]}→"
+        else
+          active_chunks.delete(boundary[:index])
+          print "←#{boundary[:index]}】"
+        end
+        
+        last_pos = pos
+      end
+      
+      # Print any remaining text
+      if last_pos < text.length
+        print text[last_pos..-1].gsub(/\n/, "↵")
+      end
+      
+      puts "\n\n"
     end
   end
 end
