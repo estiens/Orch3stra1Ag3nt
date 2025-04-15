@@ -16,6 +16,7 @@ class WebResearcherAgent < BaseAgent
   # or passing them during initialization instead of creating them inside methods.
 
   tool :search_with_perplexity, "Search the web using Perplexity for AI-enhanced results" do |query, focus = "web"|
+    # Ensure parameters are properly passed as named arguments
     search_with_perplexity(query, focus)
   end
 
@@ -44,7 +45,18 @@ class WebResearcherAgent < BaseAgent
   # --- Core Logic ---
   def run(input = nil) # Input should be the research topic/question
     before_run(input)
-    research_topic = input || task&.title || "Unknown topic"
+    
+    # Extract a clean research topic from input or task
+    research_topic = if input.present?
+      # If input is provided directly, use it
+      input.to_s.strip
+    elsif task&.title.present?
+      # If we have a task with a title, use that
+      task.title.to_s.strip
+    else
+      # Fallback
+      "Unknown topic"
+    end
 
     unless task
       Rails.logger.warn "[WebResearcherAgent] Running without an associated task record."
@@ -107,6 +119,14 @@ class WebResearcherAgent < BaseAgent
   # --- Tool Implementations ---
 
   def search_with_perplexity(query, focus = "web")
+    # Ensure query is a string
+    query = query.to_s.strip
+    
+    # Validate query
+    if query.empty?
+      return "Error: Search query cannot be empty"
+    end
+    
     search_tool = PerplexitySearchTool.new # Consider dependency injection
     # Use call method for test compatibility
     search_results = search_tool.call(query: query, focus: focus)

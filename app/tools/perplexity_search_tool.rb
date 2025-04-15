@@ -106,13 +106,13 @@ class PerplexitySearchTool
     }
   end
   def request_body
-    # Ensure exact format matches the curl command example
+    # Format according to Perplexity API requirements
     body = {
       model: "sonar-pro",
       messages: [
         {
           role: "user",
-          content: @query
+          content: @query.to_s # Ensure it's a string
         }
       ],
       max_tokens: 300
