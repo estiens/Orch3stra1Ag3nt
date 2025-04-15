@@ -175,10 +175,21 @@ module Embedding
       # Adjust chunk size for code to be more conservative
       # For code, we want smaller chunks to avoid breaking important structures
       effective_chunk_size = if content_type == :code
-                              (chunk_size * 0.85).to_i  # More conservative for code
+                              (chunk_size * 0.80).to_i  # Even more conservative for code
                             else
                               chunk_size
                             end
+                            
+      # Set a maximum chunk size to prevent API timeouts
+      max_token_estimate = effective_chunk_size / 4  # Rough estimate of tokens
+      if max_token_estimate > 1500  # Most APIs have limits around 2048 tokens
+        effective_chunk_size = 1500 * 4  # Approximately 1500 tokens
+        begin
+          @logger.debug("Limiting chunk size to ~1500 tokens to prevent API timeouts")
+        rescue => e
+          # Continue silently if logging fails
+        end
+      end
 
       # Track the last few chunks to detect potential infinite loops
       last_positions = []
@@ -307,7 +318,12 @@ module Embedding
         # Method calls and declarations
         ".map(", ".filter(", ".reduce(", ".forEach(", ".then(", ".catch(",
         # Common programming patterns
-        "try {", "catch (", "throw new", "new ", "this.", "self.", "super."
+        "try {", "catch (", "throw new", "new ", "this.", "self.", "super.",
+        # Additional code patterns
+        "import ", "export ", "require(", "module.exports", "extends ", "implements ",
+        "public class", "private class", "protected class", "interface ", "enum ",
+        "struct ", "typedef ", "namespace ", "template<", "#define ", "#ifdef",
+        "func ", "protocol ", "extension ", "@interface", "@implementation"
       ]
       
       sample = text[0...[5000, text.length].min]
@@ -433,7 +449,7 @@ module Embedding
     end
     
     # Helper method for testing in console
-    def self.test_chunking(file_path, chunk_size = 512, chunk_overlap = 50, content_type = nil, show_boundaries = false)
+    def self.test_chunking(file_path, chunk_size = 512, chunk_overlap = 50, content_type = nil, show_boundaries = false, max_chunks = nil)
       begin
         text = File.read(file_path)
         chunker = new
@@ -443,9 +459,10 @@ module Embedding
         if content_type.nil?
           # Try to guess based on file extension
           content_type = case File.extname(file_path).downcase
-                         when '.rb', '.js', '.py', '.java', '.c', '.cpp', '.cs', '.php', '.go', '.ts', '.swift'
+                         when '.rb', '.js', '.py', '.java', '.c', '.cpp', '.cs', '.php', '.go', '.ts', '.swift', 
+                              '.h', '.hpp', '.jsx', '.tsx', '.scala', '.kt', '.rs', '.dart', '.lua', '.pl', '.sh'
                            :code
-                         when '.md', '.txt', '.rst', '.adoc'
+                         when '.md', '.txt', '.rst', '.adoc', '.html', '.xml', '.json', '.csv', '.yml', '.yaml'
                            :text
                          else
                            nil # Let the instance method detect it
@@ -473,6 +490,12 @@ module Embedding
           visualize_chunks(text, chunks)
         end
         
+        # Limit chunks if requested
+        if max_chunks && chunks.size > max_chunks
+          puts "Limiting output to #{max_chunks} chunks (out of #{chunks.size} total)"
+          chunks = chunks.first(max_chunks)
+        end
+        
         # Return the chunks for further inspection
         chunks
       rescue => e
@@ -482,6 +505,14 @@ module Embedding
       end
     end
     
+    # Estimate token count for a text
+    def self.estimate_tokens(text)
+      return 0 if text.nil? || text.empty?
+      # Rough estimate: 1 token ≈ 4 characters for English text
+      # This is a very rough approximation
+      (text.length / 4.0).ceil
+    end
+    
     # Visualize where chunks start and end in the original text
     def self.visualize_chunks(text, chunks)
       # Create a map of positions where chunks start and end
@@ -489,8 +520,19 @@ module Embedding
       
       chunks.each_with_index do |chunk, i|
         # Find the start position of this chunk in the original text
-        start_pos = text.index(chunk.strip)
-        next unless start_pos # Skip if we can't find the chunk
+        chunk_to_find = chunk.strip
+        start_pos = text.index(chunk_to_find)
+        
+        # If we can't find the exact chunk, try a fuzzy match
+        unless start_pos
+          # Try with first 50 chars
+          if chunk_to_find.length > 50
+            prefix = chunk_to_find[0...50]
+            start_pos = text.index(prefix)
+          end
+        end
+        
+        next unless start_pos # Skip if we still can't find the chunk
         
         end_pos = start_pos + chunk.length
         
@@ -505,24 +547,36 @@ module Embedding
       # Print the text with boundary markers
       last_pos = 0
       active_chunks = []
+      output = ""
       
       sorted_positions.each do |pos|
-        # Print the text between the last position and this one
+        # Add the text between the last position and this one
         if pos > last_pos
-          print text[last_pos...pos].gsub(/\n/, "↵")
+          output += text[last_pos...pos].gsub(/\n/, "↵")
         end
         
-        # Print the boundary marker
+        # Add the boundary marker
         boundary = boundaries[pos]
         if boundary[:type] == :start
           active_chunks << boundary[:index]
-          print "【#{boundary[:index]}→"
+          output += "【#{boundary[:index]}→"
         else
           active_chunks.delete(boundary[:index])
-          print "←#{boundary[:index]}】"
+          output += "←#{boundary[:index]}】"
         end
         
         last_pos = pos
+      end
+      
+      # Add any remaining text
+      if last_pos < text.length
+        output += text[last_pos..-1].gsub(/\n/, "↵")
+      end
+      
+      # Print in chunks to avoid terminal buffer issues
+      output.scan(/.{1,1000}/m).each do |chunk|
+        print chunk
+        sleep(0.01) # Small delay to prevent buffer issues
       end
       
       # Print any remaining text
@@ -531,6 +585,66 @@ module Embedding
       end
       
       puts "\n\n"
+    end
+    
+    # Analyze chunks for potential issues
+    def self.analyze_chunks(chunks)
+      return if chunks.empty?
+      
+      # Calculate statistics
+      lengths = chunks.map(&:length)
+      avg_length = lengths.sum / chunks.size
+      min_length = lengths.min
+      max_length = lengths.max
+      std_dev = Math.sqrt(lengths.map { |l| (l - avg_length) ** 2 }.sum / chunks.size)
+      
+      # Check for potential issues
+      issues = []
+      
+      # Check for very small chunks
+      small_chunks = chunks.select { |c| c.length < 100 }
+      if small_chunks.any?
+        issues << "Found #{small_chunks.size} very small chunks (< 100 chars)"
+      end
+      
+      # Check for very large chunks
+      large_chunks = chunks.select { |c| c.length > 1000 }
+      if large_chunks.any?
+        issues << "Found #{large_chunks.size} very large chunks (> 1000 chars)"
+      end
+      
+      # Check for high variance in chunk sizes
+      if std_dev > avg_length * 0.5
+        issues << "High variance in chunk sizes (std dev: #{std_dev.round(2)})"
+      end
+      
+      # Check for duplicate chunks
+      duplicates = chunks.group_by(&:itself).select { |_, group| group.size > 1 }
+      if duplicates.any?
+        issues << "Found #{duplicates.size} duplicate chunks"
+      end
+      
+      # Check for chunks that might be cut in the middle of sentences
+      bad_endings = chunks.select { |c| c.end_with?(".", ",", "and", "or", "the", "a", "an") }
+      if bad_endings.any?
+        issues << "Found #{bad_endings.size} chunks with potentially bad break points"
+      end
+      
+      # Print analysis
+      puts "\nChunk Analysis:"
+      puts "---------------"
+      puts "Total chunks: #{chunks.size}"
+      puts "Average length: #{avg_length} chars"
+      puts "Min length: #{min_length} chars"
+      puts "Max length: #{max_length} chars"
+      puts "Standard deviation: #{std_dev.round(2)}"
+      
+      if issues.any?
+        puts "\nPotential issues:"
+        issues.each { |issue| puts "- #{issue}" }
+      else
+        puts "\nNo significant issues detected"
+      end
     end
   end
 end
