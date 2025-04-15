@@ -7,6 +7,7 @@ VCR.configure do |config|
 
   # Don't record sensitive data
   config.filter_sensitive_data('<OPEN_ROUTER_API_KEY>') { ENV['OPEN_ROUTER_API_KEY'] }
+  config.filter_sensitive_data('<HUGGINGFACE_API_TOKEN>') { ENV['HUGGINGFACE_API_TOKEN'] }
 
   # Allow connections to localhost
   config.ignore_localhost = true

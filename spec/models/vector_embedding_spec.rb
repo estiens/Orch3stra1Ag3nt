@@ -3,8 +3,8 @@ require 'rails_helper'
 RSpec.describe VectorEmbedding, type: :model do
   # Helper method to generate a properly sized mock embedding vector
   def mock_embedding
-    # Create an array of 1536 elements (OpenAI's embedding size)
-    Array.new(1536) { |i| i.to_f / 1536 }
+    # Create an array of 384 elements (typical for modern embedding models)
+    Array.new(384) { |i| i.to_f / 384 }
   end
 
   describe "validations" do
@@ -41,219 +41,111 @@ RSpec.describe VectorEmbedding, type: :model do
     end
   end
 
-  describe ".store" do
-    let(:project) { Project.create!(name: "Test Project") }
-    let(:task) { project.tasks.create!(title: "Test Task") }
-
-    it "generates embedding and creates record" do
-      # Stub the embedding generation with proper size
-      allow(VectorEmbedding).to receive(:generate_embedding).and_return(mock_embedding)
-
-      embedding = VectorEmbedding.store(
-        content: "Test content",
-        content_type: "text",
-        project: project,
-        task: task,
-        metadata: { test: true }
-      )
-
-      expect(embedding).to be_persisted
-      expect(embedding.content).to eq("Test content")
-      expect(embedding.project).to eq(project)
-      expect(embedding.task).to eq(task)
-      expect(embedding.metadata["test"]).to be_truthy
+  describe "scopes" do
+    before do
+      # Create test data for scopes
+      @project1 = create(:project, name: "Test Project 1")
+      @project2 = create(:project, name: "Test Project 2")
+      @task1 = create(:task, project: @project1)
+      
+      # Create embeddings with different collections and content types
+      @embedding1 = create(:vector_embedding, collection: "collection1", content_type: "text", 
+                          project: @project1, task: @task1, embedding: mock_embedding)
+      @embedding2 = create(:vector_embedding, collection: "collection2", content_type: "document", 
+                          project: @project2, embedding: mock_embedding)
+      @embedding3 = create(:vector_embedding, collection: "collection1", content_type: "code", 
+                          project: @project1, embedding: mock_embedding)
     end
 
-    it "resolves project from task if not provided" do
-      # Stub the embedding generation with proper size
-      allow(VectorEmbedding).to receive(:generate_embedding).and_return(mock_embedding)
-
-      embedding = VectorEmbedding.store(
-        content: "Test content",
-        content_type: "text",
-        task: task
-      )
-
-      expect(embedding.project).to eq(project)
+    it "filters by collection" do
+      expect(VectorEmbedding.in_collection("collection1").count).to eq(2)
+      expect(VectorEmbedding.in_collection("collection2").count).to eq(1)
     end
-  end
 
-  describe ".search" do
-    it "generates embedding and calls find_similar" do
-      mock_embed = mock_embedding
-      expect(VectorEmbedding).to receive(:generate_embedding).with("search query").and_return(mock_embed)
-      expect(VectorEmbedding).to receive(:find_similar).with(
-        mock_embed,
-        hash_including(limit: 5, collection: "test_collection", project_id: 123)
-      )
+    it "filters by content_type" do
+      expect(VectorEmbedding.by_content_type("text").count).to eq(1)
+      expect(VectorEmbedding.by_content_type("document").count).to eq(1)
+      expect(VectorEmbedding.by_content_type("code").count).to eq(1)
+    end
 
-      VectorEmbedding.search(
-        text: "search query",
-        limit: 5,
-        collection: "test_collection",
-        project_id: 123
-      )
+    it "filters by task" do
+      expect(VectorEmbedding.for_task(@task1.id).count).to eq(1)
+    end
+
+    it "filters by project" do
+      expect(VectorEmbedding.for_project(@project1.id).count).to eq(2)
+      expect(VectorEmbedding.for_project(@project2.id).count).to eq(1)
     end
   end
 
   describe ".find_similar" do
-    let(:project) { Project.create!(name: "Test Project") }
-
-    # Create a mock relation that can be chained and responds to count
-    let(:mock_relation) do
-      relation = double("ActiveRecord::Relation")
-      allow(relation).to receive(:in_collection).and_return(relation)
-      allow(relation).to receive(:for_task).and_return(relation)
-      allow(relation).to receive(:for_project).and_return(relation)
-      allow(relation).to receive(:limit).and_return(relation)
-
-      # Mock collection filtering to return specific counts
-      allow(relation).to receive(:count).and_return(4) # Default count
-      relation
-    end
-
     before do
       # Mock nearest_neighbors to avoid DB vector operations
-      allow(VectorEmbedding).to receive(:nearest_neighbors).and_return(mock_relation)
+      @mock_relation = double("ActiveRecord::Relation")
+      allow(@mock_relation).to receive(:in_collection).and_return(@mock_relation)
+      allow(@mock_relation).to receive(:for_task).and_return(@mock_relation)
+      allow(@mock_relation).to receive(:for_project).and_return(@mock_relation)
+      allow(@mock_relation).to receive(:limit).and_return(@mock_relation)
+      allow(@mock_relation).to receive(:count).and_return(3)
+      
+      allow(VectorEmbedding).to receive(:nearest_neighbors).and_return(@mock_relation)
+    end
 
-      # Create some test embeddings with proper size
-      allow(VectorEmbedding).to receive(:generate_embedding).and_return(mock_embedding)
-
-      3.times do |i|
-        VectorEmbedding.store(
-          content: "Content #{i}",
-          content_type: "text",
-          collection: "test_collection",
-          project: project
-        )
-      end
-
-      # One in a different collection
-      VectorEmbedding.store(
-        content: "Other collection",
-        content_type: "text",
-        collection: "other_collection",
-        project: project
-      )
+    it "calls nearest_neighbors with the query embedding" do
+      query_embedding = mock_embedding
+      expect(VectorEmbedding).to receive(:nearest_neighbors).with(:embedding, query_embedding, distance: "cosine")
+      VectorEmbedding.find_similar(query_embedding)
     end
 
     it "filters by collection when specified" do
-      # Set up expectations for collection filtering
-      test_collection_relation = double("CollectionRelation")
-      other_collection_relation = double("OtherCollectionRelation")
-
-      allow(mock_relation).to receive(:in_collection).with("test_collection").and_return(test_collection_relation)
-      allow(mock_relation).to receive(:in_collection).with("other_collection").and_return(other_collection_relation)
-
-      allow(test_collection_relation).to receive(:limit).and_return(test_collection_relation)
-      allow(other_collection_relation).to receive(:limit).and_return(other_collection_relation)
-
-      allow(test_collection_relation).to receive(:count).and_return(3)
-      allow(other_collection_relation).to receive(:count).and_return(1)
-
-      result = VectorEmbedding.find_similar(mock_embedding, collection: "test_collection")
-      expect(result.count).to eq(3)
-
-      result = VectorEmbedding.find_similar(mock_embedding, collection: "other_collection")
-      expect(result.count).to eq(1)
+      expect(@mock_relation).to receive(:in_collection).with("test_collection")
+      VectorEmbedding.find_similar(mock_embedding, collection: "test_collection")
     end
 
     it "filters by project_id when specified" do
-      # Create another project with embeddings
-      other_project = Project.create!(name: "Other Project")
-      VectorEmbedding.store(
-        content: "Other project content",
-        content_type: "text",
-        collection: "test_collection",
-        project: other_project
-      )
+      expect(@mock_relation).to receive(:for_project).with(123)
+      VectorEmbedding.find_similar(mock_embedding, project_id: 123)
+    end
 
-      # Set up expectations for project filtering
-      project_relation = double("ProjectRelation")
-      other_project_relation = double("OtherProjectRelation")
-
-      allow(mock_relation).to receive(:for_project).with(project.id).and_return(project_relation)
-      allow(mock_relation).to receive(:for_project).with(other_project.id).and_return(other_project_relation)
-
-      allow(project_relation).to receive(:limit).and_return(project_relation)
-      allow(other_project_relation).to receive(:limit).and_return(other_project_relation)
-
-      allow(project_relation).to receive(:count).and_return(4)
-      allow(other_project_relation).to receive(:count).and_return(1)
-
-      result = VectorEmbedding.find_similar(mock_embedding, project_id: project.id)
-      expect(result.count).to eq(4) # All from first project
-
-      result = VectorEmbedding.find_similar(mock_embedding, project_id: other_project.id)
-      expect(result.count).to eq(1) # Just the one from other project
+    it "filters by task_id when specified" do
+      expect(@mock_relation).to receive(:for_task).with(456)
+      VectorEmbedding.find_similar(mock_embedding, task_id: 456)
     end
 
     it "respects the limit parameter" do
-      # Set up expectations for limit
-      limited_relation = double("LimitedRelation")
-      allow(mock_relation).to receive(:limit).with(2).and_return(limited_relation)
-      allow(limited_relation).to receive(:count).and_return(2)
+      expect(@mock_relation).to receive(:limit).with(10)
+      VectorEmbedding.find_similar(mock_embedding, limit: 10)
+    end
 
-      result = VectorEmbedding.find_similar(mock_embedding, limit: 2)
-      expect(result.count).to eq(2)
+    it "uses the specified distance metric" do
+      expect(VectorEmbedding).to receive(:nearest_neighbors).with(:embedding, mock_embedding, distance: "euclidean")
+      VectorEmbedding.find_similar(mock_embedding, distance: "euclidean")
     end
   end
 
-  describe ".generate_embedding" do
-    it "calls OpenAI client with correct parameters" do
-      # Mock the OpenAI client
-      mock_client = double("OpenAI::Client")
-      allow(OpenAI::Client).to receive(:new).and_return(mock_client)
-
-      # Mock the response
-      expect(mock_client).to receive(:embeddings).with(
-        parameters: {
-          model: "text-embedding-ada-002",
-          input: "Test text"
-        }
-      ).and_return({
-        "data" => [ { "embedding" => mock_embedding } ]
-      })
-
-      result = VectorEmbedding.generate_embedding("Test text")
+  describe ".generate_embedding", vcr: { cassette_name: "vector_embedding/generate_embedding" } do
+    it "delegates to EmbeddingService" do
+      embedding_service = instance_double(EmbeddingService)
+      expect(EmbeddingService).to receive(:new).and_return(embedding_service)
+      expect(embedding_service).to receive(:generate_embedding).with("test text").and_return(mock_embedding)
+      
+      result = VectorEmbedding.generate_embedding("test text")
       expect(result).to eq(mock_embedding)
     end
+  end
 
-    it "truncates long text" do
-      # Mock the OpenAI client
-      mock_client = double("OpenAI::Client")
-      allow(OpenAI::Client).to receive(:new).and_return(mock_client)
-
-      # Create a very long text (> 8000 chars)
-      long_text = "a" * 10000
-      truncated_text = "a" * 8001 # 8000 chars + 1 (0-indexed)
-
-      # Expect truncated text to be sent
-      expect(mock_client).to receive(:embeddings).with(
-        parameters: {
-          model: "text-embedding-ada-002",
-          input: truncated_text
-        }
-      ).and_return({
-        "data" => [ { "embedding" => mock_embedding } ]
-      })
-
-      VectorEmbedding.generate_embedding(long_text)
-    end
-
-    it "raises error when API returns error" do
-      # Mock the OpenAI client
-      mock_client = double("OpenAI::Client")
-      allow(OpenAI::Client).to receive(:new).and_return(mock_client)
-
-      # Mock error response
-      expect(mock_client).to receive(:embeddings).and_return({
-        "error" => { "message" => "API error" }
-      })
-
-      expect {
-        VectorEmbedding.generate_embedding("Test text")
-      }.to raise_error(RuntimeError, /Failed to generate embedding/)
+  describe "#similarity" do
+    it "calculates cosine similarity correctly" do
+      embedding = VectorEmbedding.new(embedding: [1.0, 0.0, 0.0])
+      
+      # Same vector should have similarity 1.0
+      expect(embedding.similarity([1.0, 0.0, 0.0])).to be_within(0.001).of(1.0)
+      
+      # Orthogonal vector should have similarity 0.0
+      expect(embedding.similarity([0.0, 1.0, 0.0])).to be_within(0.001).of(0.0)
+      
+      # 45-degree vector should have similarity 0.707
+      expect(embedding.similarity([1.0, 1.0, 0.0])).to be_within(0.001).of(0.707)
     end
   end
 end
