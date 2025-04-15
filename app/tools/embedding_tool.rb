@@ -124,7 +124,7 @@ class EmbeddingTool
 
             # Determine content type if not provided
             detected_content_type = content_type
-            if detected_content_type.nil? && file_obj.respond_to?(:path)
+            if detected_content_type.nil? && file_obj.respond_to?(:path) && file_obj.path
               ext = File.extname(file_obj.path).downcase
               detected_content_type = case ext
               when ".md", ".txt", ".text" then "text"
@@ -148,17 +148,19 @@ class EmbeddingTool
 
             # Read file content
             begin
+              # Make sure we're at the beginning of the file
+              file_obj.rewind if file_obj.respond_to?(:rewind)
               file_content = file_obj.read
               
               # Return a hash with all the data needed for processing
               {
                 content: file_content,
                 path: file_path,
-                size: file_obj.size,
+                size: file_obj.respond_to?(:size) ? file_obj.size : file_content.size,
                 content_type: detected_content_type,
                 metadata: file_metadata,
                 source_url: source_url || file_path,
-                source_title: source_title || File.basename(file_path)
+                source_title: source_title || (file_obj.respond_to?(:path) && file_obj.path ? File.basename(file_obj.path) : "In-memory content")
               }
             rescue => e
               Rails.logger.error("Error reading file #{file_path}: #{e.message}")
@@ -406,20 +408,20 @@ class EmbeddingTool
       raise ArgumentError, "File is empty or too small: #{file}" if File.size(expanded_path) < 10
       File.open(expanded_path)
     elsif file.respond_to?(:read)
-      # Handle file-like objects
+      # Handle file-like objects (File, StringIO, etc.)
       if file.respond_to?(:path) && file.path && !file.path.empty?
         path = file.path
         # Only validate the path if it appears to be a real file path
         # (not a StringIO or other IO-like object with a non-file path)
         if File.exist?(path)
           raise ArgumentError, "File is not readable: #{path}" unless File.readable?(path)
-
-          # Check if file is at beginning
-          if file.respond_to?(:pos) && file.pos > 0
-            file.rewind rescue nil
-          end
         end
       end
+      
+      # Ensure we're at the beginning of the file
+      file.rewind if file.respond_to?(:rewind)
+      
+      # Return the file-like object
       file
     else
       raise ArgumentError, "Unsupported file object: #{file.inspect}"
