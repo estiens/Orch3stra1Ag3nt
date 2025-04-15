@@ -282,7 +282,7 @@ class OrchestratorAgent < BaseAgent
   # Tool implementation: Adjust system priorities
   def adjust_system_priorities(adjustments)
     results = []
-    
+
     # Process each adjustment
     if adjustments.is_a?(String)
       adjustment_pairs = adjustments.split(",").map(&:strip)
@@ -292,29 +292,29 @@ class OrchestratorAgent < BaseAgent
           # Convert task_id to integer if it's a string
           task_id = task_id.to_i if task_id.is_a?(String)
           task = Task.find(task_id)
-          
+
           # Validate the priority value
-          unless ["low", "normal", "high", "urgent"].include?(priority.to_s.downcase)
+          unless [ "low", "normal", "high", "urgent" ].include?(priority.to_s.downcase)
             results << "Failed to adjust task #{task_id}: Invalid priority"
             next
           end
-          
+
           # Update the task priority
           original_priority = task.priority
           task.update!(priority: priority)
-          
+
           # Always create the event, even in test environment
           task.events.create!(
             event_type: "priority_adjusted",
             data: { from: original_priority, to: priority, adjusted_by: "OrchestratorAgent" },
             agent_activity_id: @agent_activity&.id
           )
-          
+
           results << "Task #{task_id}: priority changed from #{original_priority || 'unset'} to #{priority}"
-          
+
           # Log the priority change
           Rails.logger.info("[OrchestratorAgent] Changed priority for Task ##{task_id} from #{original_priority || 'unset'} to #{priority}")
-          
+
         rescue ActiveRecord::RecordNotFound
           results << "Failed to adjust task #{task_id}: Task not found"
         rescue => e
@@ -328,17 +328,17 @@ class OrchestratorAgent < BaseAgent
           # Convert task_id to integer if it's a string
           task_id = task_id.to_i if task_id.is_a?(String)
           task = Task.find(task_id)
-          
+
           # Validate the priority value
-          unless ["low", "normal", "high", "urgent"].include?(new_priority.to_s.downcase)
+          unless [ "low", "normal", "high", "urgent" ].include?(new_priority.to_s.downcase)
             results << "Failed to adjust task #{task_id}: Invalid priority"
             next
           end
-          
+
           # Update the task priority
           old_priority = task.priority
           task.update!(priority: new_priority.to_s.downcase)
-          
+
           # Create event without requiring agent_activity
           if @agent_activity
             task.events.create!(
@@ -347,12 +347,12 @@ class OrchestratorAgent < BaseAgent
               agent_activity_id: @agent_activity.id
             )
           end
-          
+
           results << "Task #{task_id}: priority changed from #{old_priority || 'unset'} to #{new_priority}"
-          
+
           # Log the priority change
           Rails.logger.info("[OrchestratorAgent] Changed priority for Task ##{task_id} from #{old_priority || 'unset'} to #{new_priority}")
-          
+
         rescue ActiveRecord::RecordNotFound
           results << "Failed to adjust task #{task_id}: Task not found"
         rescue => e
@@ -360,7 +360,7 @@ class OrchestratorAgent < BaseAgent
         end
       end
     end
-    
+
     results.join("\n")
   end
 
@@ -488,13 +488,13 @@ class OrchestratorAgent < BaseAgent
 
   # Override after_run to add specific logging after base class actions
   def after_run(result) # Ensure parameter matches base class if needed
-    # Call the parent implementation first
-    super(result)
-    
     # Log with the exact format expected by the tests - this must come first!
     # The test is looking for this exact string format
     Rails.logger.info("OrchestratorAgent Run Summary: #{result}")
-    
+
+    # Call the parent implementation after our specific logging
+    super(result)
+
     # For OrchestratorAgent, log decisions made during this run
     decision_log = "OrchestratorAgent Run Summary (Activity: #{@agent_activity&.id}):\n"
     decision_log += "  Result: #{result.inspect}\n"
