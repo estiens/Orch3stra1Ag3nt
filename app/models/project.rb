@@ -107,7 +107,7 @@ class Project < ApplicationRecord
     {
       count: calls.count,
       total_cost: calls.sum(:cost).round(4),
-      total_tokens: calls.sum(:total_tokens),
+      total_tokens: calls.sum(:prompt_tokens).to_i + calls.sum(:completion_tokens).to_i,
       models: calls.group(:model).count,
       providers: calls.group(:provider).count
     }
