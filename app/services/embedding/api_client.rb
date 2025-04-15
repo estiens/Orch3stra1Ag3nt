@@ -12,11 +12,12 @@ module Embedding
     API_BATCH_SIZE = 32  # Maximum allowed by the API
     MAX_RETRIES = 3
 
-    attr_reader :api_key, :endpoint
+    attr_reader :api_key, :endpoint, :logger
 
     def initialize(api_key: nil, endpoint: nil)
       @api_key = api_key || ENV["HUGGINGFACE_API_TOKEN"]
       @endpoint = endpoint || ENV["HUGGINGFACE_EMBEDDING_ENDPOINT"] || DEFAULT_API_ENDPOINT
+      @logger = Embedding::Logger.new("ApiClient")
 
       raise "HUGGINGFACE_API_TOKEN environment variable not set" unless @api_key
     end
@@ -28,8 +29,8 @@ module Embedding
       # Ensure we never exceed the API's maximum batch size
       effective_batch_size = [ batch_size || API_BATCH_SIZE, API_BATCH_SIZE ].min
 
-      Rails.logger.debug("EmbeddingService: API key present? #{@api_key.present?}")
-      Rails.logger.debug("EmbeddingService: Using embedding endpoint: #{@endpoint}")
+      @logger.debug("API key present? #{@api_key.present?}")
+      @logger.debug("Using embedding endpoint: #{@endpoint}")
 
       # Process in smaller batches if needed
       results = []

@@ -5,6 +5,12 @@ require "concurrent"
 module Embedding
   # Handles text chunking for embedding generation
   class TextChunker
+    attr_reader :logger
+    
+    def initialize
+      @logger = Embedding::Logger.new("TextChunker")
+    end
+    
     # Efficiently chunk text using a simpler parallel approach
     def chunk_text(text, chunk_size, chunk_overlap)
       # For small texts, just return the whole thing or process sequentially
@@ -12,23 +18,23 @@ module Embedding
 
       # For medium texts, use sequential processing - parallelism overhead isn't worth it
       if text.length < 1_000_000
-        Rails.logger.debug("EmbeddingService: Text too small for parallel chunking, using sequential chunking")
+        @logger.debug("Text too small for parallel chunking, using sequential chunking")
         return chunk_text_segment(text, chunk_size, chunk_overlap)
       end
 
       # For larger texts, use a simpler and more efficient parallel approach
       processor_count = [ Concurrent.processor_count, 1 ].max
-      Rails.logger.debug("EmbeddingService: Using #{processor_count} threads for parallel chunking")
+      @logger.debug("Using #{processor_count} threads for parallel chunking")
 
       # Divide text into segments more efficiently
       segments = split_text_into_segments(text, processor_count, chunk_size, chunk_overlap)
-      Rails.logger.debug("EmbeddingService: Split text into #{segments.size} segments for processing")
+      @logger.debug("Split text into #{segments.size} segments for processing")
 
       # Use a simple thread pool for processing
       all_chunks = process_segments_with_threads(segments, chunk_size, chunk_overlap)
 
       # Remove duplicates that might have been created in overlap regions
-      Rails.logger.debug("EmbeddingService: Parallel chunking completed - generated #{all_chunks.size} chunks")
+      @logger.debug("Parallel chunking completed - generated #{all_chunks.size} chunks")
       all_chunks.uniq
     end
 
@@ -107,9 +113,9 @@ module Embedding
               all_chunks.concat(chunks)
             end
 
-            Rails.logger.debug("EmbeddingService: Thread processed segment #{idx+1}/#{segments.size} in #{duration.round(2)}s - #{chunks.size} chunks")
+            @logger.debug("Thread processed segment #{idx+1}/#{segments.size} in #{duration.round(2)}s - #{chunks.size} chunks")
           rescue => e
-            Rails.logger.error("EmbeddingService: Error processing segment #{idx+1}: #{e.message}")
+            @logger.error("Error processing segment #{idx+1}: #{e.message}")
           end
         end
       end
