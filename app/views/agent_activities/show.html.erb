@@ -1,0 +1,285 @@
+<div class="container mx-auto px-4 py-8">
+  <div class="mb-6">
+    <div class="flex justify-between items-center">
+      <h1 class="text-2xl font-bold">Agent Activity Details</h1>
+      <div class="flex space-x-2">
+        <%= link_to "Back", :back, class: "button" %>
+        
+        <% if @agent_activity.status == "running" %>
+          <%= button_to "Pause", pause_agent_activity_path(@agent_activity), method: :post, class: "button button-warning" %>
+        <% elsif @agent_activity.status == "paused" %>
+          <%= button_to "Resume", resume_agent_activity_path(@agent_activity), method: :post, class: "button button-success" %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+  
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main activity details -->
+    <div class="lg:col-span-2">
+      <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div class="flex items-center mb-4">
+          <div class="w-3 h-3 rounded-full mr-2 <%= @agent_activity.status == 'running' ? 'bg-green-500' : 
+                                                  @agent_activity.status == 'completed' ? 'bg-blue-500' : 
+                                                  @agent_activity.status == 'failed' ? 'bg-red-500' : 
+                                                  @agent_activity.status == 'paused' ? 'bg-yellow-500' : 'bg-gray-500' %>"></div>
+          <h2 class="text-xl font-semibold"><%= @agent_activity.agent_type %></h2>
+          <span class="ml-3"><%= status_badge(@agent_activity.status) %></span>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <p class="text-gray-600"><strong>Task:</strong> <%= link_to @agent_activity.task.title, @agent_activity.task.project %></p>
+            <p class="text-gray-600"><strong>Started:</strong> <%= @agent_activity.created_at.strftime("%B %d, %Y at %H:%M") %></p>
+            <% if @agent_activity.completed_at %>
+              <p class="text-gray-600"><strong>Completed:</strong> <%= @agent_activity.completed_at.strftime("%B %d, %Y at %H:%M") %></p>
+              <p class="text-gray-600"><strong>Duration:</strong> <%= distance_of_time_in_words(@agent_activity.created_at, @agent_activity.completed_at) %></p>
+            <% end %>
+          </div>
+          
+          <div>
+            <p class="text-gray-600"><strong>Project:</strong> 
+              <% if @agent_activity.task.project.present? %>
+                <%= link_to @agent_activity.task.project.name, @agent_activity.task.project %>
+              <% else %>
+                N/A
+              <% end %>
+            </p>
+            <% if @agent_activity.error_message.present? %>
+              <p class="text-red-600"><strong>Error:</strong> <%= @agent_activity.error_message %></p>
+            <% end %>
+            <% if @agent_activity.result.present? %>
+              <p class="text-gray-600"><strong>Result:</strong> <%= truncate(@agent_activity.result, length: 100) %></p>
+            <% end %>
+          </div>
+        </div>
+        
+        <% if @agent_activity.metadata.present? && @agent_activity.metadata.is_a?(Hash) %>
+          <div class="mt-4">
+            <h3 class="font-semibold mb-2">Metadata</h3>
+            <div class="bg-gray-50 p-3 rounded text-sm">
+              <pre class="whitespace-pre-wrap"><%= JSON.pretty_generate(@agent_activity.metadata) %></pre>
+            </div>
+          </div>
+        <% end %>
+      </div>
+      
+      <!-- LLM Calls -->
+      <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-semibold mb-4">LLM Calls</h2>
+        
+        <% if @agent_activity.llm_calls.any? %>
+          <div class="space-y-4">
+            <% @agent_activity.llm_calls.order(created_at: :desc).each do |llm_call| %>
+              <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="flex justify-between items-center mb-2">
+                  <h3 class="font-medium"><%= llm_call.model || "Unknown Model" %></h3>
+                  <span class="text-sm text-gray-500"><%= time_ago_in_words(llm_call.created_at) %> ago</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm mb-3">
+                  <p><strong>Provider:</strong> <%= llm_call.provider || "Unknown" %></p>
+                  <p><strong>Tokens:</strong> <%= llm_call.tokens_used || 0 %></p>
+                </div>
+                
+                <div class="mt-2">
+                  <button class="text-blue-600 text-sm flex items-center" 
+                          onclick="toggleLlmDetails('<%= llm_call.id %>')"
+                          id="llm-button-<%= llm_call.id %>">
+                    <span>View Prompt & Response</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  <div id="llm-<%= llm_call.id %>" class="hidden mt-3 bg-gray-50 p-3 rounded text-sm">
+                    <div class="mb-3">
+                      <h4 class="font-medium mb-1">Prompt:</h4>
+                      <pre class="whitespace-pre-wrap bg-white p-2 rounded border border-gray-200"><%= llm_call.prompt %></pre>
+                    </div>
+                    <div>
+                      <h4 class="font-medium mb-1">Response:</h4>
+                      <pre class="whitespace-pre-wrap bg-white p-2 rounded border border-gray-200"><%= llm_call.response %></pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-gray-500 text-center py-4">No LLM calls recorded for this activity</p>
+        <% end %>
+      </div>
+      
+      <!-- Events -->
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold mb-4">Events</h2>
+        
+        <% if @agent_activity.events.any? %>
+          <div class="space-y-3">
+            <% @agent_activity.events.order(created_at: :desc).each do |event| %>
+              <div class="border-l-4 border-purple-500 pl-4 py-2">
+                <div class="flex justify-between items-center">
+                  <h3 class="font-medium"><%= event.event_type %></h3>
+                  <span class="text-sm text-gray-500"><%= time_ago_in_words(event.created_at) %> ago</span>
+                </div>
+                
+                <% if event.data.present? && event.data.is_a?(Hash) && !event.data.empty? %>
+                  <button class="text-blue-600 text-sm flex items-center mt-1" 
+                          onclick="toggleEventDetails('<%= event.id %>')" 
+                          id="event-button-<%= event.id %>">
+                    <span>View Details</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  <div id="event-<%= event.id %>" class="hidden mt-2 bg-gray-50 p-3 rounded text-sm">
+                    <pre class="whitespace-pre-wrap"><%= JSON.pretty_generate(event.data) %></pre>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-gray-500 text-center py-4">No events recorded for this activity</p>
+        <% end %>
+      </div>
+    </div>
+    
+    <!-- Sidebar -->
+    <div class="lg:col-span-1">
+      <!-- Ancestry Chain -->
+      <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-semibold mb-4">Activity Chain</h2>
+        
+        <% if @agent_activity.ancestry.present? %>
+          <div class="space-y-3">
+            <% @agent_activity.ancestors.each do |ancestor| %>
+              <div class="flex items-center">
+                <div class="w-2 h-2 rounded-full bg-gray-400 mr-2"></div>
+                <div class="flex-grow">
+                  <%= link_to ancestor.agent_type, agent_activity_path(ancestor), class: "text-blue-600 hover:underline" %>
+                  <div class="text-xs text-gray-500"><%= time_ago_in_words(ancestor.created_at) %> ago</div>
+                </div>
+                <div class="w-2 h-8 border-r border-gray-300 mx-auto"></div>
+              </div>
+            <% end %>
+            
+            <!-- Current activity -->
+            <div class="flex items-center">
+              <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+              <div>
+                <span class="font-medium"><%= @agent_activity.agent_type %> (Current)</span>
+                <div class="text-xs text-gray-500"><%= time_ago_in_words(@agent_activity.created_at) %> ago</div>
+              </div>
+            </div>
+            
+            <!-- Children activities -->
+            <% if @agent_activity.children.any? %>
+              <div class="w-2 h-8 border-r border-gray-300 mx-auto"></div>
+              <% @agent_activity.children.each do |child| %>
+                <div class="flex items-center">
+                  <div class="w-2 h-2 rounded-full bg-gray-400 mr-2"></div>
+                  <div>
+                    <%= link_to child.agent_type, agent_activity_path(child), class: "text-blue-600 hover:underline" %>
+                    <div class="text-xs text-gray-500"><%= time_ago_in_words(child.created_at) %> ago</div>
+                  </div>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        <% else %>
+          <% if @agent_activity.children.any? %>
+            <!-- Root activity with children -->
+            <div class="space-y-3">
+              <!-- Current activity -->
+              <div class="flex items-center">
+                <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                <div>
+                  <span class="font-medium"><%= @agent_activity.agent_type %> (Current)</span>
+                  <div class="text-xs text-gray-500"><%= time_ago_in_words(@agent_activity.created_at) %> ago</div>
+                </div>
+              </div>
+              
+              <div class="w-2 h-8 border-r border-gray-300 mx-auto"></div>
+              
+              <!-- Children activities -->
+              <% @agent_activity.children.each do |child| %>
+                <div class="flex items-center">
+                  <div class="w-2 h-2 rounded-full bg-gray-400 mr-2"></div>
+                  <div>
+                    <%= link_to child.agent_type, agent_activity_path(child), class: "text-blue-600 hover:underline" %>
+                    <div class="text-xs text-gray-500"><%= time_ago_in_words(child.created_at) %> ago</div>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          <% else %>
+            <p class="text-gray-500 text-center py-4">This is a standalone activity</p>
+          <% end %>
+        <% end %>
+      </div>
+      
+      <!-- Task Info -->
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold mb-4">Task Information</h2>
+        
+        <div class="space-y-3">
+          <div>
+            <h3 class="font-medium">Title</h3>
+            <p><%= @agent_activity.task.title %></p>
+          </div>
+          
+          <div>
+            <h3 class="font-medium">Description</h3>
+            <p><%= @agent_activity.task.description || "No description" %></p>
+          </div>
+          
+          <div>
+            <h3 class="font-medium">Status</h3>
+            <p><%= status_badge(@agent_activity.task.state) %></p>
+          </div>
+          
+          <div>
+            <h3 class="font-medium">Type</h3>
+            <p><%= @agent_activity.task.task_type.capitalize %></p>
+          </div>
+          
+          <div class="pt-2">
+            <% if @agent_activity.task.project.present? %>
+              <%= link_to "View Project", @agent_activity.task.project, class: "button button-primary w-full text-center" %>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleEventDetails(eventId) {
+    const detailsElement = document.getElementById(`event-${eventId}`);
+    const buttonElement = document.getElementById(`event-button-${eventId}`);
+    
+    if (detailsElement.classList.contains('hidden')) {
+      detailsElement.classList.remove('hidden');
+      buttonElement.querySelector('svg').classList.add('transform', 'rotate-180');
+    } else {
+      detailsElement.classList.add('hidden');
+      buttonElement.querySelector('svg').classList.remove('transform', 'rotate-180');
+    }
+  }
+  
+  function toggleLlmDetails(llmId) {
+    const detailsElement = document.getElementById(`llm-${llmId}`);
+    const buttonElement = document.getElementById(`llm-button-${llmId}`);
+    
+    if (detailsElement.classList.contains('hidden')) {
+      detailsElement.classList.remove('hidden');
+      buttonElement.querySelector('svg').classList.add('transform', 'rotate-180');
+    } else {
+      detailsElement.classList.add('hidden');
+      buttonElement.querySelector('svg').classList.remove('transform', 'rotate-180');
+    }
+  }
+</script>

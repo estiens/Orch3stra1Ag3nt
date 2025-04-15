@@ -16,6 +16,8 @@ class VectorEmbedding < ApplicationRecord
   scope :for_task, ->(task_id) { where(task_id: task_id) }
   scope :for_project, ->(project_id) { where(project_id: project_id) }
 
+  scope :search_content, ->(query) { where("content @@ websearch_to_tsquery(?)", query) }
+
   # Find similar embeddings with a vector similarity search using Neighbor
   # @param query_embedding [Array] The query embedding vector
   # @param limit [Integer] Maximum number of results to return
@@ -25,97 +27,74 @@ class VectorEmbedding < ApplicationRecord
   # @param distance [String] The distance metric to use ("euclidean", "cosine", "inner_product")
   # @return [Array<VectorEmbedding>] Matching embeddings sorted by similarity
   def self.find_similar(query_embedding, limit: 5, collection: nil, task_id: nil, project_id: nil, distance: "cosine")
-    # Start with a nearest neighbors query
-    query = nearest_neighbors(:embedding, query_embedding, distance: distance)
-
-    # Add collection filter if specified
+    # Build query with filters
+    query = self
     query = query.in_collection(collection) if collection.present?
-
-    # Add task filter if specified
     query = query.for_task(task_id) if task_id.present?
-
-    # Add project filter if specified
     query = query.for_project(project_id) if project_id.present?
 
-    # Get nearest neighbors
-    query.limit(limit)
+    begin
+      # Log the embedding format to help with debugging
+      Rails.logger.debug("Query embedding format: #{query_embedding.class}, dimensions: #{query_embedding.size}")
+
+      # Use raw SQL operators directly to avoid AS clause conflicts
+      case distance
+      when "cosine"
+        query = query.order(Arel.sql("embedding <=> ARRAY[#{query_embedding.join(',')}]::vector"))
+      when "inner_product"
+        query = query.order(Arel.sql("embedding <#> ARRAY[#{query_embedding.join(',')}]::vector"))
+      else # euclidean
+        query = query.order(Arel.sql("embedding <-> ARRAY[#{query_embedding.join(',')}]::vector"))
+      end
+
+      query.limit(limit)
+    rescue => e
+      Rails.logger.error("Error in find_similar: #{e.message}")
+      Rails.logger.error("Embedding format that caused error: #{query_embedding.class}, #{query_embedding.inspect[0..100]}")
+
+      # Fallback to a simpler approach if the query fails
+      filtered_ids = query.pluck(:id)
+      VectorEmbedding.where(id: filtered_ids).limit(limit)
+    end
   end
 
-  # Generate an embedding for the given text using OpenAI's embeddings API
+  # Generate an embedding for the given text using the embedding service
   # @param text [String] The text to embed
   # @return [Array<Float>] The embedding vector
   def self.generate_embedding(text)
-    client = OpenAI::Client.new(access_token: ENV["OPENAI_API_KEY"])
-
-    # Truncate text if necessary (OpenAI has a token limit)
-    truncated_text = text.length > 8000 ? text[0..8000] : text
-
-    response = client.embeddings(
-      parameters: {
-        model: "text-embedding-ada-002",
-        input: truncated_text
-      }
-    )
-
-    if response["data"] && response["data"][0] && response["data"][0]["embedding"]
-      response["data"][0]["embedding"]
-    else
-      raise "Failed to generate embedding: #{response["error"]}"
-    end
+    EmbeddingService.new.generate_embedding(text)
   end
 
-  # Store content with its embedding
-  # @param content [String] The content to store
-  # @param content_type [String] The type of content
-  # @param collection [String] The collection/namespace
-  # @param task [Task] Optional associated task
-  # @param project [Project] Optional associated project
-  # @param metadata [Hash] Additional metadata
-  # @return [VectorEmbedding] The created embedding
-  def self.store(content:, content_type: "text", collection: "default",
-                task: nil, project: nil, source_url: nil, source_title: nil, metadata: {})
-    # Resolve project from task if not provided directly
-    if project.nil? && task.present? && task.project.present?
-      project = task.project
-    end
-
-    # Generate the embedding
-    embedding = generate_embedding(content)
-
-    # Create the record
-    create!(
-      content: content,
-      content_type: content_type,
-      collection: collection,
-      task: task,
-      project: project,
-      source_url: source_url,
-      source_title: source_title,
-      metadata: metadata,
-      embedding: embedding
-    )
+  def similarity(other_embedding)
+    # Calculate the cosine similarity between two vectors
+    dot_product = self.embedding.zip(other_embedding).map { |a, b| a * b }.sum
+    magnitude_self = Math.sqrt(self.embedding.map { |a| a * a }.sum)
+    magnitude_other = Math.sqrt(other_embedding.map { |a| a * a }.sum)
+    dot_product / (magnitude_self * magnitude_other)
   end
 
-  # Search for similar content
-  # @param text [String] The query text
-  # @param limit [Integer] Maximum number of results to return
-  # @param collection [String] Optional collection to search within
-  # @param task_id [Integer] Optional task_id to filter by
-  # @param project_id [Integer] Optional project_id to filter by
-  # @param distance [String] The distance metric to use ("euclidean", "cosine", "inner_product")
-  # @return [Array<VectorEmbedding>] Matching embeddings sorted by similarity
-  def self.search(text:, limit: 5, collection: nil, task_id: nil, project_id: nil, distance: "cosine")
-    # Generate embedding for the query text
-    query_embedding = generate_embedding(text)
+  def similar_to_me(limit: 5, distance: "cosine")
+    begin
+      # Use raw SQL operators directly to avoid AS clause conflicts
+      base_query = VectorEmbedding.in_collection(self.collection).where.not(id: self.id)
 
-    # Search for similar embeddings
-    find_similar(
-      query_embedding,
-      limit: limit,
-      collection: collection,
-      task_id: task_id,
-      project_id: project_id,
-      distance: distance
-    )
+      case distance
+      when "cosine"
+        base_query = base_query.order(Arel.sql("embedding <=> ARRAY[#{self.embedding.join(',')}]::vector"))
+      when "inner_product"
+        base_query = base_query.order(Arel.sql("embedding <#> ARRAY[#{self.embedding.join(',')}]::vector"))
+      else # euclidean
+        base_query = base_query.order(Arel.sql("embedding <-> ARRAY[#{self.embedding.join(',')}]::vector"))
+      end
+
+      base_query.limit(limit)
+    rescue => e
+      Rails.logger.error("Error in similar_to_me: #{e.message}")
+      # Fallback to a simpler approach if the query fails
+      collection_ids = VectorEmbedding.in_collection(self.collection)
+                                     .where.not(id: self.id)
+                                     .pluck(:id)
+      VectorEmbedding.where(id: collection_ids).limit(limit)
+    end
   end
 end

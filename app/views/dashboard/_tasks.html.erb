@@ -1,0 +1,156 @@
+<% if tasks.any? %>
+  <% tasks.each do |task| %>
+    <div id="<%= dom_id(task) %>" class="hover:bg-base-200 transition-colors duration-150">
+      <div class="p-4">
+        <div class="flex items-center justify-between">
+          <div class="min-w-0 flex-1">
+            <h3 class="text-base font-medium truncate">
+              <%= link_to task.title, task, class: "link link-hover" %>
+            </h3>
+            <div class="mt-1 flex flex-wrap items-center gap-2">
+              <span class="badge <%= task.state == 'active' ? 'badge-success' :
+                   task.state == 'paused' ? 'badge-warning' :
+                   task.state == 'completed' ? 'badge-info' :
+                   task.state == 'waiting_on_human' ? 'badge-secondary' :
+                   'badge-ghost' %>">
+                <%= task.state.humanize %>
+              </span>
+              
+              <% if task.project %>
+                <span class="flex items-center text-xs opacity-70">
+                  <svg class="mr-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  </svg>
+                  <%= link_to task.project.name, project_path(task.project), class: "link link-hover" %>
+                </span>
+              <% end %>
+              
+              <span class="flex items-center text-xs opacity-70">
+                <svg class="mr-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <%= task.task_type.humanize %>
+              </span>
+              
+              <% if task.agent_activities.any? %>
+                <span class="flex items-center text-xs opacity-70">
+                  <svg class="mr-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <%= pluralize(task.agent_activities.count, 'activity') %>
+                </span>
+              <% end %>
+            </div>
+          </div>
+          
+          <div class="ml-4 flex-shrink-0">
+            <% if task.state == "pending" %>
+              <%= button_to activate_task_path(task), method: :post, form: { data: { turbo: true } }, class: "btn btn-sm btn-success" do %>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                </svg>
+                Start
+              <% end %>
+            <% elsif task.state == "active" %>
+              <%= button_to pause_task_path(task), method: :post, form: { data: { turbo: true } }, class: "btn btn-sm btn-warning" do %>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Pause
+              <% end %>
+            <% elsif task.state == "paused" %>
+              <%= button_to resume_task_path(task), method: :post, form: { data: { turbo: true } }, class: "btn btn-sm btn-info" do %>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                </svg>
+                Resume
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+        
+        <% if task.description.present? %>
+          <p class="mt-2 text-sm opacity-70 line-clamp-2"><%= task.description %></p>
+        <% end %>
+        
+        <div class="mt-2 text-xs opacity-60">
+          Created <%= time_ago_in_words(task.created_at) %> ago
+        </div>
+        
+        <!-- Expandable Task Details -->
+        <div class="mt-2">
+          <button class="inline-flex items-center text-xs font-medium text-primary hover:text-primary-focus"
+                  data-controller="collapsible"
+                  data-action="click->collapsible#toggle"
+                  data-collapsible-target="trigger"
+                  data-collapsible-id-value="task-details-<%= task.id %>">
+            <span>View Details</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          
+          <div id="task-details-<%= task.id %>" class="hidden mt-2 rounded-md border border-base-300 overflow-hidden">
+            <!-- Task Agent Activities -->
+            <% if task.agent_activities.any? %>
+              <div class="border-b border-base-300 bg-base-200 px-4 py-2 text-xs font-medium">
+                Recent Activities
+              </div>
+              <div class="p-2 bg-base-100 max-h-48 overflow-y-auto">
+                <% task.agent_activities.order(created_at: :desc).limit(3).each do |activity| %>
+                  <div class="mb-2 p-2 text-xs border-l-2 <%= activity.status == 'running' ? 'border-success' :
+                                                             activity.status == 'completed' ? 'border-info' :
+                                                             activity.status == 'failed' ? 'border-error' :
+                                                             'border-base-300' %>">
+                    <div class="font-medium"><%= activity.agent_type %> (<%= activity.status %>)</div>
+                    <div class="text-xs opacity-70">Started <%= time_ago_in_words(activity.created_at) %> ago</div>
+                  </div>
+                <% end %>
+                <% if task.agent_activities.count > 3 %>
+                  <%= link_to "View all #{task.agent_activities.count} activities", task_path(task), class: "text-xs link link-primary" %>
+                <% end %>
+              </div>
+            <% end %>
+            
+            <!-- Task Details -->
+            <div class="border-t border-base-300 bg-base-200 px-4 py-2 text-xs font-medium">
+              Task Details
+            </div>
+            <div class="p-2 bg-base-100">
+              <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                <dt class="font-medium">Type:</dt>
+                <dd><%= task.task_type.humanize %></dd>
+                
+                <dt class="font-medium">Status:</dt>
+                <dd><%= task.state.humanize %></dd>
+                
+                <dt class="font-medium">Created:</dt>
+                <dd><%= task.created_at.strftime("%Y-%m-%d %H:%M") %></dd>
+                
+                <% if task.state == "active" || task.state == "completed" || task.state == "failed" %>
+                  <dt class="font-medium">Started:</dt>
+                  <dd><%= task.agent_activities.minimum(:created_at)&.strftime("%Y-%m-%d %H:%M") || "Unknown" %></dd>
+                <% end %>
+                
+                <% if task.state == "completed" %>
+                  <dt class="font-medium">Completed:</dt>
+                  <dd><%= task.agent_activities.maximum(:updated_at)&.strftime("%Y-%m-%d %H:%M") || "Unknown" %></dd>
+                <% end %>
+              </dl>
+              
+              <%= link_to "View full task", task_path(task), class: "mt-2 inline-block text-xs link link-primary" %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+<% else %>
+  <div class="p-6 text-center">
+    <svg class="mx-auto h-12 w-12 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+    </svg>
+    <h3 class="mt-2 text-sm font-medium">No active tasks</h3>
+    <p class="mt-1 text-sm opacity-70">Tasks will appear here when projects are running.</p>
+  </div>
+<% end %>

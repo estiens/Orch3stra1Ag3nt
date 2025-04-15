@@ -1,0 +1,213 @@
+<div class="container mx-auto px-4 py-8">
+  <div class="mb-6">
+    <div class="flex justify-between items-center">
+      <h1 class="text-2xl font-bold"><%= @project.name %></h1>
+      <div class="flex space-x-2">
+        <%= link_to edit_project_path(@project), class: "btn btn-outline" do %>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          Edit
+        <% end %>
+        
+        <%= link_to projects_path, class: "btn btn-outline" do %>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Back
+        <% end %>
+        
+        <% if @project.status == "pending" %>
+          <%= button_to kickoff_project_path(@project), method: :post, class: "btn btn-success" do %>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+            </svg>
+            Kickoff
+          <% end %>
+        <% elsif @project.status == "active" %>
+          <%= button_to pause_project_path(@project), method: :post, class: "btn btn-warning" do %>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Pause
+          <% end %>
+        <% elsif @project.status == "paused" %>
+          <%= button_to resume_project_path(@project), method: :post, class: "btn btn-info" do %>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+            </svg>
+            Resume
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+    
+    <div class="mt-2">
+      <span class="inline-block <%= @project.status == 'active' ? 'bg-green-100 text-green-800' : 
+                                  @project.status == 'paused' ? 'bg-yellow-100 text-yellow-800' : 
+                                  @project.status == 'completed' ? 'bg-blue-100 text-blue-800' : 
+                                  'bg-gray-100 text-gray-800' %> 
+            px-2 py-1 text-xs font-semibold rounded-full">
+        <%= @project.status.capitalize %>
+      </span>
+      <span class="text-gray-500 ml-4">Created <%= time_ago_in_words(@project.created_at) %> ago</span>
+    </div>
+  </div>
+  
+  <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">Project Details</h2>
+    <p class="mb-4"><%= @project.description %></p>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+      <div class="bg-gray-50 p-4 rounded">
+        <h3 class="font-medium text-gray-700">Priority</h3>
+        <p class="mt-1"><%= @project.priority || "Not set" %></p>
+      </div>
+      
+      <div class="bg-gray-50 p-4 rounded">
+        <h3 class="font-medium text-gray-700">Due Date</h3>
+        <p class="mt-1"><%= @project.due_date ? @project.due_date.strftime("%B %d, %Y") : "Not set" %></p>
+      </div>
+      
+      <div class="bg-gray-50 p-4 rounded">
+        <h3 class="font-medium text-gray-700">Tasks</h3>
+        <p class="mt-1"><%= @project.tasks.count %> total</p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold">Tasks</h2>
+      <% if @project.status == "active" %>
+        <%= link_to new_task_path(project_id: @project.id), class: "btn btn-primary" do %>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          New Task
+        <% end %>
+      <% end %>
+    </div>
+    <% if @tasks.any? %>
+      <div class="divide-y divide-gray-200">
+        <!-- Independent Tasks (no dependencies) -->
+        <% if @tasks_by_dependency[:independent].any? %>
+          <div class="mb-4">
+            <h3 class="text-lg font-medium mb-2">Independent Tasks</h3>
+            <div class="space-y-4">
+              <% @tasks_by_dependency[:independent].each do |task| %>
+                <%= render 'task_item', task: task, dependency_map: @tasks_by_dependency[:dependency_map] %>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+        
+        <!-- Tasks with Dependencies -->
+        <% if @tasks_by_dependency[:dependent].any? %>
+          <div class="pt-4">
+            <h3 class="text-lg font-medium mb-2">Dependent Tasks</h3>
+            
+            <% @tasks_by_dependency[:dependent].each do |dependency_id, dependent_tasks| %>
+              <% dependency_task = @tasks.find { |t| t.id == dependency_id } %>
+              <% if dependency_task %>
+                <div class="mb-6 border-l-2 border-primary pl-4">
+                  <div class="mb-2">
+                    <h4 class="font-medium">Depends on: <%= link_to dependency_task.title, dependency_task, class: "link link-hover text-primary" %></h4>
+                    <div class="flex items-center mt-1">
+                      <span class="badge <%= dependency_task.state == 'completed' ? 'badge-success' : 'badge-outline' %> mr-2">
+                        <%= dependency_task.state.capitalize %>
+                      </span>
+                      <% if dependency_task.state == 'completed' %>
+                        <span class="text-xs text-success">✓ Dependency satisfied</span>
+                      <% else %>
+                        <span class="text-xs text-warning">⚠ Waiting for this task to complete</span>
+                      <% end %>
+                    </div>
+                  </div>
+                  
+                  <div class="pl-4 space-y-4 mt-4">
+                    <% dependent_tasks.each do |task| %>
+                      <%= render 'task_item', task: task, dependency_map: @tasks_by_dependency[:dependency_map] %>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+      </div>
+    <% else %>
+      <div class="text-center py-8 text-gray-500">
+        <p>No tasks yet. Tasks will be created when the project is kicked off.</p>
+      </div>
+    <% end %>
+    
+    <% if @tasks.count > 10 %>
+      <div class="mt-4 text-center">
+        <%= link_to tasks_path(project_id: @project.id), class: "text-indigo-600 hover:text-indigo-900" do %>
+          View all <%= @tasks.count %> tasks
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+  
+  <div class="bg-white rounded-lg shadow-md p-6">
+    <h2 class="text-xl font-semibold mb-4">Project Stats</h2>
+    
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div class="bg-gray-50 p-4 rounded text-center">
+        <div class="text-2xl font-bold"><%= @stats[:total_tasks] %></div>
+        <div class="text-gray-600">Total Tasks</div>
+      </div>
+      
+      <div class="bg-gray-50 p-4 rounded text-center">
+        <div class="text-2xl font-bold text-yellow-600"><%= @stats[:pending_tasks] %></div>
+        <div class="text-gray-600">Pending</div>
+      </div>
+      
+      <div class="bg-gray-50 p-4 rounded text-center">
+        <div class="text-2xl font-bold text-green-600"><%= @stats[:active_tasks] %></div>
+        <div class="text-gray-600">Active</div>
+      </div>
+      
+      <div class="bg-gray-50 p-4 rounded text-center">
+        <div class="text-2xl font-bold text-blue-600"><%= @stats[:completed_tasks] %></div>
+        <div class="text-gray-600">Completed</div>
+      </div>
+      
+      <div class="bg-gray-50 p-4 rounded text-center">
+        <div class="text-2xl font-bold text-orange-600"><%= @stats[:waiting_on_human_tasks] %></div>
+        <div class="text-gray-600">Waiting</div>
+      </div>
+    </div>
+    
+    <% llm_stats = @project.llm_call_stats %>
+    <% if llm_stats[:count] > 0 %>
+      <div class="mt-6">
+        <h3 class="text-lg font-medium mb-3">LLM Usage</h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="bg-indigo-50 p-4 rounded text-center">
+            <div class="text-2xl font-bold text-indigo-700"><%= llm_stats[:count] %></div>
+            <div class="text-gray-600">Total Calls</div>
+          </div>
+          
+          <div class="bg-indigo-50 p-4 rounded text-center">
+            <div class="text-2xl font-bold text-indigo-700">$<%= sprintf('%.4f', llm_stats[:total_cost]) %></div>
+            <div class="text-gray-600">Total Cost</div>
+          </div>
+          
+          <div class="bg-indigo-50 p-4 rounded text-center">
+            <div class="text-2xl font-bold text-indigo-700"><%= number_to_human(llm_stats[:total_tokens]) %></div>
+            <div class="text-gray-600">Total Tokens</div>
+          </div>
+          
+          <div class="bg-indigo-50 p-4 rounded text-center">
+            <div class="text-2xl font-bold text-indigo-700"><%= llm_stats[:models].keys.first&.split('/')&.last || 'N/A' %></div>
+            <div class="text-gray-600">Primary Model</div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

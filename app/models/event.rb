@@ -1,7 +1,9 @@
 class Event < ApplicationRecord
-  # Association with an agent activity - while optional in DB, validate presence
-  belongs_to :agent_activity, optional: false
-  validates :agent_activity, presence: true
+  include DashboardBroadcaster
+
+  # Association with an agent activity - optional for system events
+  belongs_to :agent_activity, optional: true
+  validates :agent_activity, presence: true, unless: :system_event?
 
   # Validations
   validates :event_type, presence: true
@@ -12,53 +14,21 @@ class Event < ApplicationRecord
   # Note: We're not using serialize :data, JSON because it's causing errors
   # Instead we'll handle serialization/deserialization manually
 
-  # Accessors for working with data as a hash
+  # Use Rails 7's serialized_hash attribute for cleaner data handling
+  serialize :data, coder: JSON
+
+  # Ensure data is always a hash
   def data
-    return {} if self[:data].blank?
-
-    if self[:data].is_a?(Hash)
-      self[:data]
-    else
-      begin
-        JSON.parse(self[:data].to_s)
-      rescue
-        {}
-      end
-    end
+    super || {}
   end
 
-  # Override the setter to store hashes as JSON strings
+  # Override the setter to ensure data is always properly formatted
   def data=(value)
-    value = {} if value.nil?
-
-    if value.is_a?(Hash)
-      self[:data] = value.to_json
-    else
-      self[:data] = value
-    end
+    super(value.is_a?(Hash) ? value : {})
   end
 
-  # Convert the data hash to a string before saving
-  before_save :ensure_json_data
-
-  def ensure_json_data
-    if self[:data].blank?
-      # Set an empty hash as default
-      self[:data] = {}.to_json
-    elsif self[:data].is_a?(Hash)
-      # Convert hash to properly formatted JSON string
-      self[:data] = self[:data].to_json
-    elsif self[:data].is_a?(String) && !self[:data].start_with?("{")
-      # If it's a string but not JSON formatted, try to parse it and re-serialize it
-      begin
-        parsed = JSON.parse(self[:data])
-        self[:data] = parsed.to_json
-      rescue
-        # If it can't be parsed, set to empty hash
-        self[:data] = {}.to_json
-      end
-    end
-  end
+  # No need for the ensure_json_data method anymore as the serializer handles it
+  # Remove the callback as well
 
   # Callback to publish the event when created
   after_create :publish_to_event_bus
@@ -78,15 +48,45 @@ class Event < ApplicationRecord
 
   # Create and publish an event in one step
   def self.publish(event_type, data = {}, options = {})
-    event = create!(
-      event_type: event_type,
-      data: data,
-      agent_activity_id: options[:agent_activity_id],
-      priority: options[:priority] || NORMAL_PRIORITY
-    )
+    # Check if this is a system event (specified by a flag)
+    is_system_event = options.delete(:system_event) || false
 
-    # Event is published through the after_create callback
-    event
+    # Validate agent_activity_id early to provide better error messages
+    if options[:agent_activity_id].blank? && !is_system_event
+      Rails.logger.warn("Event.publish: Cannot publish event '#{event_type}' without agent_activity_id")
+      return nil
+    end
+
+    begin
+      # Build event attributes
+      event_attrs = {
+        event_type: event_type,
+        data: data,
+        priority: options[:priority] || NORMAL_PRIORITY
+      }
+
+      # Only add agent_activity_id if this is not a system event
+      event_attrs[:agent_activity_id] = options[:agent_activity_id] unless is_system_event
+
+      # For system events, we need to bypass the agent_activity validation
+      if is_system_event
+        # Create with validation disabled, then manually validate
+        event = new(event_attrs)
+        event.save(validate: false)
+
+        # Log system event creation
+        Rails.logger.info("Created system event: #{event_type} [#{event.id}]")
+      else
+        # Normal event creation with validations
+        event = create!(event_attrs)
+      end
+
+      # Event is published through the after_create callback
+      event
+    rescue ActiveRecord::RecordInvalid => e
+      Rails.logger.error("Event.publish: Failed to create event '#{event_type}': #{e.message}")
+      nil
+    end
   end
 
   # Process this event through the EventBus

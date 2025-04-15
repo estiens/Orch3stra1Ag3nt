@@ -1,0 +1,2096 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# ROLE
+        AND GOAL\nYou are a meticulous Automated Code Explorer. Your primary objective
+        is to systematically navigate and understand the codebase to gather information
+        that comprehensively answers the user''s question.\nUSER QUESTION: Task Title:
+        Research Ruby error handling\n\nTask Description:\nFind best practices for
+        error handling in Ruby\n\nSpecific Instructions for this Run:\nHow should
+        I handle errors in Ruby?\n\n# ANTI-REPETITION DIRECTIVE\nYou MUST avoid redundant
+        actions. Do NOT:\n- Examine directories already listed below.\n- Run commands
+        substantially similar to those already run.\n- Take notes covering information
+        already recorded.\n\n# CURRENT EXPLORATION STATUS\nIteration: 1/50\n\nDIRECTORIES
+        ALREADY EXAMINED (via ''examine_directory''):\n- None yet\n\nRECENT SHELL
+        COMMANDS ALREADY RUN (via ''shell_command''):\n- None yet\n\nNOTES TAKEN SO
+        FAR (Significant findings discovered):\n```\nNo notes taken yet.\n```\n\nLAST
+        TOOL RESULT (Output or error from your previous action):\n```\nNo tool executed
+        yet.\n```\n\nAVAILABLE TOOLS (Use these to explore and gather information):\n-
+        analyze_code_question: Break down a code-related research question\n- shell_command:
+        Execute a shell command (safely within allowed directories)\n- search_code_base:
+        Search the code base for code examples using ripgrep (takes ''query: \u003cyour
+        query here\u003e'') \n- examine_directory: Examine a directory and generate
+        a textual summary of its contents using the code2prompt tool. Takes ''directory_path:
+        \u003cpath to directory\u003e''.\n- search_for_examples: Search for code examples
+        on a topic\n- explain_code: Explain how a piece of code works\n- take_notes:
+        IMPORTANT: Document findings about the codebase. Use this after discoveries
+        to build the final report. Each note should contain specific, detailed observations.
+        Pass (note: \u003cnote)\n- compile_findings: Compile research notes into structured
+        findings\n\n=== YOUR TASK ===\nBased on the USER QUESTION, CURRENT NOTES,
+        and LAST TOOL RESULT, determine the single best *next action* to progress
+        towards answering the question.\n\n=== STRATEGIC THINKING PROCESS (Follow
+        these steps): ===\n1.  **Analyze Goal:** Re-read the USER QUESTION. What specific
+        information is still needed?\n2.  **Review Context:** Examine CURRENT NOTES.
+        What parts of the codebase have been explored? What remains unknown?\n3.  **Evaluate
+        Last Result:** Analyze the LAST TOOL RESULT.\n    *   If it contains useful
+        information (file listing, file content, search results, directory summary):
+        What key insight does it provide? Does it suggest the next file/directory
+        to examine? Should I use `take_notes` *now* to record this insight before
+        moving on?\n    *   If it was an error: Why did it fail (e.g., file not found,
+        command error)? Can I try an alternative (different path, simpler command,
+        different tool)? Should I use `take_notes` to record the obstacle?\n4.  **Plan
+        Next Step:** Decide the most logical next exploration target (e.g., examine
+        root directory, list files in `app/models`, read `app/controllers/users_controller.rb`,
+        search for `User.find`).\n5.  **Select Optimal Tool:** Choose the *single
+        tool* that directly achieves your planned next step. Prioritize `take_notes`
+        if step 3 identified key info to save *before* exploring further.\n6.  **Formulate
+        Action:** Construct the arguments for the chosen tool precisely.\n\n=== TOOL
+        USAGE GUIDELINES ===\n*   `shell_command`: Your primary exploration tool.
+        Use specific commands:\n    *   `ls -l \u003cdirectory\u003e`: To list contents
+        of a directory. Start broad (e.g., `ls -l .`) then explore subdirectories.\n    *   `cat
+        \u003cfile_path\u003e`: To read the contents of a *specific* file identified
+        via `ls` or other tools.\n    *   `grep \u003cpattern\u003e \u003cfile\u003e`:
+        For simple searches within a known file.\n    *   **AVOID**: Generic commands
+        like just `explore`. Be specific.\n*   `examine_directory`: Use when you need
+        a *summary* of *all* files in a directory, processed by `code2prompt`. Useful
+        for getting an overview of a complex area like `app/services` *before* diving
+        into individual files with `cat`. More costly than `ls`.\n*   `search_code_base`:
+        Use *only* when you need to find specific code snippets, function calls, or
+        keywords *across the entire codebase* (uses `rg`). Less useful for general
+        structure exploration than `ls` or `examine_directory`.\n*   `explain_code`:
+        Use *sparingly* only for short, specific code snippets already retrieved via
+        `cat` or `search_code_base` that you cannot understand from context.\n*   `take_notes`:
+        **CRITICAL**. Use frequently to record **significant findings** directly contributing
+        to the answer:\n    *   Purpose of a directory or important file.\n    *   Key
+        logic or data flow identified.\n    *   Relationships between different code
+        parts.\n    *   Direct evidence answering the USER QUESTION.\n    *   Obstacles
+        or errors encountered during exploration.\n    *   **Do NOT** use for trivial
+        actions like \"Executed ls command\". Notes form the basis of the final answer.\n*   `analyze_code_question`:
+        Usually only needed once at the start if the initial question is unclear (rarely
+        needed in the loop).\n*   `finish`: Use **ONLY** when you are confident that
+        the CURRENT NOTES contain enough information gathered through exploration
+        to comprehensively answer the original USER QUESTION. Do not finish prematurely.\n\n===
+        RESPONSE FORMATTING ===\nRespond ONLY with a valid JSON object adhering to
+        the schema below.\nDO NOT include any other text, explanations, or markdown
+        formatting (like ```json ... ```) outside of the JSON object itself.\nYour
+        entire response must be ONLY the JSON object.\n--- SCHEMA START ---\nYou must
+        format your output as a JSON value that adheres to a given \"JSON Schema\"
+        instance.\n\n\"JSON Schema\" is a declarative language that allows you to
+        annotate and validate JSON documents.\n\nFor example, the example \"JSON Schema\"
+        instance {\"properties\": {\"foo\": {\"description\": \"a list of test words\",
+        \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}}\nwould
+        match an object with one required property, \"foo\". The \"type\" property
+        specifies \"foo\" must be an \"array\", and the \"description\" property semantically
+        describes it as \"a list of test words\". The items within \"foo\" must be
+        strings.\nThus, the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted
+        instance of this example \"JSON Schema\". The object {\"properties\": {\"foo\":
+        [\"bar\", \"baz\"]}}} is not well-formatted.\n\nYour output will be parsed
+        and type-checked according to the provided schema instance, so make sure all
+        fields in your output match the schema exactly and there are no trailing commas!\n\nHere
+        is the JSON Schema instance your output must adhere to. Include the enclosing
+        markdown codeblock:\n```json\n{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"description\":\"The
+        name of the tool to use or ''finish''.\",\"enum\":[\"analyze_code_question\",\"shell_command\",\"search_code_base\",\"examine_directory\",\"search_for_examples\",\"explain_code\",\"take_notes\",\"compile_findings\",\"finish\"]},\"arguments\":{\"type\":\"object\",\"description\":\"A
+        hash of arguments for the chosen tool (string keys and values). Empty if action
+        is ''finish''. Arguments should be passed as keyword arguments.\",\"additionalProperties\":{\"type\":\"string\"}}},\"required\":[\"action\",\"arguments\"],\"additionalProperties\":false}\n```\n\n---
+        SCHEMA END ---\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:13:40 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e526be95a213-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n{\"id\":\"gen-1744672421-ojW6dCjvlJk67OHnNAeG\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672421,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"```json\\n{\\\"action\\\":\\\"search_for_examples\\\",\\\"arguments\\\":{\\\"query\\\":\\\"best
+        practices for error handling in Ruby\\\"}}\\n```\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_cf18407276\",\"usage\":{\"prompt_tokens\":1604,\"completion_tokens\":25,\"total_tokens\":1629,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:13:41 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# ROLE
+        AND GOAL\nYou are a meticulous Automated Code Explorer. Your primary objective
+        is to systematically navigate and understand the codebase to gather information
+        that comprehensively answers the user''s question.\nUSER QUESTION: Task Title:
+        Research Ruby error handling\n\nTask Description:\nFind best practices for
+        error handling in Ruby\n\nSpecific Instructions for this Run:\nHow should
+        I handle errors in Ruby?\n\n# ANTI-REPETITION DIRECTIVE\nYou MUST avoid redundant
+        actions. Do NOT:\n- Examine directories already listed below.\n- Run commands
+        substantially similar to those already run.\n- Take notes covering information
+        already recorded.\n\n# CURRENT EXPLORATION STATUS\nIteration: 2/50\n\nDIRECTORIES
+        ALREADY EXAMINED (via ''examine_directory''):\n- None yet\n\nRECENT SHELL
+        COMMANDS ALREADY RUN (via ''shell_command''):\n- None yet\n\nNOTES TAKEN SO
+        FAR (Significant findings discovered):\n```\nNo notes taken yet.\n```\n\nLAST
+        TOOL RESULT (Output or error from your previous action):\n```\nError executing
+        tool ''search_for_examples'': Error executing tool ''search_for_examples'':
+        missing keyword: :topic\n```\n\nAVAILABLE TOOLS (Use these to explore and
+        gather information):\n- analyze_code_question: Break down a code-related research
+        question\n- shell_command: Execute a shell command (safely within allowed
+        directories)\n- search_code_base: Search the code base for code examples using
+        ripgrep (takes ''query: \u003cyour query here\u003e'') \n- examine_directory:
+        Examine a directory and generate a textual summary of its contents using the
+        code2prompt tool. Takes ''directory_path: \u003cpath to directory\u003e''.\n-
+        search_for_examples: Search for code examples on a topic\n- explain_code:
+        Explain how a piece of code works\n- take_notes: IMPORTANT: Document findings
+        about the codebase. Use this after discoveries to build the final report.
+        Each note should contain specific, detailed observations. Pass (note: \u003cnote)\n-
+        compile_findings: Compile research notes into structured findings\n\n=== YOUR
+        TASK ===\nBased on the USER QUESTION, CURRENT NOTES, and LAST TOOL RESULT,
+        determine the single best *next action* to progress towards answering the
+        question.\n\n=== STRATEGIC THINKING PROCESS (Follow these steps): ===\n1.  **Analyze
+        Goal:** Re-read the USER QUESTION. What specific information is still needed?\n2.  **Review
+        Context:** Examine CURRENT NOTES. What parts of the codebase have been explored?
+        What remains unknown?\n3.  **Evaluate Last Result:** Analyze the LAST TOOL
+        RESULT.\n    *   If it contains useful information (file listing, file content,
+        search results, directory summary): What key insight does it provide? Does
+        it suggest the next file/directory to examine? Should I use `take_notes` *now*
+        to record this insight before moving on?\n    *   If it was an error: Why
+        did it fail (e.g., file not found, command error)? Can I try an alternative
+        (different path, simpler command, different tool)? Should I use `take_notes`
+        to record the obstacle?\n4.  **Plan Next Step:** Decide the most logical next
+        exploration target (e.g., examine root directory, list files in `app/models`,
+        read `app/controllers/users_controller.rb`, search for `User.find`).\n5.  **Select
+        Optimal Tool:** Choose the *single tool* that directly achieves your planned
+        next step. Prioritize `take_notes` if step 3 identified key info to save *before*
+        exploring further.\n6.  **Formulate Action:** Construct the arguments for
+        the chosen tool precisely.\n\n=== TOOL USAGE GUIDELINES ===\n*   `shell_command`:
+        Your primary exploration tool. Use specific commands:\n    *   `ls -l \u003cdirectory\u003e`:
+        To list contents of a directory. Start broad (e.g., `ls -l .`) then explore
+        subdirectories.\n    *   `cat \u003cfile_path\u003e`: To read the contents
+        of a *specific* file identified via `ls` or other tools.\n    *   `grep \u003cpattern\u003e
+        \u003cfile\u003e`: For simple searches within a known file.\n    *   **AVOID**:
+        Generic commands like just `explore`. Be specific.\n*   `examine_directory`:
+        Use when you need a *summary* of *all* files in a directory, processed by
+        `code2prompt`. Useful for getting an overview of a complex area like `app/services`
+        *before* diving into individual files with `cat`. More costly than `ls`.\n*   `search_code_base`:
+        Use *only* when you need to find specific code snippets, function calls, or
+        keywords *across the entire codebase* (uses `rg`). Less useful for general
+        structure exploration than `ls` or `examine_directory`.\n*   `explain_code`:
+        Use *sparingly* only for short, specific code snippets already retrieved via
+        `cat` or `search_code_base` that you cannot understand from context.\n*   `take_notes`:
+        **CRITICAL**. Use frequently to record **significant findings** directly contributing
+        to the answer:\n    *   Purpose of a directory or important file.\n    *   Key
+        logic or data flow identified.\n    *   Relationships between different code
+        parts.\n    *   Direct evidence answering the USER QUESTION.\n    *   Obstacles
+        or errors encountered during exploration.\n    *   **Do NOT** use for trivial
+        actions like \"Executed ls command\". Notes form the basis of the final answer.\n*   `analyze_code_question`:
+        Usually only needed once at the start if the initial question is unclear (rarely
+        needed in the loop).\n*   `finish`: Use **ONLY** when you are confident that
+        the CURRENT NOTES contain enough information gathered through exploration
+        to comprehensively answer the original USER QUESTION. Do not finish prematurely.\n\n===
+        RESPONSE FORMATTING ===\nRespond ONLY with a valid JSON object adhering to
+        the schema below.\nDO NOT include any other text, explanations, or markdown
+        formatting (like ```json ... ```) outside of the JSON object itself.\nYour
+        entire response must be ONLY the JSON object.\n--- SCHEMA START ---\nYou must
+        format your output as a JSON value that adheres to a given \"JSON Schema\"
+        instance.\n\n\"JSON Schema\" is a declarative language that allows you to
+        annotate and validate JSON documents.\n\nFor example, the example \"JSON Schema\"
+        instance {\"properties\": {\"foo\": {\"description\": \"a list of test words\",
+        \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}}\nwould
+        match an object with one required property, \"foo\". The \"type\" property
+        specifies \"foo\" must be an \"array\", and the \"description\" property semantically
+        describes it as \"a list of test words\". The items within \"foo\" must be
+        strings.\nThus, the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted
+        instance of this example \"JSON Schema\". The object {\"properties\": {\"foo\":
+        [\"bar\", \"baz\"]}}} is not well-formatted.\n\nYour output will be parsed
+        and type-checked according to the provided schema instance, so make sure all
+        fields in your output match the schema exactly and there are no trailing commas!\n\nHere
+        is the JSON Schema instance your output must adhere to. Include the enclosing
+        markdown codeblock:\n```json\n{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"description\":\"The
+        name of the tool to use or ''finish''.\",\"enum\":[\"analyze_code_question\",\"shell_command\",\"search_code_base\",\"examine_directory\",\"search_for_examples\",\"explain_code\",\"take_notes\",\"compile_findings\",\"finish\"]},\"arguments\":{\"type\":\"object\",\"description\":\"A
+        hash of arguments for the chosen tool (string keys and values). Empty if action
+        is ''finish''. Arguments should be passed as keyword arguments.\",\"additionalProperties\":{\"type\":\"string\"}}},\"required\":[\"action\",\"arguments\"],\"additionalProperties\":false}\n```\n\n---
+        SCHEMA END ---\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:13:41 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e52c1829acea-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n{\"id\":\"gen-1744672422-imhMBD5qSoyvOJWRpWiN\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672422,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"```json\\n{\\\"action\\\":\\\"search_for_examples\\\",\\\"arguments\\\":{\\\"topic\\\":\\\"Ruby
+        error handling\\\"}}\\n```\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_cf18407276\",\"usage\":{\"prompt_tokens\":1621,\"completion_tokens\":21,\"total_tokens\":1642,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:13:42 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"Find
+        code examples for the topic:\n\nTOPIC: Ruby error handling\n\nProvide:\n1.
+        2-3 realistic, well-commented code examples.\n2. Brief explanations for each.\n3.
+        Common variations or alternatives.\n\nFORMAT:\n## Example 1\n```code\n[Code]\n```\n**Explanation**:
+        [Explanation]\n\n## Example 2\n...\n\n## Common Variations\n[Variations]\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:13:43 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e5344f7eacde-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n\n         \n\n         \n\n         \n\n
+        \        \n\n         \n\n         \n\n         \n\n         \n\n         \n\n
+        \        \n\n         \n\n         \n\n         \n\n         \n{\"id\":\"gen-1744672423-hsbYPzG0ClQdI3rdxDLj\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672423,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"##
+        Example 1\\n```ruby\\nbegin\\n  # Attempt to open a file that may not exist\\n
+        \ file = File.open(\\\"nonexistent.txt\\\", \\\"r\\\")\\n  puts file.read\\nrescue
+        Errno::ENOENT => e\\n  # Handle the case where the file doesn't exist\\n  puts
+        \\\"File not found: #{e.message}\\\"\\nensure\\n  # Always executed, even
+        if an exception occurs\\n  file.close if file\\nend\\n```\\n**Explanation**:
+        \ \\nThis example demonstrates basic error handling in Ruby using `begin`,
+        `rescue`, and `ensure`. If the file doesn't exist, an `Errno::ENOENT` exception
+        is raised and handled in the `rescue` block. The `ensure` block runs regardless
+        of whether an error occurred, ensuring resources are cleaned up.\\n\\n---\\n\\n##
+        Example 2\\n```ruby\\ndef divide(a, b)\\n  begin\\n    result = a / b\\n  rescue
+        ZeroDivisionError\\n    puts \\\"You can't divide by zero!\\\"\\n    result
+        = nil\\n  end\\n  result\\nend\\n\\nputs divide(10, 2)   # Outputs: 5\\nputs
+        divide(10, 0)   # Outputs: You can't divide by zero!\\n```\\n**Explanation**:
+        \ \\nThis function demonstrates handling a specific exception (`ZeroDivisionError`)
+        inside a method. If division by zero is attempted, the error is caught, a
+        message is printed, and `nil` is returned instead of crashing the program.\\n\\n---\\n\\n##
+        Example 3\\n```ruby\\nbegin\\n  # Simulate an error\\n  raise ArgumentError,
+        \\\"Invalid argument!\\\"\\nrescue ArgumentError => e\\n  puts \\\"Caught
+        an argument error: #{e.message}\\\"\\nrescue StandardError => e\\n  puts \\\"Caught
+        a standard error: #{e.message}\\\"\\nelse\\n  puts \\\"No errors occurred.\\\"\\nend\\n```\\n**Explanation**:
+        \ \\nThis example shows multiple `rescue` clauses to handle different exception
+        types separately. The `else` block runs only if no exceptions are raised in
+        the `begin` block.\\n\\n---\\n\\n## Common Variations\\n\\n- **Rescuing Multiple
+        Exceptions**:  \\n  You can rescue multiple exception types in a single line:\\n
+        \ ```ruby\\n  rescue IOError, SystemCallError => e\\n    puts \\\"IO or system
+        call error: #{e.message}\\\"\\n  ```\\n\\n- **Rescue Modifier**:  \\n  For
+        simple expressions, you can use the rescue modifier:\\n  ```ruby\\n  value
+        = Integer(\\\"abc\\\") rescue 0\\n  # value is 0 if conversion fails\\n  ```\\n\\n-
+        **Custom Exception Classes**:  \\n  You can define and raise your own exceptions:\\n
+        \ ```ruby\\n  class MyCustomError < StandardError; end\\n\\n  raise MyCustomError,
+        \\\"Something went wrong!\\\"\\n  ```\\n\\n- **Retrying**:  \\n  The `retry`
+        keyword can be used to repeat the `begin` block:\\n  ```ruby\\n  attempts
+        = 0\\n  begin\\n    # code that might fail\\n  rescue\\n    attempts += 1\\n
+        \   retry if attempts < 3\\n  end\\n  ```\\n\\n- **Global Exception Handling**:
+        \ \\n  Rescue `Exception` to catch all errors (not recommended unless absolutely
+        necessary):\\n  ```ruby\\n  rescue Exception => e\\n    puts \\\"Caught all
+        exceptions: #{e.message}\\\"\\n  ```\\n  Use this with caution, as it can
+        also catch system-exiting exceptions.\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_a1102cf978\",\"usage\":{\"prompt_tokens\":88,\"completion_tokens\":706,\"total_tokens\":794,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:13:50 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# ROLE
+        AND GOAL\nYou are a meticulous Automated Code Explorer. Your primary objective
+        is to systematically navigate and understand the codebase to gather information
+        that comprehensively answers the user''s question.\nUSER QUESTION: Task Title:
+        Research Ruby error handling\n\nTask Description:\nFind best practices for
+        error handling in Ruby\n\nSpecific Instructions for this Run:\nHow should
+        I handle errors in Ruby?\n\n# ANTI-REPETITION DIRECTIVE\nYou MUST avoid redundant
+        actions. Do NOT:\n- Examine directories already listed below.\n- Run commands
+        substantially similar to those already run.\n- Take notes covering information
+        already recorded.\n\n# CURRENT EXPLORATION STATUS\nIteration: 3/50\n\nDIRECTORIES
+        ALREADY EXAMINED (via ''examine_directory''):\n- None yet\n\nRECENT SHELL
+        COMMANDS ALREADY RUN (via ''shell_command''):\n- None yet\n\nNOTES TAKEN SO
+        FAR (Significant findings discovered):\n```\nNo notes taken yet.\n```\n\nLAST
+        TOOL RESULT (Output or error from your previous action):\n```\n## Example
+        1\n```ruby\nbegin\n  # Attempt to open a file that may not exist\n  file =
+        File.open(\"nonexistent.txt\", \"r\")\n  puts file.read\nrescue Errno::ENOENT
+        =\u003e e\n  # Handle the case where the file doesn''t exist\n  puts \"File
+        not found: #{e.message}\"\nensure\n  # Always executed, even if an exception
+        occurs\n  file.close if file\nend\n```\n**Explanation**:  \nThis example demonstrates
+        basic error handling in Ruby using `begin`, `rescue`, and `ensure`. If the
+        file doesn''t exist, an `Errno::ENOENT` exception is raised and handled in
+        the `rescue` block. The `ensure` block runs regardless of whether an error
+        occurred, ensuring resources are cleaned up.\n\n---\n\n## Example 2\n```ruby\ndef
+        divide(a, b)\n  begin\n    result = a / b\n  rescue ZeroDivisionError\n    puts
+        \"You can''t divide by zero!\"\n    result = nil\n  end\n  result\nend\n\nputs
+        divide(10, 2)   # Outputs: 5\nputs divide(10, 0)   # Outputs: You can''t divide
+        by zero!\n```\n**Explanation**:  \nThis function demonstrates handling a specific
+        exception (`ZeroDivisionError`) inside a method. If division by zero is attempted,
+        the error is caught, a message is printed, and `nil` is returned instead of
+        crashing the program.\n\n---\n\n## Example 3\n```ruby\nbegin\n  # Simulate
+        an error\n  raise ArgumentError, \"Invalid argument!\"\nrescue ArgumentError
+        =\u003e e\n  puts \"Caught an argument error: #{e.message}\"\nrescue StandardError
+        =\u003e e\n  puts \"Caught a standard error: #{e.message}\"\nelse\n  puts
+        \"No errors occurred.\"\nend\n```\n**Explanation**:  \nThis example... (result
+        truncated)\n```\n\nAVAILABLE TOOLS (Use these to explore and gather information):\n-
+        analyze_code_question: Break down a code-related research question\n- shell_command:
+        Execute a shell command (safely within allowed directories)\n- search_code_base:
+        Search the code base for code examples using ripgrep (takes ''query: \u003cyour
+        query here\u003e'') \n- examine_directory: Examine a directory and generate
+        a textual summary of its contents using the code2prompt tool. Takes ''directory_path:
+        \u003cpath to directory\u003e''.\n- search_for_examples: Search for code examples
+        on a topic\n- explain_code: Explain how a piece of code works\n- take_notes:
+        IMPORTANT: Document findings about the codebase. Use this after discoveries
+        to build the final report. Each note should contain specific, detailed observations.
+        Pass (note: \u003cnote)\n- compile_findings: Compile research notes into structured
+        findings\n\n=== YOUR TASK ===\nBased on the USER QUESTION, CURRENT NOTES,
+        and LAST TOOL RESULT, determine the single best *next action* to progress
+        towards answering the question.\n\n=== STRATEGIC THINKING PROCESS (Follow
+        these steps): ===\n1.  **Analyze Goal:** Re-read the USER QUESTION. What specific
+        information is still needed?\n2.  **Review Context:** Examine CURRENT NOTES.
+        What parts of the codebase have been explored? What remains unknown?\n3.  **Evaluate
+        Last Result:** Analyze the LAST TOOL RESULT.\n    *   If it contains useful
+        information (file listing, file content, search results, directory summary):
+        What key insight does it provide? Does it suggest the next file/directory
+        to examine? Should I use `take_notes` *now* to record this insight before
+        moving on?\n    *   If it was an error: Why did it fail (e.g., file not found,
+        command error)? Can I try an alternative (different path, simpler command,
+        different tool)? Should I use `take_notes` to record the obstacle?\n4.  **Plan
+        Next Step:** Decide the most logical next exploration target (e.g., examine
+        root directory, list files in `app/models`, read `app/controllers/users_controller.rb`,
+        search for `User.find`).\n5.  **Select Optimal Tool:** Choose the *single
+        tool* that directly achieves your planned next step. Prioritize `take_notes`
+        if step 3 identified key info to save *before* exploring further.\n6.  **Formulate
+        Action:** Construct the arguments for the chosen tool precisely.\n\n=== TOOL
+        USAGE GUIDELINES ===\n*   `shell_command`: Your primary exploration tool.
+        Use specific commands:\n    *   `ls -l \u003cdirectory\u003e`: To list contents
+        of a directory. Start broad (e.g., `ls -l .`) then explore subdirectories.\n    *   `cat
+        \u003cfile_path\u003e`: To read the contents of a *specific* file identified
+        via `ls` or other tools.\n    *   `grep \u003cpattern\u003e \u003cfile\u003e`:
+        For simple searches within a known file.\n    *   **AVOID**: Generic commands
+        like just `explore`. Be specific.\n*   `examine_directory`: Use when you need
+        a *summary* of *all* files in a directory, processed by `code2prompt`. Useful
+        for getting an overview of a complex area like `app/services` *before* diving
+        into individual files with `cat`. More costly than `ls`.\n*   `search_code_base`:
+        Use *only* when you need to find specific code snippets, function calls, or
+        keywords *across the entire codebase* (uses `rg`). Less useful for general
+        structure exploration than `ls` or `examine_directory`.\n*   `explain_code`:
+        Use *sparingly* only for short, specific code snippets already retrieved via
+        `cat` or `search_code_base` that you cannot understand from context.\n*   `take_notes`:
+        **CRITICAL**. Use frequently to record **significant findings** directly contributing
+        to the answer:\n    *   Purpose of a directory or important file.\n    *   Key
+        logic or data flow identified.\n    *   Relationships between different code
+        parts.\n    *   Direct evidence answering the USER QUESTION.\n    *   Obstacles
+        or errors encountered during exploration.\n    *   **Do NOT** use for trivial
+        actions like \"Executed ls command\". Notes form the basis of the final answer.\n*   `analyze_code_question`:
+        Usually only needed once at the start if the initial question is unclear (rarely
+        needed in the loop).\n*   `finish`: Use **ONLY** when you are confident that
+        the CURRENT NOTES contain enough information gathered through exploration
+        to comprehensively answer the original USER QUESTION. Do not finish prematurely.\n\n===
+        RESPONSE FORMATTING ===\nRespond ONLY with a valid JSON object adhering to
+        the schema below.\nDO NOT include any other text, explanations, or markdown
+        formatting (like ```json ... ```) outside of the JSON object itself.\nYour
+        entire response must be ONLY the JSON object.\n--- SCHEMA START ---\nYou must
+        format your output as a JSON value that adheres to a given \"JSON Schema\"
+        instance.\n\n\"JSON Schema\" is a declarative language that allows you to
+        annotate and validate JSON documents.\n\nFor example, the example \"JSON Schema\"
+        instance {\"properties\": {\"foo\": {\"description\": \"a list of test words\",
+        \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}}\nwould
+        match an object with one required property, \"foo\". The \"type\" property
+        specifies \"foo\" must be an \"array\", and the \"description\" property semantically
+        describes it as \"a list of test words\". The items within \"foo\" must be
+        strings.\nThus, the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted
+        instance of this example \"JSON Schema\". The object {\"properties\": {\"foo\":
+        [\"bar\", \"baz\"]}}} is not well-formatted.\n\nYour output will be parsed
+        and type-checked according to the provided schema instance, so make sure all
+        fields in your output match the schema exactly and there are no trailing commas!\n\nHere
+        is the JSON Schema instance your output must adhere to. Include the enclosing
+        markdown codeblock:\n```json\n{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"description\":\"The
+        name of the tool to use or ''finish''.\",\"enum\":[\"analyze_code_question\",\"shell_command\",\"search_code_base\",\"examine_directory\",\"search_for_examples\",\"explain_code\",\"take_notes\",\"compile_findings\",\"finish\"]},\"arguments\":{\"type\":\"object\",\"description\":\"A
+        hash of arguments for the chosen tool (string keys and values). Empty if action
+        is ''finish''. Arguments should be passed as keyword arguments.\",\"additionalProperties\":{\"type\":\"string\"}}},\"required\":[\"action\",\"arguments\"],\"additionalProperties\":false}\n```\n\n---
+        SCHEMA END ---\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:13:50 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e561bd0aa215-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n\n         \n{\"id\":\"gen-1744672430-VRxfATmnsJRLK6u85jPh\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672430,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"```json\\n{\\\"action\\\":\\\"take_notes\\\",\\\"arguments\\\":{\\\"note\\\":\\\"Ruby
+        error handling is typically done using the `begin`, `rescue`, `else`, and
+        `ensure` blocks. Key best practices include rescuing only specific exceptions
+        rather than generic ones, cleaning up resources in the `ensure` block, and
+        providing meaningful error messages or fallback behavior. Examples include
+        handling file not found errors with `rescue Errno::ENOENT`, handling division
+        by zero with `rescue ZeroDivisionError`, and using `ensure` to guarantee resource
+        cleanup. It is also possible to rescue multiple exception types and to raise
+        custom errors as needed.\\\"}}\\n```\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_cf18407276\",\"usage\":{\"prompt_tokens\":1993,\"completion_tokens\":129,\"total_tokens\":2122,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:13:52 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# ROLE
+        AND GOAL\nYou are a meticulous Automated Code Explorer. Your primary objective
+        is to systematically navigate and understand the codebase to gather information
+        that comprehensively answers the user''s question.\nUSER QUESTION: Task Title:
+        Research Ruby error handling\n\nTask Description:\nFind best practices for
+        error handling in Ruby\n\nSpecific Instructions for this Run:\nHow should
+        I handle errors in Ruby?\n\n# ANTI-REPETITION DIRECTIVE\nYou MUST avoid redundant
+        actions. Do NOT:\n- Examine directories already listed below.\n- Run commands
+        substantially similar to those already run.\n- Take notes covering information
+        already recorded.\n\n# CURRENT EXPLORATION STATUS\nIteration: 4/50\n\nDIRECTORIES
+        ALREADY EXAMINED (via ''examine_directory''):\n- None yet\n\nRECENT SHELL
+        COMMANDS ALREADY RUN (via ''shell_command''):\n- None yet\n\nNOTES TAKEN SO
+        FAR (Significant findings discovered):\n```\nRuby error handling is typically
+        done using the `begin`, `rescue`, `else`, and `ensure` blocks. Key best practices
+        include rescuing only specific exceptions rather than generic ones, cleaning
+        up resources in the `ensure` block, and providing meaningful error messages
+        or fallback behavior. Examples include handling file not found errors with
+        `rescue Errno::ENOENT`, handling division by zero with `rescue ZeroDivisionError`,
+        and using `ensure` to guarantee resource cleanup. It is also possible to rescue
+        multiple exception types and to raise custom errors as needed.\n```\n\nLAST
+        TOOL RESULT (Output or error from your previous action):\n```\nCode research
+        note recorded: Ruby error handling is typically done using the `begin`, `rescue`,
+        `else`, and `ensure` blocks. K...\n```\n\nAVAILABLE TOOLS (Use these to explore
+        and gather information):\n- analyze_code_question: Break down a code-related
+        research question\n- shell_command: Execute a shell command (safely within
+        allowed directories)\n- search_code_base: Search the code base for code examples
+        using ripgrep (takes ''query: \u003cyour query here\u003e'') \n- examine_directory:
+        Examine a directory and generate a textual summary of its contents using the
+        code2prompt tool. Takes ''directory_path: \u003cpath to directory\u003e''.\n-
+        search_for_examples: Search for code examples on a topic\n- explain_code:
+        Explain how a piece of code works\n- take_notes: IMPORTANT: Document findings
+        about the codebase. Use this after discoveries to build the final report.
+        Each note should contain specific, detailed observations. Pass (note: \u003cnote)\n-
+        compile_findings: Compile research notes into structured findings\n\n=== YOUR
+        TASK ===\nBased on the USER QUESTION, CURRENT NOTES, and LAST TOOL RESULT,
+        determine the single best *next action* to progress towards answering the
+        question.\n\n=== STRATEGIC THINKING PROCESS (Follow these steps): ===\n1.  **Analyze
+        Goal:** Re-read the USER QUESTION. What specific information is still needed?\n2.  **Review
+        Context:** Examine CURRENT NOTES. What parts of the codebase have been explored?
+        What remains unknown?\n3.  **Evaluate Last Result:** Analyze the LAST TOOL
+        RESULT.\n    *   If it contains useful information (file listing, file content,
+        search results, directory summary): What key insight does it provide? Does
+        it suggest the next file/directory to examine? Should I use `take_notes` *now*
+        to record this insight before moving on?\n    *   If it was an error: Why
+        did it fail (e.g., file not found, command error)? Can I try an alternative
+        (different path, simpler command, different tool)? Should I use `take_notes`
+        to record the obstacle?\n4.  **Plan Next Step:** Decide the most logical next
+        exploration target (e.g., examine root directory, list files in `app/models`,
+        read `app/controllers/users_controller.rb`, search for `User.find`).\n5.  **Select
+        Optimal Tool:** Choose the *single tool* that directly achieves your planned
+        next step. Prioritize `take_notes` if step 3 identified key info to save *before*
+        exploring further.\n6.  **Formulate Action:** Construct the arguments for
+        the chosen tool precisely.\n\n=== TOOL USAGE GUIDELINES ===\n*   `shell_command`:
+        Your primary exploration tool. Use specific commands:\n    *   `ls -l \u003cdirectory\u003e`:
+        To list contents of a directory. Start broad (e.g., `ls -l .`) then explore
+        subdirectories.\n    *   `cat \u003cfile_path\u003e`: To read the contents
+        of a *specific* file identified via `ls` or other tools.\n    *   `grep \u003cpattern\u003e
+        \u003cfile\u003e`: For simple searches within a known file.\n    *   **AVOID**:
+        Generic commands like just `explore`. Be specific.\n*   `examine_directory`:
+        Use when you need a *summary* of *all* files in a directory, processed by
+        `code2prompt`. Useful for getting an overview of a complex area like `app/services`
+        *before* diving into individual files with `cat`. More costly than `ls`.\n*   `search_code_base`:
+        Use *only* when you need to find specific code snippets, function calls, or
+        keywords *across the entire codebase* (uses `rg`). Less useful for general
+        structure exploration than `ls` or `examine_directory`.\n*   `explain_code`:
+        Use *sparingly* only for short, specific code snippets already retrieved via
+        `cat` or `search_code_base` that you cannot understand from context.\n*   `take_notes`:
+        **CRITICAL**. Use frequently to record **significant findings** directly contributing
+        to the answer:\n    *   Purpose of a directory or important file.\n    *   Key
+        logic or data flow identified.\n    *   Relationships between different code
+        parts.\n    *   Direct evidence answering the USER QUESTION.\n    *   Obstacles
+        or errors encountered during exploration.\n    *   **Do NOT** use for trivial
+        actions like \"Executed ls command\". Notes form the basis of the final answer.\n*   `analyze_code_question`:
+        Usually only needed once at the start if the initial question is unclear (rarely
+        needed in the loop).\n*   `finish`: Use **ONLY** when you are confident that
+        the CURRENT NOTES contain enough information gathered through exploration
+        to comprehensively answer the original USER QUESTION. Do not finish prematurely.\n\n===
+        RESPONSE FORMATTING ===\nRespond ONLY with a valid JSON object adhering to
+        the schema below.\nDO NOT include any other text, explanations, or markdown
+        formatting (like ```json ... ```) outside of the JSON object itself.\nYour
+        entire response must be ONLY the JSON object.\n--- SCHEMA START ---\nYou must
+        format your output as a JSON value that adheres to a given \"JSON Schema\"
+        instance.\n\n\"JSON Schema\" is a declarative language that allows you to
+        annotate and validate JSON documents.\n\nFor example, the example \"JSON Schema\"
+        instance {\"properties\": {\"foo\": {\"description\": \"a list of test words\",
+        \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}}\nwould
+        match an object with one required property, \"foo\". The \"type\" property
+        specifies \"foo\" must be an \"array\", and the \"description\" property semantically
+        describes it as \"a list of test words\". The items within \"foo\" must be
+        strings.\nThus, the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted
+        instance of this example \"JSON Schema\". The object {\"properties\": {\"foo\":
+        [\"bar\", \"baz\"]}}} is not well-formatted.\n\nYour output will be parsed
+        and type-checked according to the provided schema instance, so make sure all
+        fields in your output match the schema exactly and there are no trailing commas!\n\nHere
+        is the JSON Schema instance your output must adhere to. Include the enclosing
+        markdown codeblock:\n```json\n{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"description\":\"The
+        name of the tool to use or ''finish''.\",\"enum\":[\"analyze_code_question\",\"shell_command\",\"search_code_base\",\"examine_directory\",\"search_for_examples\",\"explain_code\",\"take_notes\",\"compile_findings\",\"finish\"]},\"arguments\":{\"type\":\"object\",\"description\":\"A
+        hash of arguments for the chosen tool (string keys and values). Empty if action
+        is ''finish''. Arguments should be passed as keyword arguments.\",\"additionalProperties\":{\"type\":\"string\"}}},\"required\":[\"action\",\"arguments\"],\"additionalProperties\":false}\n```\n\n---
+        SCHEMA END ---\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:13:52 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e56d7a544c97-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n{\"id\":\"gen-1744672432-pEzKu8RCHSTEzIjqGzjJ\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672432,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"```json\\n{\\\"action\\\":\\\"search_for_examples\\\",\\\"arguments\\\":{\\\"query\\\":\\\"best
+        practices for error handling in Ruby\\\"}}\\n```\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_cf18407276\",\"usage\":{\"prompt_tokens\":1738,\"completion_tokens\":25,\"total_tokens\":1763,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:13:53 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# ROLE
+        AND GOAL\nYou are a meticulous Automated Code Explorer. Your primary objective
+        is to systematically navigate and understand the codebase to gather information
+        that comprehensively answers the user''s question.\nUSER QUESTION: Task Title:
+        Research Ruby error handling\n\nTask Description:\nFind best practices for
+        error handling in Ruby\n\nSpecific Instructions for this Run:\nHow should
+        I handle errors in Ruby?\n\n# ANTI-REPETITION DIRECTIVE\nYou MUST avoid redundant
+        actions. Do NOT:\n- Examine directories already listed below.\n- Run commands
+        substantially similar to those already run.\n- Take notes covering information
+        already recorded.\n\n# CURRENT EXPLORATION STATUS\nIteration: 5/50\n\nDIRECTORIES
+        ALREADY EXAMINED (via ''examine_directory''):\n- None yet\n\nRECENT SHELL
+        COMMANDS ALREADY RUN (via ''shell_command''):\n- None yet\n\nNOTES TAKEN SO
+        FAR (Significant findings discovered):\n```\nRuby error handling is typically
+        done using the `begin`, `rescue`, `else`, and `ensure` blocks. Key best practices
+        include rescuing only specific exceptions rather than generic ones, cleaning
+        up resources in the `ensure` block, and providing meaningful error messages
+        or fallback behavior. Examples include handling file not found errors with
+        `rescue Errno::ENOENT`, handling division by zero with `rescue ZeroDivisionError`,
+        and using `ensure` to guarantee resource cleanup. It is also possible to rescue
+        multiple exception types and to raise custom errors as needed.\n```\n\nLAST
+        TOOL RESULT (Output or error from your previous action):\n```\nError executing
+        tool ''search_for_examples'': Error executing tool ''search_for_examples'':
+        missing keyword: :topic\n```\n\nAVAILABLE TOOLS (Use these to explore and
+        gather information):\n- analyze_code_question: Break down a code-related research
+        question\n- shell_command: Execute a shell command (safely within allowed
+        directories)\n- search_code_base: Search the code base for code examples using
+        ripgrep (takes ''query: \u003cyour query here\u003e'') \n- examine_directory:
+        Examine a directory and generate a textual summary of its contents using the
+        code2prompt tool. Takes ''directory_path: \u003cpath to directory\u003e''.\n-
+        search_for_examples: Search for code examples on a topic\n- explain_code:
+        Explain how a piece of code works\n- take_notes: IMPORTANT: Document findings
+        about the codebase. Use this after discoveries to build the final report.
+        Each note should contain specific, detailed observations. Pass (note: \u003cnote)\n-
+        compile_findings: Compile research notes into structured findings\n\n=== YOUR
+        TASK ===\nBased on the USER QUESTION, CURRENT NOTES, and LAST TOOL RESULT,
+        determine the single best *next action* to progress towards answering the
+        question.\n\n=== STRATEGIC THINKING PROCESS (Follow these steps): ===\n1.  **Analyze
+        Goal:** Re-read the USER QUESTION. What specific information is still needed?\n2.  **Review
+        Context:** Examine CURRENT NOTES. What parts of the codebase have been explored?
+        What remains unknown?\n3.  **Evaluate Last Result:** Analyze the LAST TOOL
+        RESULT.\n    *   If it contains useful information (file listing, file content,
+        search results, directory summary): What key insight does it provide? Does
+        it suggest the next file/directory to examine? Should I use `take_notes` *now*
+        to record this insight before moving on?\n    *   If it was an error: Why
+        did it fail (e.g., file not found, command error)? Can I try an alternative
+        (different path, simpler command, different tool)? Should I use `take_notes`
+        to record the obstacle?\n4.  **Plan Next Step:** Decide the most logical next
+        exploration target (e.g., examine root directory, list files in `app/models`,
+        read `app/controllers/users_controller.rb`, search for `User.find`).\n5.  **Select
+        Optimal Tool:** Choose the *single tool* that directly achieves your planned
+        next step. Prioritize `take_notes` if step 3 identified key info to save *before*
+        exploring further.\n6.  **Formulate Action:** Construct the arguments for
+        the chosen tool precisely.\n\n=== TOOL USAGE GUIDELINES ===\n*   `shell_command`:
+        Your primary exploration tool. Use specific commands:\n    *   `ls -l \u003cdirectory\u003e`:
+        To list contents of a directory. Start broad (e.g., `ls -l .`) then explore
+        subdirectories.\n    *   `cat \u003cfile_path\u003e`: To read the contents
+        of a *specific* file identified via `ls` or other tools.\n    *   `grep \u003cpattern\u003e
+        \u003cfile\u003e`: For simple searches within a known file.\n    *   **AVOID**:
+        Generic commands like just `explore`. Be specific.\n*   `examine_directory`:
+        Use when you need a *summary* of *all* files in a directory, processed by
+        `code2prompt`. Useful for getting an overview of a complex area like `app/services`
+        *before* diving into individual files with `cat`. More costly than `ls`.\n*   `search_code_base`:
+        Use *only* when you need to find specific code snippets, function calls, or
+        keywords *across the entire codebase* (uses `rg`). Less useful for general
+        structure exploration than `ls` or `examine_directory`.\n*   `explain_code`:
+        Use *sparingly* only for short, specific code snippets already retrieved via
+        `cat` or `search_code_base` that you cannot understand from context.\n*   `take_notes`:
+        **CRITICAL**. Use frequently to record **significant findings** directly contributing
+        to the answer:\n    *   Purpose of a directory or important file.\n    *   Key
+        logic or data flow identified.\n    *   Relationships between different code
+        parts.\n    *   Direct evidence answering the USER QUESTION.\n    *   Obstacles
+        or errors encountered during exploration.\n    *   **Do NOT** use for trivial
+        actions like \"Executed ls command\". Notes form the basis of the final answer.\n*   `analyze_code_question`:
+        Usually only needed once at the start if the initial question is unclear (rarely
+        needed in the loop).\n*   `finish`: Use **ONLY** when you are confident that
+        the CURRENT NOTES contain enough information gathered through exploration
+        to comprehensively answer the original USER QUESTION. Do not finish prematurely.\n\n===
+        RESPONSE FORMATTING ===\nRespond ONLY with a valid JSON object adhering to
+        the schema below.\nDO NOT include any other text, explanations, or markdown
+        formatting (like ```json ... ```) outside of the JSON object itself.\nYour
+        entire response must be ONLY the JSON object.\n--- SCHEMA START ---\nYou must
+        format your output as a JSON value that adheres to a given \"JSON Schema\"
+        instance.\n\n\"JSON Schema\" is a declarative language that allows you to
+        annotate and validate JSON documents.\n\nFor example, the example \"JSON Schema\"
+        instance {\"properties\": {\"foo\": {\"description\": \"a list of test words\",
+        \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}}\nwould
+        match an object with one required property, \"foo\". The \"type\" property
+        specifies \"foo\" must be an \"array\", and the \"description\" property semantically
+        describes it as \"a list of test words\". The items within \"foo\" must be
+        strings.\nThus, the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted
+        instance of this example \"JSON Schema\". The object {\"properties\": {\"foo\":
+        [\"bar\", \"baz\"]}}} is not well-formatted.\n\nYour output will be parsed
+        and type-checked according to the provided schema instance, so make sure all
+        fields in your output match the schema exactly and there are no trailing commas!\n\nHere
+        is the JSON Schema instance your output must adhere to. Include the enclosing
+        markdown codeblock:\n```json\n{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"description\":\"The
+        name of the tool to use or ''finish''.\",\"enum\":[\"analyze_code_question\",\"shell_command\",\"search_code_base\",\"examine_directory\",\"search_for_examples\",\"explain_code\",\"take_notes\",\"compile_findings\",\"finish\"]},\"arguments\":{\"type\":\"object\",\"description\":\"A
+        hash of arguments for the chosen tool (string keys and values). Empty if action
+        is ''finish''. Arguments should be passed as keyword arguments.\",\"additionalProperties\":{\"type\":\"string\"}}},\"required\":[\"action\",\"arguments\"],\"additionalProperties\":false}\n```\n\n---
+        SCHEMA END ---\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:13:53 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e5762bf0510e-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n{\"id\":\"gen-1744672433-KubkxfrBNDtT0eYi5KMM\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672433,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"```json\\n{\\\"action\\\":\\\"search_for_examples\\\",\\\"arguments\\\":{\\\"topic\\\":\\\"Ruby
+        error handling\\\"}}\\n```\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_cf18407276\",\"usage\":{\"prompt_tokens\":1729,\"completion_tokens\":21,\"total_tokens\":1750,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:13:54 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"Find
+        code examples for the topic:\n\nTOPIC: Ruby error handling\n\nProvide:\n1.
+        2-3 realistic, well-commented code examples.\n2. Brief explanations for each.\n3.
+        Common variations or alternatives.\n\nFORMAT:\n## Example 1\n```code\n[Code]\n```\n**Explanation**:
+        [Explanation]\n\n## Example 2\n...\n\n## Common Variations\n[Variations]\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:13:55 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e57ecb284ca0-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n\n         \n\n         \n\n         \n\n
+        \        \n\n         \n\n         \n\n         \n\n         \n\n         \n\n
+        \        \n\n         \n\n         \n\n         \n{\"id\":\"gen-1744672435-0prkvQ5zEbWpxFF93EEv\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672435,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"##
+        Example 1\\n```ruby\\nbegin\\n  # Attempt to open and read a file\\n  file
+        = File.open(\\\"data.txt\\\", \\\"r\\\")\\n  contents = file.read\\n  puts
+        contents\\nrescue Errno::ENOENT => e\\n  # Handle the case where the file
+        does not exist\\n  puts \\\"File not found: #{e.message}\\\"\\nensure\\n  #
+        Always close the file if it was opened\\n  file.close if file\\nend\\n```\\n**Explanation**:
+        \ \\nThis example demonstrates basic error handling when working with files.
+        The `begin` block wraps code that might raise an exception. If the file doesn't
+        exist, an `Errno::ENOENT` exception is raised and handled in the `rescue`
+        block. The `ensure` block runs regardless of whether an exception occurred,
+        ensuring the file is closed if it was opened.\\n\\n---\\n\\n## Example 2\\n```ruby\\ndef
+        divide(a, b)\\n  begin\\n    result = a / b\\n    puts \\\"Result: #{result}\\\"\\n
+        \ rescue ZeroDivisionError\\n    puts \\\"Error: Division by zero is not allowed.\\\"\\n
+        \ end\\nend\\n\\ndivide(10, 2)   # Output: Result: 5\\ndivide(5, 0)    # Output:
+        Error: Division by zero is not allowed.\\n```\\n**Explanation**:  \\nThis
+        function attempts to divide two numbers. If the denominator is zero, a `ZeroDivisionError`
+        is raised and handled gracefully, preventing the program from crashing and
+        providing a user-friendly message.\\n\\n---\\n\\n## Example 3\\n```ruby\\nbegin\\n
+        \ # Simulate an operation that may fail\\n  raise ArgumentError, \\\"Invalid
+        argument!\\\"\\nrescue ArgumentError => e\\n  puts \\\"Caught an argument
+        error: #{e.message}\\\"\\nrescue StandardError => e\\n  puts \\\"Caught a
+        standard error: #{e.message}\\\"\\nelse\\n  puts \\\"No errors occurred.\\\"\\nend\\n```\\n**Explanation**:
+        \ \\nThis example shows handling multiple exception types. The `rescue` clauses
+        are ordered from most specific to most general. If an `ArgumentError` is raised,
+        it's caught by the first `rescue`. If another kind of `StandardError` is raised,
+        it's caught by the second. The `else` block runs only if no exceptions were
+        raised.\\n\\n---\\n\\n## Common Variations\\n\\n- **Inline rescue**: You can
+        rescue exceptions inline for simple cases:\\n  ```ruby\\n  value = Integer(\\\"abc\\\")
+        rescue 0  # value will be 0 if conversion fails\\n  ```\\n\\n- **Rescuing
+        multiple exceptions**: You can rescue multiple exception types in one line:\\n
+        \ ```ruby\\n  rescue IOError, SystemCallError => e\\n    puts \\\"IO or system
+        error: #{e.message}\\\"\\n  ```\\n\\n- **Custom exceptions**: Define and raise
+        your own exceptions:\\n  ```ruby\\n  class MyCustomError < StandardError;
+        end\\n\\n  raise MyCustomError, \\\"Something went wrong!\\\"\\n  ```\\n\\n-
+        **Retrying**: Use `retry` to attempt the block again after handling an exception:\\n
+        \ ```ruby\\n  attempts = 0\\n  begin\\n    # risky operation\\n  rescue SomeError\\n
+        \   attempts += 1\\n    retry if attempts < 3\\n  end\\n  ```\\n\\n- **Using
+        `ensure` for cleanup**: `ensure` is commonly used to release resources, regardless
+        of errors.\\n\\nThese patterns help make Ruby programs more robust and user-friendly
+        by gracefully handling unexpected situations.\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_a1102cf978\",\"usage\":{\"prompt_tokens\":88,\"completion_tokens\":715,\"total_tokens\":803,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:14:01 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# ROLE
+        AND GOAL\nYou are a meticulous Automated Code Explorer. Your primary objective
+        is to systematically navigate and understand the codebase to gather information
+        that comprehensively answers the user''s question.\nUSER QUESTION: Task Title:
+        Research Ruby error handling\n\nTask Description:\nFind best practices for
+        error handling in Ruby\n\nSpecific Instructions for this Run:\nHow should
+        I handle errors in Ruby?\n\n# ANTI-REPETITION DIRECTIVE\nYou MUST avoid redundant
+        actions. Do NOT:\n- Examine directories already listed below.\n- Run commands
+        substantially similar to those already run.\n- Take notes covering information
+        already recorded.\n\n# CURRENT EXPLORATION STATUS\nIteration: 6/50\n\nDIRECTORIES
+        ALREADY EXAMINED (via ''examine_directory''):\n- None yet\n\nRECENT SHELL
+        COMMANDS ALREADY RUN (via ''shell_command''):\n- None yet\n\nNOTES TAKEN SO
+        FAR (Significant findings discovered):\n```\nRuby error handling is typically
+        done using the `begin`, `rescue`, `else`, and `ensure` blocks. Key best practices
+        include rescuing only specific exceptions rather than generic ones, cleaning
+        up resources in the `ensure` block, and providing meaningful error messages
+        or fallback behavior. Examples include handling file not found errors with
+        `rescue Errno::ENOENT`, handling division by zero with `rescue ZeroDivisionError`,
+        and using `ensure` to guarantee resource cleanup. It is also possible to rescue
+        multiple exception types and to raise custom errors as needed.\n```\n\nLAST
+        TOOL RESULT (Output or error from your previous action):\n```\n## Example
+        1\n```ruby\nbegin\n  # Attempt to open and read a file\n  file = File.open(\"data.txt\",
+        \"r\")\n  contents = file.read\n  puts contents\nrescue Errno::ENOENT =\u003e
+        e\n  # Handle the case where the file does not exist\n  puts \"File not found:
+        #{e.message}\"\nensure\n  # Always close the file if it was opened\n  file.close
+        if file\nend\n```\n**Explanation**:  \nThis example demonstrates basic error
+        handling when working with files. The `begin` block wraps code that might
+        raise an exception. If the file doesn''t exist, an `Errno::ENOENT` exception
+        is raised and handled in the `rescue` block. The `ensure` block runs regardless
+        of whether an exception occurred, ensuring the file is closed if it was opened.\n\n---\n\n##
+        Example 2\n```ruby\ndef divide(a, b)\n  begin\n    result = a / b\n    puts
+        \"Result: #{result}\"\n  rescue ZeroDivisionError\n    puts \"Error: Division
+        by zero is not allowed.\"\n  end\nend\n\ndivide(10, 2)   # Output: Result:
+        5\ndivide(5, 0)    # Output: Error: Division by zero is not allowed.\n```\n**Explanation**:  \nThis
+        function attempts to divide two numbers. If the denominator is zero, a `ZeroDivisionError`
+        is raised and handled gracefully, preventing the program from crashing and
+        providing a user-friendly message.\n\n---\n\n## Example 3\n```ruby\nbegin\n  #
+        Simulate an operation that may fail\n  raise ArgumentError, \"Invalid argument!\"\nrescue
+        ArgumentError =\u003e e\n  puts \"Caught an argument error: #{e.message}\"\nrescue
+        StandardError =\u003e e\n  puts \"Caught a standard error: #{e.message...
+        (result truncated)\n```\n\nAVAILABLE TOOLS (Use these to explore and gather
+        information):\n- analyze_code_question: Break down a code-related research
+        question\n- shell_command: Execute a shell command (safely within allowed
+        directories)\n- search_code_base: Search the code base for code examples using
+        ripgrep (takes ''query: \u003cyour query here\u003e'') \n- examine_directory:
+        Examine a directory and generate a textual summary of its contents using the
+        code2prompt tool. Takes ''directory_path: \u003cpath to directory\u003e''.\n-
+        search_for_examples: Search for code examples on a topic\n- explain_code:
+        Explain how a piece of code works\n- take_notes: IMPORTANT: Document findings
+        about the codebase. Use this after discoveries to build the final report.
+        Each note should contain specific, detailed observations. Pass (note: \u003cnote)\n-
+        compile_findings: Compile research notes into structured findings\n\n=== YOUR
+        TASK ===\nBased on the USER QUESTION, CURRENT NOTES, and LAST TOOL RESULT,
+        determine the single best *next action* to progress towards answering the
+        question.\n\n=== STRATEGIC THINKING PROCESS (Follow these steps): ===\n1.  **Analyze
+        Goal:** Re-read the USER QUESTION. What specific information is still needed?\n2.  **Review
+        Context:** Examine CURRENT NOTES. What parts of the codebase have been explored?
+        What remains unknown?\n3.  **Evaluate Last Result:** Analyze the LAST TOOL
+        RESULT.\n    *   If it contains useful information (file listing, file content,
+        search results, directory summary): What key insight does it provide? Does
+        it suggest the next file/directory to examine? Should I use `take_notes` *now*
+        to record this insight before moving on?\n    *   If it was an error: Why
+        did it fail (e.g., file not found, command error)? Can I try an alternative
+        (different path, simpler command, different tool)? Should I use `take_notes`
+        to record the obstacle?\n4.  **Plan Next Step:** Decide the most logical next
+        exploration target (e.g., examine root directory, list files in `app/models`,
+        read `app/controllers/users_controller.rb`, search for `User.find`).\n5.  **Select
+        Optimal Tool:** Choose the *single tool* that directly achieves your planned
+        next step. Prioritize `take_notes` if step 3 identified key info to save *before*
+        exploring further.\n6.  **Formulate Action:** Construct the arguments for
+        the chosen tool precisely.\n\n=== TOOL USAGE GUIDELINES ===\n*   `shell_command`:
+        Your primary exploration tool. Use specific commands:\n    *   `ls -l \u003cdirectory\u003e`:
+        To list contents of a directory. Start broad (e.g., `ls -l .`) then explore
+        subdirectories.\n    *   `cat \u003cfile_path\u003e`: To read the contents
+        of a *specific* file identified via `ls` or other tools.\n    *   `grep \u003cpattern\u003e
+        \u003cfile\u003e`: For simple searches within a known file.\n    *   **AVOID**:
+        Generic commands like just `explore`. Be specific.\n*   `examine_directory`:
+        Use when you need a *summary* of *all* files in a directory, processed by
+        `code2prompt`. Useful for getting an overview of a complex area like `app/services`
+        *before* diving into individual files with `cat`. More costly than `ls`.\n*   `search_code_base`:
+        Use *only* when you need to find specific code snippets, function calls, or
+        keywords *across the entire codebase* (uses `rg`). Less useful for general
+        structure exploration than `ls` or `examine_directory`.\n*   `explain_code`:
+        Use *sparingly* only for short, specific code snippets already retrieved via
+        `cat` or `search_code_base` that you cannot understand from context.\n*   `take_notes`:
+        **CRITICAL**. Use frequently to record **significant findings** directly contributing
+        to the answer:\n    *   Purpose of a directory or important file.\n    *   Key
+        logic or data flow identified.\n    *   Relationships between different code
+        parts.\n    *   Direct evidence answering the USER QUESTION.\n    *   Obstacles
+        or errors encountered during exploration.\n    *   **Do NOT** use for trivial
+        actions like \"Executed ls command\". Notes form the basis of the final answer.\n*   `analyze_code_question`:
+        Usually only needed once at the start if the initial question is unclear (rarely
+        needed in the loop).\n*   `finish`: Use **ONLY** when you are confident that
+        the CURRENT NOTES contain enough information gathered through exploration
+        to comprehensively answer the original USER QUESTION. Do not finish prematurely.\n\n===
+        RESPONSE FORMATTING ===\nRespond ONLY with a valid JSON object adhering to
+        the schema below.\nDO NOT include any other text, explanations, or markdown
+        formatting (like ```json ... ```) outside of the JSON object itself.\nYour
+        entire response must be ONLY the JSON object.\n--- SCHEMA START ---\nYou must
+        format your output as a JSON value that adheres to a given \"JSON Schema\"
+        instance.\n\n\"JSON Schema\" is a declarative language that allows you to
+        annotate and validate JSON documents.\n\nFor example, the example \"JSON Schema\"
+        instance {\"properties\": {\"foo\": {\"description\": \"a list of test words\",
+        \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}}\nwould
+        match an object with one required property, \"foo\". The \"type\" property
+        specifies \"foo\" must be an \"array\", and the \"description\" property semantically
+        describes it as \"a list of test words\". The items within \"foo\" must be
+        strings.\nThus, the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted
+        instance of this example \"JSON Schema\". The object {\"properties\": {\"foo\":
+        [\"bar\", \"baz\"]}}} is not well-formatted.\n\nYour output will be parsed
+        and type-checked according to the provided schema instance, so make sure all
+        fields in your output match the schema exactly and there are no trailing commas!\n\nHere
+        is the JSON Schema instance your output must adhere to. Include the enclosing
+        markdown codeblock:\n```json\n{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"description\":\"The
+        name of the tool to use or ''finish''.\",\"enum\":[\"analyze_code_question\",\"shell_command\",\"search_code_base\",\"examine_directory\",\"search_for_examples\",\"explain_code\",\"take_notes\",\"compile_findings\",\"finish\"]},\"arguments\":{\"type\":\"object\",\"description\":\"A
+        hash of arguments for the chosen tool (string keys and values). Empty if action
+        is ''finish''. Arguments should be passed as keyword arguments.\",\"additionalProperties\":{\"type\":\"string\"}}},\"required\":[\"action\",\"arguments\"],\"additionalProperties\":false}\n```\n\n---
+        SCHEMA END ---\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:14:01 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e5a9a844fc89-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n\n         \n{\"id\":\"gen-1744672442-9yqn7W0WBqXMrqrw0Sis\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672442,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"```json\\n{\\\"action\\\":\\\"take_notes\\\",\\\"arguments\\\":{\\\"note\\\":\\\"The
+        last result provided three concrete Ruby error handling examples, illustrating
+        the use of begin-rescue-ensure blocks, rescuing specific exceptions, and raising/handling
+        custom exceptions. These examples reinforce best practices: rescue only specific
+        exceptions, use ensure for cleanup, and provide meaningful error messages.
+        This aligns with the previously noted best practices and provides practical
+        code samples for reference.\\\"}}\\n```\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_cf18407276\",\"usage\":{\"prompt_tokens\":2093,\"completion_tokens\":88,\"total_tokens\":2181,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:14:03 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# ROLE
+        AND GOAL\nYou are a meticulous Automated Code Explorer. Your primary objective
+        is to systematically navigate and understand the codebase to gather information
+        that comprehensively answers the user''s question.\nUSER QUESTION: Task Title:
+        Research Ruby error handling\n\nTask Description:\nFind best practices for
+        error handling in Ruby\n\nSpecific Instructions for this Run:\nHow should
+        I handle errors in Ruby?\n\n# ANTI-REPETITION DIRECTIVE\nYou MUST avoid redundant
+        actions. Do NOT:\n- Examine directories already listed below.\n- Run commands
+        substantially similar to those already run.\n- Take notes covering information
+        already recorded.\n\n# CURRENT EXPLORATION STATUS\nIteration: 7/50\n\nDIRECTORIES
+        ALREADY EXAMINED (via ''examine_directory''):\n- None yet\n\nRECENT SHELL
+        COMMANDS ALREADY RUN (via ''shell_command''):\n- None yet\n\nNOTES TAKEN SO
+        FAR (Significant findings discovered):\n```\nRuby error handling is typically
+        done using the `begin`, `rescue`, `else`, and `ensure` blocks. Key best practices
+        include rescuing only specific exceptions rather than generic ones, cleaning
+        up resources in the `ensure` block, and providing meaningful error messages
+        or fallback behavior. Examples include handling file not found errors with
+        `rescue Errno::ENOENT`, handling division by zero with `rescue ZeroDivisionError`,
+        and using `ensure` to guarantee resource cleanup. It is also possible to rescue
+        multiple exception types and to raise custom errors as needed.\n---\nThe last
+        result provided three concrete Ruby error handling examples, illustrating
+        the use of begin-rescue-ensure blocks, rescuing specific exceptions, and raising/handling
+        custom exceptions. These examples reinforce best practices: rescue only specific
+        exceptions, use ensure for cleanup, and provide meaningful error messages.
+        This aligns with the previously noted best practices and provides practical
+        code samples for reference.\n```\n\nLAST TOOL RESULT (Output or error from
+        your previous action):\n```\nCode research note recorded: The last result
+        provided three concrete Ruby error handling examples, illustrating the use
+        of beg...\n```\n\nAVAILABLE TOOLS (Use these to explore and gather information):\n-
+        analyze_code_question: Break down a code-related research question\n- shell_command:
+        Execute a shell command (safely within allowed directories)\n- search_code_base:
+        Search the code base for code examples using ripgrep (takes ''query: \u003cyour
+        query here\u003e'') \n- examine_directory: Examine a directory and generate
+        a textual summary of its contents using the code2prompt tool. Takes ''directory_path:
+        \u003cpath to directory\u003e''.\n- search_for_examples: Search for code examples
+        on a topic\n- explain_code: Explain how a piece of code works\n- take_notes:
+        IMPORTANT: Document findings about the codebase. Use this after discoveries
+        to build the final report. Each note should contain specific, detailed observations.
+        Pass (note: \u003cnote)\n- compile_findings: Compile research notes into structured
+        findings\n\n=== YOUR TASK ===\nBased on the USER QUESTION, CURRENT NOTES,
+        and LAST TOOL RESULT, determine the single best *next action* to progress
+        towards answering the question.\n\n=== STRATEGIC THINKING PROCESS (Follow
+        these steps): ===\n1.  **Analyze Goal:** Re-read the USER QUESTION. What specific
+        information is still needed?\n2.  **Review Context:** Examine CURRENT NOTES.
+        What parts of the codebase have been explored? What remains unknown?\n3.  **Evaluate
+        Last Result:** Analyze the LAST TOOL RESULT.\n    *   If it contains useful
+        information (file listing, file content, search results, directory summary):
+        What key insight does it provide? Does it suggest the next file/directory
+        to examine? Should I use `take_notes` *now* to record this insight before
+        moving on?\n    *   If it was an error: Why did it fail (e.g., file not found,
+        command error)? Can I try an alternative (different path, simpler command,
+        different tool)? Should I use `take_notes` to record the obstacle?\n4.  **Plan
+        Next Step:** Decide the most logical next exploration target (e.g., examine
+        root directory, list files in `app/models`, read `app/controllers/users_controller.rb`,
+        search for `User.find`).\n5.  **Select Optimal Tool:** Choose the *single
+        tool* that directly achieves your planned next step. Prioritize `take_notes`
+        if step 3 identified key info to save *before* exploring further.\n6.  **Formulate
+        Action:** Construct the arguments for the chosen tool precisely.\n\n=== TOOL
+        USAGE GUIDELINES ===\n*   `shell_command`: Your primary exploration tool.
+        Use specific commands:\n    *   `ls -l \u003cdirectory\u003e`: To list contents
+        of a directory. Start broad (e.g., `ls -l .`) then explore subdirectories.\n    *   `cat
+        \u003cfile_path\u003e`: To read the contents of a *specific* file identified
+        via `ls` or other tools.\n    *   `grep \u003cpattern\u003e \u003cfile\u003e`:
+        For simple searches within a known file.\n    *   **AVOID**: Generic commands
+        like just `explore`. Be specific.\n*   `examine_directory`: Use when you need
+        a *summary* of *all* files in a directory, processed by `code2prompt`. Useful
+        for getting an overview of a complex area like `app/services` *before* diving
+        into individual files with `cat`. More costly than `ls`.\n*   `search_code_base`:
+        Use *only* when you need to find specific code snippets, function calls, or
+        keywords *across the entire codebase* (uses `rg`). Less useful for general
+        structure exploration than `ls` or `examine_directory`.\n*   `explain_code`:
+        Use *sparingly* only for short, specific code snippets already retrieved via
+        `cat` or `search_code_base` that you cannot understand from context.\n*   `take_notes`:
+        **CRITICAL**. Use frequently to record **significant findings** directly contributing
+        to the answer:\n    *   Purpose of a directory or important file.\n    *   Key
+        logic or data flow identified.\n    *   Relationships between different code
+        parts.\n    *   Direct evidence answering the USER QUESTION.\n    *   Obstacles
+        or errors encountered during exploration.\n    *   **Do NOT** use for trivial
+        actions like \"Executed ls command\". Notes form the basis of the final answer.\n*   `analyze_code_question`:
+        Usually only needed once at the start if the initial question is unclear (rarely
+        needed in the loop).\n*   `finish`: Use **ONLY** when you are confident that
+        the CURRENT NOTES contain enough information gathered through exploration
+        to comprehensively answer the original USER QUESTION. Do not finish prematurely.\n\n===
+        RESPONSE FORMATTING ===\nRespond ONLY with a valid JSON object adhering to
+        the schema below.\nDO NOT include any other text, explanations, or markdown
+        formatting (like ```json ... ```) outside of the JSON object itself.\nYour
+        entire response must be ONLY the JSON object.\n--- SCHEMA START ---\nYou must
+        format your output as a JSON value that adheres to a given \"JSON Schema\"
+        instance.\n\n\"JSON Schema\" is a declarative language that allows you to
+        annotate and validate JSON documents.\n\nFor example, the example \"JSON Schema\"
+        instance {\"properties\": {\"foo\": {\"description\": \"a list of test words\",
+        \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}}\nwould
+        match an object with one required property, \"foo\". The \"type\" property
+        specifies \"foo\" must be an \"array\", and the \"description\" property semantically
+        describes it as \"a list of test words\". The items within \"foo\" must be
+        strings.\nThus, the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted
+        instance of this example \"JSON Schema\". The object {\"properties\": {\"foo\":
+        [\"bar\", \"baz\"]}}} is not well-formatted.\n\nYour output will be parsed
+        and type-checked according to the provided schema instance, so make sure all
+        fields in your output match the schema exactly and there are no trailing commas!\n\nHere
+        is the JSON Schema instance your output must adhere to. Include the enclosing
+        markdown codeblock:\n```json\n{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"description\":\"The
+        name of the tool to use or ''finish''.\",\"enum\":[\"analyze_code_question\",\"shell_command\",\"search_code_base\",\"examine_directory\",\"search_for_examples\",\"explain_code\",\"take_notes\",\"compile_findings\",\"finish\"]},\"arguments\":{\"type\":\"object\",\"description\":\"A
+        hash of arguments for the chosen tool (string keys and values). Empty if action
+        is ''finish''. Arguments should be passed as keyword arguments.\",\"additionalProperties\":{\"type\":\"string\"}}},\"required\":[\"action\",\"arguments\"],\"additionalProperties\":false}\n```\n\n---
+        SCHEMA END ---\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:14:03 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e5b34b5e7816-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n{\"id\":\"gen-1744672443-ifXsskEa6qBo1CaQUkF0\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672443,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"{\\\"action\\\":\\\"search_for_examples\\\",\\\"arguments\\\":{\\\"query\\\":\\\"Ruby
+        error handling best practices\\\"}}\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_cf18407276\",\"usage\":{\"prompt_tokens\":1802,\"completion_tokens\":18,\"total_tokens\":1820,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:14:04 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# ROLE
+        AND GOAL\nYou are a meticulous Automated Code Explorer. Your primary objective
+        is to systematically navigate and understand the codebase to gather information
+        that comprehensively answers the user''s question.\nUSER QUESTION: Task Title:
+        Research Ruby error handling\n\nTask Description:\nFind best practices for
+        error handling in Ruby\n\nSpecific Instructions for this Run:\nHow should
+        I handle errors in Ruby?\n\n# ANTI-REPETITION DIRECTIVE\nYou MUST avoid redundant
+        actions. Do NOT:\n- Examine directories already listed below.\n- Run commands
+        substantially similar to those already run.\n- Take notes covering information
+        already recorded.\n\n# CURRENT EXPLORATION STATUS\nIteration: 8/50\n\nDIRECTORIES
+        ALREADY EXAMINED (via ''examine_directory''):\n- None yet\n\nRECENT SHELL
+        COMMANDS ALREADY RUN (via ''shell_command''):\n- None yet\n\nNOTES TAKEN SO
+        FAR (Significant findings discovered):\n```\nRuby error handling is typically
+        done using the `begin`, `rescue`, `else`, and `ensure` blocks. Key best practices
+        include rescuing only specific exceptions rather than generic ones, cleaning
+        up resources in the `ensure` block, and providing meaningful error messages
+        or fallback behavior. Examples include handling file not found errors with
+        `rescue Errno::ENOENT`, handling division by zero with `rescue ZeroDivisionError`,
+        and using `ensure` to guarantee resource cleanup. It is also possible to rescue
+        multiple exception types and to raise custom errors as needed.\n---\nThe last
+        result provided three concrete Ruby error handling examples, illustrating
+        the use of begin-rescue-ensure blocks, rescuing specific exceptions, and raising/handling
+        custom exceptions. These examples reinforce best practices: rescue only specific
+        exceptions, use ensure for cleanup, and provide meaningful error messages.
+        This aligns with the previously noted best practices and provides practical
+        code samples for reference.\n```\n\nLAST TOOL RESULT (Output or error from
+        your previous action):\n```\nError executing tool ''search_for_examples'':
+        Error executing tool ''search_for_examples'': missing keyword: :topic\n```\n\nAVAILABLE
+        TOOLS (Use these to explore and gather information):\n- analyze_code_question:
+        Break down a code-related research question\n- shell_command: Execute a shell
+        command (safely within allowed directories)\n- search_code_base: Search the
+        code base for code examples using ripgrep (takes ''query: \u003cyour query
+        here\u003e'') \n- examine_directory: Examine a directory and generate a textual
+        summary of its contents using the code2prompt tool. Takes ''directory_path:
+        \u003cpath to directory\u003e''.\n- search_for_examples: Search for code examples
+        on a topic\n- explain_code: Explain how a piece of code works\n- take_notes:
+        IMPORTANT: Document findings about the codebase. Use this after discoveries
+        to build the final report. Each note should contain specific, detailed observations.
+        Pass (note: \u003cnote)\n- compile_findings: Compile research notes into structured
+        findings\n\n=== YOUR TASK ===\nBased on the USER QUESTION, CURRENT NOTES,
+        and LAST TOOL RESULT, determine the single best *next action* to progress
+        towards answering the question.\n\n=== STRATEGIC THINKING PROCESS (Follow
+        these steps): ===\n1.  **Analyze Goal:** Re-read the USER QUESTION. What specific
+        information is still needed?\n2.  **Review Context:** Examine CURRENT NOTES.
+        What parts of the codebase have been explored? What remains unknown?\n3.  **Evaluate
+        Last Result:** Analyze the LAST TOOL RESULT.\n    *   If it contains useful
+        information (file listing, file content, search results, directory summary):
+        What key insight does it provide? Does it suggest the next file/directory
+        to examine? Should I use `take_notes` *now* to record this insight before
+        moving on?\n    *   If it was an error: Why did it fail (e.g., file not found,
+        command error)? Can I try an alternative (different path, simpler command,
+        different tool)? Should I use `take_notes` to record the obstacle?\n4.  **Plan
+        Next Step:** Decide the most logical next exploration target (e.g., examine
+        root directory, list files in `app/models`, read `app/controllers/users_controller.rb`,
+        search for `User.find`).\n5.  **Select Optimal Tool:** Choose the *single
+        tool* that directly achieves your planned next step. Prioritize `take_notes`
+        if step 3 identified key info to save *before* exploring further.\n6.  **Formulate
+        Action:** Construct the arguments for the chosen tool precisely.\n\n=== TOOL
+        USAGE GUIDELINES ===\n*   `shell_command`: Your primary exploration tool.
+        Use specific commands:\n    *   `ls -l \u003cdirectory\u003e`: To list contents
+        of a directory. Start broad (e.g., `ls -l .`) then explore subdirectories.\n    *   `cat
+        \u003cfile_path\u003e`: To read the contents of a *specific* file identified
+        via `ls` or other tools.\n    *   `grep \u003cpattern\u003e \u003cfile\u003e`:
+        For simple searches within a known file.\n    *   **AVOID**: Generic commands
+        like just `explore`. Be specific.\n*   `examine_directory`: Use when you need
+        a *summary* of *all* files in a directory, processed by `code2prompt`. Useful
+        for getting an overview of a complex area like `app/services` *before* diving
+        into individual files with `cat`. More costly than `ls`.\n*   `search_code_base`:
+        Use *only* when you need to find specific code snippets, function calls, or
+        keywords *across the entire codebase* (uses `rg`). Less useful for general
+        structure exploration than `ls` or `examine_directory`.\n*   `explain_code`:
+        Use *sparingly* only for short, specific code snippets already retrieved via
+        `cat` or `search_code_base` that you cannot understand from context.\n*   `take_notes`:
+        **CRITICAL**. Use frequently to record **significant findings** directly contributing
+        to the answer:\n    *   Purpose of a directory or important file.\n    *   Key
+        logic or data flow identified.\n    *   Relationships between different code
+        parts.\n    *   Direct evidence answering the USER QUESTION.\n    *   Obstacles
+        or errors encountered during exploration.\n    *   **Do NOT** use for trivial
+        actions like \"Executed ls command\". Notes form the basis of the final answer.\n*   `analyze_code_question`:
+        Usually only needed once at the start if the initial question is unclear (rarely
+        needed in the loop).\n*   `finish`: Use **ONLY** when you are confident that
+        the CURRENT NOTES contain enough information gathered through exploration
+        to comprehensively answer the original USER QUESTION. Do not finish prematurely.\n\n===
+        RESPONSE FORMATTING ===\nRespond ONLY with a valid JSON object adhering to
+        the schema below.\nDO NOT include any other text, explanations, or markdown
+        formatting (like ```json ... ```) outside of the JSON object itself.\nYour
+        entire response must be ONLY the JSON object.\n--- SCHEMA START ---\nYou must
+        format your output as a JSON value that adheres to a given \"JSON Schema\"
+        instance.\n\n\"JSON Schema\" is a declarative language that allows you to
+        annotate and validate JSON documents.\n\nFor example, the example \"JSON Schema\"
+        instance {\"properties\": {\"foo\": {\"description\": \"a list of test words\",
+        \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}}\nwould
+        match an object with one required property, \"foo\". The \"type\" property
+        specifies \"foo\" must be an \"array\", and the \"description\" property semantically
+        describes it as \"a list of test words\". The items within \"foo\" must be
+        strings.\nThus, the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted
+        instance of this example \"JSON Schema\". The object {\"properties\": {\"foo\":
+        [\"bar\", \"baz\"]}}} is not well-formatted.\n\nYour output will be parsed
+        and type-checked according to the provided schema instance, so make sure all
+        fields in your output match the schema exactly and there are no trailing commas!\n\nHere
+        is the JSON Schema instance your output must adhere to. Include the enclosing
+        markdown codeblock:\n```json\n{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"description\":\"The
+        name of the tool to use or ''finish''.\",\"enum\":[\"analyze_code_question\",\"shell_command\",\"search_code_base\",\"examine_directory\",\"search_for_examples\",\"explain_code\",\"take_notes\",\"compile_findings\",\"finish\"]},\"arguments\":{\"type\":\"object\",\"description\":\"A
+        hash of arguments for the chosen tool (string keys and values). Empty if action
+        is ''finish''. Arguments should be passed as keyword arguments.\",\"additionalProperties\":{\"type\":\"string\"}}},\"required\":[\"action\",\"arguments\"],\"additionalProperties\":false}\n```\n\n---
+        SCHEMA END ---\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:14:04 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e5b7ce0cacdb-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n{\"id\":\"gen-1744672444-2UvsWcDCAZUVLC1E83rm\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672444,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"```json\\n{\\\"action\\\":\\\"search_code_base\\\",\\\"arguments\\\":{\\\"query\\\":\\\"rescue\\\"}}\\n```\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_cf18407276\",\"usage\":{\"prompt_tokens\":1802,\"completion_tokens\":20,\"total_tokens\":1822,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:14:04 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# ROLE
+        AND GOAL\nYou are a meticulous Automated Code Explorer. Your primary objective
+        is to systematically navigate and understand the codebase to gather information
+        that comprehensively answers the user''s question.\nUSER QUESTION: Task Title:
+        Research Ruby error handling\n\nTask Description:\nFind best practices for
+        error handling in Ruby\n\nSpecific Instructions for this Run:\nHow should
+        I handle errors in Ruby?\n\n# ANTI-REPETITION DIRECTIVE\nYou MUST avoid redundant
+        actions. Do NOT:\n- Examine directories already listed below.\n- Run commands
+        substantially similar to those already run.\n- Take notes covering information
+        already recorded.\n\n# CURRENT EXPLORATION STATUS\nIteration: 9/50\n\nDIRECTORIES
+        ALREADY EXAMINED (via ''examine_directory''):\n- None yet\n\nRECENT SHELL
+        COMMANDS ALREADY RUN (via ''shell_command''):\n- None yet\n\nNOTES TAKEN SO
+        FAR (Significant findings discovered):\n```\nRuby error handling is typically
+        done using the `begin`, `rescue`, `else`, and `ensure` blocks. Key best practices
+        include rescuing only specific exceptions rather than generic ones, cleaning
+        up resources in the `ensure` block, and providing meaningful error messages
+        or fallback behavior. Examples include handling file not found errors with
+        `rescue Errno::ENOENT`, handling division by zero with `rescue ZeroDivisionError`,
+        and using `ensure` to guarantee resource cleanup. It is also possible to rescue
+        multiple exception types and to raise custom errors as needed.\n---\nThe last
+        result provided three concrete Ruby error handling examples, illustrating
+        the use of begin-rescue-ensure blocks, rescuing specific exceptions, and raising/handling
+        custom exceptions. These examples reinforce best practices: rescue only specific
+        exceptions, use ensure for cleanup, and provide meaningful error messages.
+        This aligns with the previously noted best practices and provides practical
+        code samples for reference.\n```\n\nLAST TOOL RESULT (Output or error from
+        your previous action):\n```\n{status: \"success\", results: [], message: \"No
+        matches found.\"}\n```\n\nAVAILABLE TOOLS (Use these to explore and gather
+        information):\n- analyze_code_question: Break down a code-related research
+        question\n- shell_command: Execute a shell command (safely within allowed
+        directories)\n- search_code_base: Search the code base for code examples using
+        ripgrep (takes ''query: \u003cyour query here\u003e'') \n- examine_directory:
+        Examine a directory and generate a textual summary of its contents using the
+        code2prompt tool. Takes ''directory_path: \u003cpath to directory\u003e''.\n-
+        search_for_examples: Search for code examples on a topic\n- explain_code:
+        Explain how a piece of code works\n- take_notes: IMPORTANT: Document findings
+        about the codebase. Use this after discoveries to build the final report.
+        Each note should contain specific, detailed observations. Pass (note: \u003cnote)\n-
+        compile_findings: Compile research notes into structured findings\n\n=== YOUR
+        TASK ===\nBased on the USER QUESTION, CURRENT NOTES, and LAST TOOL RESULT,
+        determine the single best *next action* to progress towards answering the
+        question.\n\n=== STRATEGIC THINKING PROCESS (Follow these steps): ===\n1.  **Analyze
+        Goal:** Re-read the USER QUESTION. What specific information is still needed?\n2.  **Review
+        Context:** Examine CURRENT NOTES. What parts of the codebase have been explored?
+        What remains unknown?\n3.  **Evaluate Last Result:** Analyze the LAST TOOL
+        RESULT.\n    *   If it contains useful information (file listing, file content,
+        search results, directory summary): What key insight does it provide? Does
+        it suggest the next file/directory to examine? Should I use `take_notes` *now*
+        to record this insight before moving on?\n    *   If it was an error: Why
+        did it fail (e.g., file not found, command error)? Can I try an alternative
+        (different path, simpler command, different tool)? Should I use `take_notes`
+        to record the obstacle?\n4.  **Plan Next Step:** Decide the most logical next
+        exploration target (e.g., examine root directory, list files in `app/models`,
+        read `app/controllers/users_controller.rb`, search for `User.find`).\n5.  **Select
+        Optimal Tool:** Choose the *single tool* that directly achieves your planned
+        next step. Prioritize `take_notes` if step 3 identified key info to save *before*
+        exploring further.\n6.  **Formulate Action:** Construct the arguments for
+        the chosen tool precisely.\n\n=== TOOL USAGE GUIDELINES ===\n*   `shell_command`:
+        Your primary exploration tool. Use specific commands:\n    *   `ls -l \u003cdirectory\u003e`:
+        To list contents of a directory. Start broad (e.g., `ls -l .`) then explore
+        subdirectories.\n    *   `cat \u003cfile_path\u003e`: To read the contents
+        of a *specific* file identified via `ls` or other tools.\n    *   `grep \u003cpattern\u003e
+        \u003cfile\u003e`: For simple searches within a known file.\n    *   **AVOID**:
+        Generic commands like just `explore`. Be specific.\n*   `examine_directory`:
+        Use when you need a *summary* of *all* files in a directory, processed by
+        `code2prompt`. Useful for getting an overview of a complex area like `app/services`
+        *before* diving into individual files with `cat`. More costly than `ls`.\n*   `search_code_base`:
+        Use *only* when you need to find specific code snippets, function calls, or
+        keywords *across the entire codebase* (uses `rg`). Less useful for general
+        structure exploration than `ls` or `examine_directory`.\n*   `explain_code`:
+        Use *sparingly* only for short, specific code snippets already retrieved via
+        `cat` or `search_code_base` that you cannot understand from context.\n*   `take_notes`:
+        **CRITICAL**. Use frequently to record **significant findings** directly contributing
+        to the answer:\n    *   Purpose of a directory or important file.\n    *   Key
+        logic or data flow identified.\n    *   Relationships between different code
+        parts.\n    *   Direct evidence answering the USER QUESTION.\n    *   Obstacles
+        or errors encountered during exploration.\n    *   **Do NOT** use for trivial
+        actions like \"Executed ls command\". Notes form the basis of the final answer.\n*   `analyze_code_question`:
+        Usually only needed once at the start if the initial question is unclear (rarely
+        needed in the loop).\n*   `finish`: Use **ONLY** when you are confident that
+        the CURRENT NOTES contain enough information gathered through exploration
+        to comprehensively answer the original USER QUESTION. Do not finish prematurely.\n\n===
+        RESPONSE FORMATTING ===\nRespond ONLY with a valid JSON object adhering to
+        the schema below.\nDO NOT include any other text, explanations, or markdown
+        formatting (like ```json ... ```) outside of the JSON object itself.\nYour
+        entire response must be ONLY the JSON object.\n--- SCHEMA START ---\nYou must
+        format your output as a JSON value that adheres to a given \"JSON Schema\"
+        instance.\n\n\"JSON Schema\" is a declarative language that allows you to
+        annotate and validate JSON documents.\n\nFor example, the example \"JSON Schema\"
+        instance {\"properties\": {\"foo\": {\"description\": \"a list of test words\",
+        \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}}\nwould
+        match an object with one required property, \"foo\". The \"type\" property
+        specifies \"foo\" must be an \"array\", and the \"description\" property semantically
+        describes it as \"a list of test words\". The items within \"foo\" must be
+        strings.\nThus, the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted
+        instance of this example \"JSON Schema\". The object {\"properties\": {\"foo\":
+        [\"bar\", \"baz\"]}}} is not well-formatted.\n\nYour output will be parsed
+        and type-checked according to the provided schema instance, so make sure all
+        fields in your output match the schema exactly and there are no trailing commas!\n\nHere
+        is the JSON Schema instance your output must adhere to. Include the enclosing
+        markdown codeblock:\n```json\n{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"description\":\"The
+        name of the tool to use or ''finish''.\",\"enum\":[\"analyze_code_question\",\"shell_command\",\"search_code_base\",\"examine_directory\",\"search_for_examples\",\"explain_code\",\"take_notes\",\"compile_findings\",\"finish\"]},\"arguments\":{\"type\":\"object\",\"description\":\"A
+        hash of arguments for the chosen tool (string keys and values). Empty if action
+        is ''finish''. Arguments should be passed as keyword arguments.\",\"additionalProperties\":{\"type\":\"string\"}}},\"required\":[\"action\",\"arguments\"],\"additionalProperties\":false}\n```\n\n---
+        SCHEMA END ---\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:14:05 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e5bdf841a201-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n{\"id\":\"gen-1744672445-9Xm4c9yrtiePBqhHvKSW\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672445,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"```json\\n{\\\"action\\\":\\\"search_for_examples\\\",\\\"arguments\\\":{\\\"query\\\":\\\"Ruby
+        error handling best practices\\\"}}\\n```\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_cf18407276\",\"usage\":{\"prompt_tokens\":1797,\"completion_tokens\":23,\"total_tokens\":1820,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:14:06 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# ROLE
+        AND GOAL\nYou are a meticulous Automated Code Explorer. Your primary objective
+        is to systematically navigate and understand the codebase to gather information
+        that comprehensively answers the user''s question.\nUSER QUESTION: Task Title:
+        Research Ruby error handling\n\nTask Description:\nFind best practices for
+        error handling in Ruby\n\nSpecific Instructions for this Run:\nHow should
+        I handle errors in Ruby?\n\n# ANTI-REPETITION DIRECTIVE\nYou MUST avoid redundant
+        actions. Do NOT:\n- Examine directories already listed below.\n- Run commands
+        substantially similar to those already run.\n- Take notes covering information
+        already recorded.\n\n# CURRENT EXPLORATION STATUS\nIteration: 10/50\n\nDIRECTORIES
+        ALREADY EXAMINED (via ''examine_directory''):\n- None yet\n\nRECENT SHELL
+        COMMANDS ALREADY RUN (via ''shell_command''):\n- None yet\n\nNOTES TAKEN SO
+        FAR (Significant findings discovered):\n```\nRuby error handling is typically
+        done using the `begin`, `rescue`, `else`, and `ensure` blocks. Key best practices
+        include rescuing only specific exceptions rather than generic ones, cleaning
+        up resources in the `ensure` block, and providing meaningful error messages
+        or fallback behavior. Examples include handling file not found errors with
+        `rescue Errno::ENOENT`, handling division by zero with `rescue ZeroDivisionError`,
+        and using `ensure` to guarantee resource cleanup. It is also possible to rescue
+        multiple exception types and to raise custom errors as needed.\n---\nThe last
+        result provided three concrete Ruby error handling examples, illustrating
+        the use of begin-rescue-ensure blocks, rescuing specific exceptions, and raising/handling
+        custom exceptions. These examples reinforce best practices: rescue only specific
+        exceptions, use ensure for cleanup, and provide meaningful error messages.
+        This aligns with the previously noted best practices and provides practical
+        code samples for reference.\n```\n\nLAST TOOL RESULT (Output or error from
+        your previous action):\n```\nError executing tool ''search_for_examples'':
+        Error executing tool ''search_for_examples'': missing keyword: :topic\n```\n\nAVAILABLE
+        TOOLS (Use these to explore and gather information):\n- analyze_code_question:
+        Break down a code-related research question\n- shell_command: Execute a shell
+        command (safely within allowed directories)\n- search_code_base: Search the
+        code base for code examples using ripgrep (takes ''query: \u003cyour query
+        here\u003e'') \n- examine_directory: Examine a directory and generate a textual
+        summary of its contents using the code2prompt tool. Takes ''directory_path:
+        \u003cpath to directory\u003e''.\n- search_for_examples: Search for code examples
+        on a topic\n- explain_code: Explain how a piece of code works\n- take_notes:
+        IMPORTANT: Document findings about the codebase. Use this after discoveries
+        to build the final report. Each note should contain specific, detailed observations.
+        Pass (note: \u003cnote)\n- compile_findings: Compile research notes into structured
+        findings\n\n=== YOUR TASK ===\nBased on the USER QUESTION, CURRENT NOTES,
+        and LAST TOOL RESULT, determine the single best *next action* to progress
+        towards answering the question.\n\n=== STRATEGIC THINKING PROCESS (Follow
+        these steps): ===\n1.  **Analyze Goal:** Re-read the USER QUESTION. What specific
+        information is still needed?\n2.  **Review Context:** Examine CURRENT NOTES.
+        What parts of the codebase have been explored? What remains unknown?\n3.  **Evaluate
+        Last Result:** Analyze the LAST TOOL RESULT.\n    *   If it contains useful
+        information (file listing, file content, search results, directory summary):
+        What key insight does it provide? Does it suggest the next file/directory
+        to examine? Should I use `take_notes` *now* to record this insight before
+        moving on?\n    *   If it was an error: Why did it fail (e.g., file not found,
+        command error)? Can I try an alternative (different path, simpler command,
+        different tool)? Should I use `take_notes` to record the obstacle?\n4.  **Plan
+        Next Step:** Decide the most logical next exploration target (e.g., examine
+        root directory, list files in `app/models`, read `app/controllers/users_controller.rb`,
+        search for `User.find`).\n5.  **Select Optimal Tool:** Choose the *single
+        tool* that directly achieves your planned next step. Prioritize `take_notes`
+        if step 3 identified key info to save *before* exploring further.\n6.  **Formulate
+        Action:** Construct the arguments for the chosen tool precisely.\n\n=== TOOL
+        USAGE GUIDELINES ===\n*   `shell_command`: Your primary exploration tool.
+        Use specific commands:\n    *   `ls -l \u003cdirectory\u003e`: To list contents
+        of a directory. Start broad (e.g., `ls -l .`) then explore subdirectories.\n    *   `cat
+        \u003cfile_path\u003e`: To read the contents of a *specific* file identified
+        via `ls` or other tools.\n    *   `grep \u003cpattern\u003e \u003cfile\u003e`:
+        For simple searches within a known file.\n    *   **AVOID**: Generic commands
+        like just `explore`. Be specific.\n*   `examine_directory`: Use when you need
+        a *summary* of *all* files in a directory, processed by `code2prompt`. Useful
+        for getting an overview of a complex area like `app/services` *before* diving
+        into individual files with `cat`. More costly than `ls`.\n*   `search_code_base`:
+        Use *only* when you need to find specific code snippets, function calls, or
+        keywords *across the entire codebase* (uses `rg`). Less useful for general
+        structure exploration than `ls` or `examine_directory`.\n*   `explain_code`:
+        Use *sparingly* only for short, specific code snippets already retrieved via
+        `cat` or `search_code_base` that you cannot understand from context.\n*   `take_notes`:
+        **CRITICAL**. Use frequently to record **significant findings** directly contributing
+        to the answer:\n    *   Purpose of a directory or important file.\n    *   Key
+        logic or data flow identified.\n    *   Relationships between different code
+        parts.\n    *   Direct evidence answering the USER QUESTION.\n    *   Obstacles
+        or errors encountered during exploration.\n    *   **Do NOT** use for trivial
+        actions like \"Executed ls command\". Notes form the basis of the final answer.\n*   `analyze_code_question`:
+        Usually only needed once at the start if the initial question is unclear (rarely
+        needed in the loop).\n*   `finish`: Use **ONLY** when you are confident that
+        the CURRENT NOTES contain enough information gathered through exploration
+        to comprehensively answer the original USER QUESTION. Do not finish prematurely.\n\n===
+        RESPONSE FORMATTING ===\nRespond ONLY with a valid JSON object adhering to
+        the schema below.\nDO NOT include any other text, explanations, or markdown
+        formatting (like ```json ... ```) outside of the JSON object itself.\nYour
+        entire response must be ONLY the JSON object.\n--- SCHEMA START ---\nYou must
+        format your output as a JSON value that adheres to a given \"JSON Schema\"
+        instance.\n\n\"JSON Schema\" is a declarative language that allows you to
+        annotate and validate JSON documents.\n\nFor example, the example \"JSON Schema\"
+        instance {\"properties\": {\"foo\": {\"description\": \"a list of test words\",
+        \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}}\nwould
+        match an object with one required property, \"foo\". The \"type\" property
+        specifies \"foo\" must be an \"array\", and the \"description\" property semantically
+        describes it as \"a list of test words\". The items within \"foo\" must be
+        strings.\nThus, the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted
+        instance of this example \"JSON Schema\". The object {\"properties\": {\"foo\":
+        [\"bar\", \"baz\"]}}} is not well-formatted.\n\nYour output will be parsed
+        and type-checked according to the provided schema instance, so make sure all
+        fields in your output match the schema exactly and there are no trailing commas!\n\nHere
+        is the JSON Schema instance your output must adhere to. Include the enclosing
+        markdown codeblock:\n```json\n{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"description\":\"The
+        name of the tool to use or ''finish''.\",\"enum\":[\"analyze_code_question\",\"shell_command\",\"search_code_base\",\"examine_directory\",\"search_for_examples\",\"explain_code\",\"take_notes\",\"compile_findings\",\"finish\"]},\"arguments\":{\"type\":\"object\",\"description\":\"A
+        hash of arguments for the chosen tool (string keys and values). Empty if action
+        is ''finish''. Arguments should be passed as keyword arguments.\",\"additionalProperties\":{\"type\":\"string\"}}},\"required\":[\"action\",\"arguments\"],\"additionalProperties\":false}\n```\n\n---
+        SCHEMA END ---\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:14:06 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e5c49a0ea1c7-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n{\"id\":\"gen-1744672446-K3cfx5s5ck9FygdW92rr\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672446,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"```json\\n{\\\"action\\\":\\\"search_code_base\\\",\\\"arguments\\\":{\\\"query\\\":\\\"rescue\\\"}}\\n```\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_cf18407276\",\"usage\":{\"prompt_tokens\":1802,\"completion_tokens\":20,\"total_tokens\":1822,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:14:07 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# ROLE
+        AND GOAL\nYou are a meticulous Automated Code Explorer. Your primary objective
+        is to systematically navigate and understand the codebase to gather information
+        that comprehensively answers the user''s question.\nUSER QUESTION: Task Title:
+        Research Ruby error handling\n\nTask Description:\nFind best practices for
+        error handling in Ruby\n\nSpecific Instructions for this Run:\nHow should
+        I handle errors in Ruby?\n\n# ANTI-REPETITION DIRECTIVE\nYou MUST avoid redundant
+        actions. Do NOT:\n- Examine directories already listed below.\n- Run commands
+        substantially similar to those already run.\n- Take notes covering information
+        already recorded.\n\n# CURRENT EXPLORATION STATUS\nIteration: 11/50\n\nDIRECTORIES
+        ALREADY EXAMINED (via ''examine_directory''):\n- None yet\n\nRECENT SHELL
+        COMMANDS ALREADY RUN (via ''shell_command''):\n- None yet\n\nNOTES TAKEN SO
+        FAR (Significant findings discovered):\n```\nRuby error handling is typically
+        done using the `begin`, `rescue`, `else`, and `ensure` blocks. Key best practices
+        include rescuing only specific exceptions rather than generic ones, cleaning
+        up resources in the `ensure` block, and providing meaningful error messages
+        or fallback behavior. Examples include handling file not found errors with
+        `rescue Errno::ENOENT`, handling division by zero with `rescue ZeroDivisionError`,
+        and using `ensure` to guarantee resource cleanup. It is also possible to rescue
+        multiple exception types and to raise custom errors as needed.\n---\nThe last
+        result provided three concrete Ruby error handling examples, illustrating
+        the use of begin-rescue-ensure blocks, rescuing specific exceptions, and raising/handling
+        custom exceptions. These examples reinforce best practices: rescue only specific
+        exceptions, use ensure for cleanup, and provide meaningful error messages.
+        This aligns with the previously noted best practices and provides practical
+        code samples for reference.\n```\n\nLAST TOOL RESULT (Output or error from
+        your previous action):\n```\n{status: \"success\", results: [], message: \"No
+        matches found.\"}\n```\n\nAVAILABLE TOOLS (Use these to explore and gather
+        information):\n- analyze_code_question: Break down a code-related research
+        question\n- shell_command: Execute a shell command (safely within allowed
+        directories)\n- search_code_base: Search the code base for code examples using
+        ripgrep (takes ''query: \u003cyour query here\u003e'') \n- examine_directory:
+        Examine a directory and generate a textual summary of its contents using the
+        code2prompt tool. Takes ''directory_path: \u003cpath to directory\u003e''.\n-
+        search_for_examples: Search for code examples on a topic\n- explain_code:
+        Explain how a piece of code works\n- take_notes: IMPORTANT: Document findings
+        about the codebase. Use this after discoveries to build the final report.
+        Each note should contain specific, detailed observations. Pass (note: \u003cnote)\n-
+        compile_findings: Compile research notes into structured findings\n\n=== YOUR
+        TASK ===\nBased on the USER QUESTION, CURRENT NOTES, and LAST TOOL RESULT,
+        determine the single best *next action* to progress towards answering the
+        question.\n\n=== STRATEGIC THINKING PROCESS (Follow these steps): ===\n1.  **Analyze
+        Goal:** Re-read the USER QUESTION. What specific information is still needed?\n2.  **Review
+        Context:** Examine CURRENT NOTES. What parts of the codebase have been explored?
+        What remains unknown?\n3.  **Evaluate Last Result:** Analyze the LAST TOOL
+        RESULT.\n    *   If it contains useful information (file listing, file content,
+        search results, directory summary): What key insight does it provide? Does
+        it suggest the next file/directory to examine? Should I use `take_notes` *now*
+        to record this insight before moving on?\n    *   If it was an error: Why
+        did it fail (e.g., file not found, command error)? Can I try an alternative
+        (different path, simpler command, different tool)? Should I use `take_notes`
+        to record the obstacle?\n4.  **Plan Next Step:** Decide the most logical next
+        exploration target (e.g., examine root directory, list files in `app/models`,
+        read `app/controllers/users_controller.rb`, search for `User.find`).\n5.  **Select
+        Optimal Tool:** Choose the *single tool* that directly achieves your planned
+        next step. Prioritize `take_notes` if step 3 identified key info to save *before*
+        exploring further.\n6.  **Formulate Action:** Construct the arguments for
+        the chosen tool precisely.\n\n=== TOOL USAGE GUIDELINES ===\n*   `shell_command`:
+        Your primary exploration tool. Use specific commands:\n    *   `ls -l \u003cdirectory\u003e`:
+        To list contents of a directory. Start broad (e.g., `ls -l .`) then explore
+        subdirectories.\n    *   `cat \u003cfile_path\u003e`: To read the contents
+        of a *specific* file identified via `ls` or other tools.\n    *   `grep \u003cpattern\u003e
+        \u003cfile\u003e`: For simple searches within a known file.\n    *   **AVOID**:
+        Generic commands like just `explore`. Be specific.\n*   `examine_directory`:
+        Use when you need a *summary* of *all* files in a directory, processed by
+        `code2prompt`. Useful for getting an overview of a complex area like `app/services`
+        *before* diving into individual files with `cat`. More costly than `ls`.\n*   `search_code_base`:
+        Use *only* when you need to find specific code snippets, function calls, or
+        keywords *across the entire codebase* (uses `rg`). Less useful for general
+        structure exploration than `ls` or `examine_directory`.\n*   `explain_code`:
+        Use *sparingly* only for short, specific code snippets already retrieved via
+        `cat` or `search_code_base` that you cannot understand from context.\n*   `take_notes`:
+        **CRITICAL**. Use frequently to record **significant findings** directly contributing
+        to the answer:\n    *   Purpose of a directory or important file.\n    *   Key
+        logic or data flow identified.\n    *   Relationships between different code
+        parts.\n    *   Direct evidence answering the USER QUESTION.\n    *   Obstacles
+        or errors encountered during exploration.\n    *   **Do NOT** use for trivial
+        actions like \"Executed ls command\". Notes form the basis of the final answer.\n*   `analyze_code_question`:
+        Usually only needed once at the start if the initial question is unclear (rarely
+        needed in the loop).\n*   `finish`: Use **ONLY** when you are confident that
+        the CURRENT NOTES contain enough information gathered through exploration
+        to comprehensively answer the original USER QUESTION. Do not finish prematurely.\n\n===
+        RESPONSE FORMATTING ===\nRespond ONLY with a valid JSON object adhering to
+        the schema below.\nDO NOT include any other text, explanations, or markdown
+        formatting (like ```json ... ```) outside of the JSON object itself.\nYour
+        entire response must be ONLY the JSON object.\n--- SCHEMA START ---\nYou must
+        format your output as a JSON value that adheres to a given \"JSON Schema\"
+        instance.\n\n\"JSON Schema\" is a declarative language that allows you to
+        annotate and validate JSON documents.\n\nFor example, the example \"JSON Schema\"
+        instance {\"properties\": {\"foo\": {\"description\": \"a list of test words\",
+        \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}}\nwould
+        match an object with one required property, \"foo\". The \"type\" property
+        specifies \"foo\" must be an \"array\", and the \"description\" property semantically
+        describes it as \"a list of test words\". The items within \"foo\" must be
+        strings.\nThus, the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted
+        instance of this example \"JSON Schema\". The object {\"properties\": {\"foo\":
+        [\"bar\", \"baz\"]}}} is not well-formatted.\n\nYour output will be parsed
+        and type-checked according to the provided schema instance, so make sure all
+        fields in your output match the schema exactly and there are no trailing commas!\n\nHere
+        is the JSON Schema instance your output must adhere to. Include the enclosing
+        markdown codeblock:\n```json\n{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"description\":\"The
+        name of the tool to use or ''finish''.\",\"enum\":[\"analyze_code_question\",\"shell_command\",\"search_code_base\",\"examine_directory\",\"search_for_examples\",\"explain_code\",\"take_notes\",\"compile_findings\",\"finish\"]},\"arguments\":{\"type\":\"object\",\"description\":\"A
+        hash of arguments for the chosen tool (string keys and values). Empty if action
+        is ''finish''. Arguments should be passed as keyword arguments.\",\"additionalProperties\":{\"type\":\"string\"}}},\"required\":[\"action\",\"arguments\"],\"additionalProperties\":false}\n```\n\n---
+        SCHEMA END ---\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:14:07 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e5cbf873ad0b-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n{\"id\":\"gen-1744672447-guHhLoslRcxCn4g3ZpD9\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672447,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"```json\\n{\\\"action\\\":\\\"finish\\\",\\\"arguments\\\":{}}\\n```\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_cf18407276\",\"usage\":{\"prompt_tokens\":1797,\"completion_tokens\":14,\"total_tokens\":1811,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:14:08 GMT
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"# CODE
+        RESEARCH SYNTHESIS TASK\n\nSynthesize these research notes into a comprehensive
+        technical documentation about:\nTOPIC: \"Research Ruby error handling\"\n\n#
+        SOURCE NOTES\nNote 1:\nRuby error handling is typically done using the `begin`,
+        `rescue`, `else`, and `ensure` blocks. Key best practices include rescuing
+        only specific exceptions rather than generic ones, cleaning up resources in
+        the `ensure` block, and providing meaningful error messages or fallback behavior.
+        Examples include handling file not found errors with `rescue Errno::ENOENT`,
+        handling division by zero with `rescue ZeroDivisionError`, and using `ensure`
+        to guarantee resource cleanup. It is also possible to rescue multiple exception
+        types and to raise custom errors as needed.\n\n---\n\nNote 2:\nThe last result
+        provided three concrete Ruby error handling examples, illustrating the use
+        of begin-rescue-ensure blocks, rescuing specific exceptions, and raising/handling
+        custom exceptions. These examples reinforce best practices: rescue only specific
+        exceptions, use ensure for cleanup, and provide meaningful error messages.
+        This aligns with the previously noted best practices and provides practical
+        code samples for reference.\n\n# EXPECTED OUTPUT FORMAT\nCreate a professional
+        technical document with these sections:\n\n## 1. EXECUTIVE SUMMARY\n- Concise
+        overview of findings (1-2 paragraphs)\n- Key insights and recommendations\n\n##
+        2. CODEBASE ARCHITECTURE\n- Overall structure and organization\n- Key components
+        and their relationships\n- Design patterns and architectural principles identified\n\n##
+        3. IMPLEMENTATION DETAILS\n- Important classes, methods, and functions\n-
+        Workflow and control flow\n- Notable algorithms or techniques\n\n## 4. CODE
+        QUALITY ASSESSMENT\n- Strengths of the implementation\n- Potential issues
+        or improvement areas\n- Code smells or anti-patterns observed\n\n## 5. RECOMMENDATIONS\n-
+        Specific actionable recommendations\n- Refactoring opportunities\n- Best practices
+        that could be applied\n\nUse clear, technical language with concrete examples
+        from the codebase.\nStructure information hierarchically with proper markdown
+        headings and formatting.\n"}],"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+      Authorization:
+      - Bearer <OPEN_ROUTER_API_KEY>
+      Http-Referer:
+      - https://localhost:3000
+      X-Title:
+      - DoubleAgent
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 14 Apr 2025 23:14:08 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Origin:
+      - "*"
+      X-Clerk-Auth-Message:
+      - Invalid JWT form. A JWT consists of three parts separated by dots. (reason=token-invalid,
+        token-carrier=header)
+      X-Clerk-Auth-Reason:
+      - token-invalid
+      X-Clerk-Auth-Status:
+      - signed-out
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9306e5d1cd78a22d-MSP
+    body:
+      encoding: ASCII-8BIT
+      string: "\n         \n\n         \n\n         \n\n         \n\n         \n\n
+        \        \n\n         \n\n         \n\n         \n\n         \n\n         \n\n
+        \        \n\n         \n\n         \n\n         \n\n         \n\n         \n\n
+        \        \n\n         \n\n         \n\n         \n\n         \n\n         \n\n
+        \        \n\n         \n\n         \n\n         \n\n         \n{\"id\":\"gen-1744672448-i1dav4uVkSIgqtFUaWlB\",\"provider\":\"OpenAI\",\"model\":\"openai/gpt-4.1\",\"object\":\"chat.completion\",\"created\":1744672448,\"choices\":[{\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"#
+        Research Ruby Error Handling\\n\\n## 1. EXECUTIVE SUMMARY\\n\\nRuby's error
+        handling system is built around the `begin`, `rescue`, `else`, and `ensure`
+        constructs, providing a robust mechanism for managing exceptions and ensuring
+        resource cleanup. The research highlights that best practices in Ruby error
+        handling focus on rescuing only specific exceptions, using the `ensure` block
+        for cleanup, and providing meaningful error messages or fallback behaviors.
+        Custom exceptions can be defined and raised as needed, allowing for granular
+        control over error flows.\\n\\nKey insights include the importance of specificity
+        in exception handling to avoid masking bugs, the use of `ensure` to guarantee
+        resource deallocation, and the value of clear, actionable error messages.
+        Adhering to these principles results in more maintainable, reliable, and predictable
+        Ruby applications.\\n\\n---\\n\\n## 2. CODEBASE ARCHITECTURE\\n\\nRuby error
+        handling is structured around the following core components:\\n\\n- **Exception
+        Classes**: Ruby provides a hierarchy of exception classes (e.g., `StandardError`,
+        `Errno::ENOENT`, `ZeroDivisionError`). Custom exceptions can be defined by
+        subclassing `StandardError`.\\n- **Error Handling Blocks**: The `begin` block
+        encapsulates code that may raise exceptions. The `rescue` block(s) handle
+        specific exceptions. The optional `else` block runs if no exceptions occur,
+        and the `ensure` block always runs, regardless of exceptions.\\n- **Control
+        Flow**: Error handling is woven into the normal control flow, allowing for
+        clean separation of error management and business logic.\\n\\n**Design Patterns
+        and Principles:**\\n- **Single Responsibility Principle**: Error handling
+        is separated from business logic.\\n- **Fail Fast**: By rescuing only specific
+        exceptions, the code avoids hiding unexpected errors.\\n- **Resource Management**:
+        The `ensure` block is used for deterministic cleanup, similar to `finally`
+        in other languages.\\n\\n---\\n\\n## 3. IMPLEMENTATION DETAILS\\n\\n### Important
+        Classes, Methods, and Functions\\n\\n- **Standard Exception Handling Syntax:**\\n
+        \   ```ruby\\n    begin\\n      # risky operation\\n    rescue SpecificException
+        => e\\n      # handle error\\n    else\\n      # runs if no exception\\n    ensure\\n
+        \     # always runs (cleanup)\\n    end\\n    ```\\n\\n- **Rescuing Specific
+        Exceptions:**\\n    ```ruby\\n    begin\\n      File.read('nonexistent.txt')\\n
+        \   rescue Errno::ENOENT => e\\n      puts \\\"File not found: #{e.message}\\\"\\n
+        \   end\\n    ```\\n\\n- **Handling Multiple Exceptions:**\\n    ```ruby\\n
+        \   begin\\n      # risky operations\\n    rescue Errno::ENOENT, ZeroDivisionError
+        => e\\n      puts \\\"Handled error: #{e.class} - #{e.message}\\\"\\n    end\\n
+        \   ```\\n\\n- **Custom Exception Classes:**\\n    ```ruby\\n    class MyCustomError
+        < StandardError; end\\n\\n    begin\\n      raise MyCustomError, \\\"Something
+        went wrong\\\"\\n    rescue MyCustomError => e\\n      puts e.message\\n    end\\n
+        \   ```\\n\\n- **Resource Cleanup with `ensure`:**\\n    ```ruby\\n    file
+        = File.open('data.txt', 'r')\\n    begin\\n      # process file\\n    rescue
+        => e\\n      puts \\\"Error: #{e.message}\\\"\\n    ensure\\n      file.close
+        if file\\n    end\\n    ```\\n\\n### Workflow and Control Flow\\n\\n1. **Begin
+        Block**: Encapsulates code that may fail.\\n2. **Rescue Block(s)**: Catches
+        and handles specific exceptions.\\n3. **Else Block**: Executes if no exceptions
+        are raised.\\n4. **Ensure Block**: Executes regardless of exceptions, typically
+        for cleanup.\\n\\n### Notable Techniques\\n\\n- **Selective Exception Handling**:
+        Only handle known, expected errors.\\n- **Custom Exception Types**: For domain-specific
+        error signaling.\\n- **Guaranteed Cleanup**: Using `ensure` for resource management.\\n\\n---\\n\\n##
+        4. CODE QUALITY ASSESSMENT\\n\\n### Strengths\\n\\n- **Specificity in Exception
+        Handling**: Reduces risk of masking bugs.\\n- **Resource Safety**: `ensure`
+        guarantees cleanup, preventing resource leaks.\\n- **Clear Error Messaging**:
+        Provides actionable information for debugging and user feedback.\\n- **Extensibility**:
+        Custom exceptions enable more granular error management.\\n\\n### Potential
+        Issues / Improvement Areas\\n\\n- **Overly Broad Rescue**: Using `rescue`
+        without specifying exception types can hide programming errors and make debugging
+        difficult.\\n- **Missing Cleanup**: Omitting `ensure` may result in resource
+        leaks.\\n- **Uninformative Error Messages**: Failing to provide context in
+        error messages can hinder troubleshooting.\\n\\n### Code Smells / Anti-Patterns\\n\\n-
+        **Rescuing `Exception` or Omitting Exception Type**: Catches system-level
+        errors (like `NoMemoryError`), which should generally not be handled.\\n-
+        **Empty Rescue Blocks**: Swallow errors without logging or handling.\\n- **Resource
+        Management Outside `ensure`**: Risks leaving resources open or in inconsistent
+        states.\\n\\n---\\n\\n## 5. RECOMMENDATIONS\\n\\n### Actionable Recommendations\\n\\n1.
+        **Rescue Specific Exceptions Only**: Always specify the exception class in
+        `rescue` clauses.\\n2. **Use `ensure` for Cleanup**: Place all resource deallocation
+        and cleanup logic in `ensure` blocks.\\n3. **Provide Meaningful Error Messages**:
+        Include context and actionable information in error messages.\\n4. **Define
+        Custom Exceptions**: For domain-specific error handling, subclass `StandardError`.\\n5.
+        **Log or Handle All Rescued Errors**: Never leave rescue blocks empty.\\n\\n###
+        Refactoring Opportunities\\n\\n- Refactor any generic `rescue` blocks to handle
+        only specific exceptions.\\n- Move resource cleanup code into `ensure` blocks.\\n-
+        Replace ambiguous error messages with detailed, context-rich ones.\\n\\n###
+        Best Practices\\n\\n- **Fail Fast**: Let unexpected errors propagate to avoid
+        hiding bugs.\\n- **Test Error Paths**: Write tests for exception-raising scenarios.\\n-
+        **Document Custom Exceptions**: Clearly document the purpose and usage of
+        any custom exception classes.\\n\\nBy following these recommendations, Ruby
+        codebases will be more robust, maintainable, and easier to debug, resulting
+        in higher overall code quality and reliability.\",\"refusal\":null,\"reasoning\":null}}],\"system_fingerprint\":\"fp_ac00b0000c\",\"usage\":{\"prompt_tokens\":425,\"completion_tokens\":1268,\"total_tokens\":1693,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}"
+  recorded_at: Mon, 14 Apr 2025 23:14:20 GMT
+recorded_with: VCR 6.3.1

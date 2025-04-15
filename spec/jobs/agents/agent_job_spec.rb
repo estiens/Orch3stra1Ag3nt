@@ -25,7 +25,7 @@ RSpec.describe Agents::AgentJob, type: :job do
       invalid_class = "String"
       expect {
         described_class.new.perform(invalid_class, agent_prompt, options)
-      }.to raise_error(ArgumentError, "agent_class must inherit from Regent::Agent")
+      }.to raise_error(ArgumentError, "agent_class must inherit from BaseAgent")
     end
 
     it "activates a pending task" do

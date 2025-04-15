@@ -11,328 +11,338 @@ class SummarizerAgent < BaseAgent
     3
   end
 
-  # Tools that the summarizer can use
-  tool :summarize_text, "Summarize a piece of text, condensing it while preserving key information"
-  tool :extract_key_points, "Extract the most important points from text"
-  tool :combine_summaries, "Combine multiple summaries into a coherent whole"
-  tool :generate_insights, "Generate insights and observations from the summarized content"
-  tool :compile_final_summary, "Compile all information into a final, structured summary"
-
-  # Tool implementation: Summarize a piece of text
-  def summarize_text(text, max_length = "medium")
-    # Define the length constraints based on the max_length parameter
-    length_guide = case max_length.downcase
-    when "short"
-                    "Keep the summary very concise, around 10-15% of the original length."
-    when "medium"
-                    "Create a balanced summary, around 20-30% of the original length."
-    when "long"
-                    "Create a comprehensive summary, around 30-40% of the original length."
-    else
-                    "Create a balanced summary, around 20-30% of the original length."
-    end
-
-    # Create a prompt for the LLM to summarize the text
-    prompt = <<~PROMPT
-      Please summarize the following text, preserving all key information while reducing length:
-
-      TEXT TO SUMMARIZE:
-      #{text}
-
-      INSTRUCTIONS:
-      1. #{length_guide}
-      2. Preserve all essential information, facts, and arguments
-      3. Maintain the original tone and perspective
-      4. Eliminate redundancies and less important details
-      5. Ensure the summary could stand alone as a complete understanding of the original
-
-      FORMAT:
-      [Provide a coherent, flowing summary in paragraph form]
-    PROMPT
-
-    # Use a thinking model for comprehension and synthesis
-    thinking_model = Regent::LLM.new(REGENT_MODEL_DEFAULTS[:thinking], temperature: 0.3)
-    result = thinking_model.invoke(prompt)
-
-    # Log this LLM call
-    if agent_activity
-      agent_activity.llm_calls.create!(
-        provider: "openrouter",
-        model: REGENT_MODEL_DEFAULTS[:thinking],
-        prompt: prompt,
-        response: result.content,
-        tokens_used: (result.input_tokens || 0) + (result.output_tokens || 0)
-      )
-    end
-
-    # Store summary in task metadata if available
-    if task
-      summaries = task.metadata&.dig("summaries") || []
-      task.update!(
-        metadata: (task.metadata || {}).merge({
-          "summaries" => summaries + [ result.content ]
-        })
-      )
-    end
-
-    # Return the summary
-    result.content
+  # --- Tools ---
+  tool :summarize_texts, "Summarize a text or an array of texts, condensing it while preserving key information (args: text: <string|array>, max_length: <short|medium|long default(medium))" do |text:, max_length: "medium"|
+    summarize_text(text, max_length)
   end
 
-  # Tool implementation: Extract key points
-  def extract_key_points(text)
-    # Create a prompt for the LLM to extract key points
-    prompt = <<~PROMPT
-      Please extract the most important key points from the following text:
+  tool :extract_key_points, "Extract the most important points from text" do |text|
+    extract_key_points(text)
+  end
+
+  tool :combine_summaries, "Combine multiple summaries (stored in task metadata) into a coherent whole" do
+    combine_summaries
+  end
+
+  tool :generate_insights, "Generate insights and observations from text or the combined summary" do |text = nil|
+    generate_insights(text)
+  end
+
+  tool :compile_final_summary, "Compile all stored information (summaries, points, insights) into a final, structured summary" do
+    compile_final_summary
+  end
+  # --- End Tools ---
+
+  # --- Core Logic ---
+  def run(input = nil) # Input should contain the text/details to summarize
+    before_run(input)
+    # Trust the input from AgentJob, which should now contain task details/instructions
+    text_to_process = input.present? ? input : ""
+
+    unless task
+      Rails.logger.warn "[SummarizerAgent] Running without an associated task record. Metadata persistence will be skipped."
+    end
+
+    if text_to_process.blank?
+      result = "SummarizerAgent Error: No input text provided."
+      Rails.logger.error result
+      @session_data[:output] = result
+      after_run(result)
+      return result
+    end
+
+    result_message = "Summarization run completed."
+    begin
+      Rails.logger.info "[SummarizerAgent-#{task&.id || 'no-task'}] Starting summarization..."
+
+      # Step 1: Initial Summary
+      summary = execute_tool(:summarize_text, text_to_process)
+      # Note: summarize_text tool already updates task metadata["summaries"]
+
+      # Step 2: Extract Key Points
+      key_points = execute_tool(:extract_key_points, text_to_process)
+      # Note: extract_key_points tool already updates task metadata["key_points"]
+
+      # Step 3: Generate Insights (from the summary)
+      insights = execute_tool(:generate_insights, summary)
+      # Note: generate_insights tool already updates task metadata["insights"]
+
+      # Step 4: Compile Final Summary
+      # This tool reads from metadata populated by previous steps
+      final_summary = execute_tool(:compile_final_summary)
+      # Note: compile_final_summary tool updates task.result and marks complete
+
+      result_message = final_summary
+
+    rescue => e
+      handle_run_error(e)
+      raise
+    end
+
+    @session_data[:output] = result_message
+    after_run(result_message)
+    result_message
+  end
+  # --- End Core Logic ---
+
+  # --- Tool Implementations ---
+  def summarize_text(text, max_length = "medium")
+    length_guide = case max_length.downcase
+    when "short" then "around 10-15% of original length."
+    when "medium" then "around 20-30% of original length."
+    when "long" then "around 30-40% of original length."
+    else "around 20-30% of original length."
+    end
+
+    prompt_content = <<~PROMPT
+      Summarize the following text, preserving key information:
 
       TEXT:
       #{text}
 
       INSTRUCTIONS:
-      1. Identify the 5-10 most significant facts, claims, or arguments
-      2. Present each point as a concise bullet point
-      3. Use the original wording where possible
-      4. Include any critical numbers, statistics, or quotes
-      5. Ensure the key points represent a complete picture of the most important content
+      - #{length_guide}
+      - Preserve essential info/facts/arguments.
+      - Maintain original tone/perspective.
+      - Eliminate redundancies.
+      - Ensure summary can stand alone.
+
+      FORMAT:
+      [Provide a coherent, flowing summary in paragraph form]
+    PROMPT
+
+    begin
+      # Use agent's LLM
+      response = @llm.chat(messages: [ { role: "user", content: prompt_content } ])
+      summary_content = response.chat_completion # or response.content
+
+      # Manually log the LLM call
+      log_direct_llm_call(prompt_content, response)
+
+      # Store summary in task metadata (still relevant for this agent's state)
+      if task
+        summaries = task.metadata&.dig("summaries") || []
+        task.update!(metadata: (task.metadata || {}).merge({ "summaries" => summaries + [ summary_content ] }))
+      end
+
+      summary_content
+    rescue => e
+      Rails.logger.error "[SummarizerAgent] LLM Error in summarize_text: #{e.message}"
+      "Error summarizing text: #{e.message}"
+    end
+  end
+
+  def extract_key_points(text)
+    prompt_content = <<~PROMPT
+      Extract the 5-10 most important key points from the following text:
+
+      TEXT:
+      #{text}
+
+      INSTRUCTIONS:
+      - Present each as a concise bullet point.
+      - Use original wording where possible.
+      - Include critical numbers/stats/quotes.
 
       FORMAT:
       KEY POINTS:
       - [Point 1]
       - [Point 2]
-      - [Point 3]
-      - etc.
+      ...
     PROMPT
 
-    # Use a fast model for extraction
-    fast_model = Regent::LLM.new(REGENT_MODEL_DEFAULTS[:fast], temperature: 0.2)
-    result = fast_model.invoke(prompt)
+    begin
+      # Use agent's LLM (can use default, or specify fast if needed)
+      response = @llm.chat(messages: [ { role: "user", content: prompt_content } ])
+      key_points_content = response.chat_completion # or response.content
 
-    # Log this LLM call
-    if agent_activity
-      agent_activity.llm_calls.create!(
-        provider: "openrouter",
-        model: REGENT_MODEL_DEFAULTS[:fast],
-        prompt: prompt,
-        response: result.content,
-        tokens_used: (result.input_tokens || 0) + (result.output_tokens || 0)
-      )
+      # Manually log the LLM call
+      log_direct_llm_call(prompt_content, response)
+
+      # Store key points in task metadata
+      if task
+        key_points = task.metadata&.dig("key_points") || []
+        # Consider parsing the bullet points if needed downstream
+        task.update!(metadata: (task.metadata || {}).merge({ "key_points" => key_points + [ key_points_content ] }))
+      end
+
+      key_points_content
+    rescue => e
+      Rails.logger.error "[SummarizerAgent] LLM Error in extract_key_points: #{e.message}"
+      "Error extracting key points: #{e.message}"
     end
-
-    # Store key points in task metadata if available
-    if task
-      key_points = task.metadata&.dig("key_points") || []
-      task.update!(
-        metadata: (task.metadata || {}).merge({
-          "key_points" => key_points + [ result.content ]
-        })
-      )
-    end
-
-    # Return the key points
-    result.content
   end
 
-  # Tool implementation: Combine summaries
   def combine_summaries
-    return "Error: No task available to access summaries" unless task
-
-    # Get all the summaries we've collected
-    summaries = task.metadata&.dig("summaries") || []
-
-    if summaries.empty?
-      return "No summaries found to combine. Use summarize_text tool first."
+    unless task
+      return "Error: Cannot combine summaries - Agent not associated with a task."
     end
 
-    # Format the summaries for the prompt
-    formatted_summaries = summaries.map.with_index { |summary, i| "Summary #{i+1}:\n#{summary}" }.join("\n\n")
+    summaries = task.metadata&.dig("summaries") || []
+    if summaries.empty?
+      return "No summaries found in task metadata to combine. Use summarize_text tool first."
+    end
 
-    # Create a prompt for the LLM to combine the summaries
-    prompt = <<~PROMPT
-      I have multiple summaries of related content that need to be combined into a single coherent summary:
+    formatted_summaries = summaries.map.with_index { |summary, i| "Summary #{i + 1}:\n#{summary}" }.join("\n\n---\n\n")
+
+    prompt_content = <<~PROMPT
+      Combine these summaries into a single coherent summary:
 
       #{formatted_summaries}
 
       INSTRUCTIONS:
-      1. Integrate all these summaries into one comprehensive summary
-      2. Eliminate redundancies across the summaries
-      3. Resolve any contradictions by noting different perspectives
-      4. Organize the information in a logical flow
-      5. Ensure all key information from each summary is preserved
+      - Integrate all summaries comprehensively.
+      - Eliminate redundancies.
+      - Resolve contradictions or note different perspectives.
+      - Organize logically.
+      - Preserve all key information.
 
       FORMAT:
       [Provide a single, coherent combined summary in paragraph form]
     PROMPT
 
-    # Use a thinking model for synthesis
-    thinking_model = Regent::LLM.new(REGENT_MODEL_DEFAULTS[:thinking], temperature: 0.3)
-    result = thinking_model.invoke(prompt)
+    begin
+      # Use agent's LLM
+      response = @llm.chat(messages: [ { role: "user", content: prompt_content } ])
+      combined_summary_content = response.chat_completion # or response.content
 
-    # Log this LLM call
-    if agent_activity
-      agent_activity.llm_calls.create!(
-        provider: "openrouter",
-        model: REGENT_MODEL_DEFAULTS[:thinking],
-        prompt: prompt,
-        response: result.content,
-        tokens_used: (result.input_tokens || 0) + (result.output_tokens || 0)
-      )
+      # Manually log the LLM call
+      log_direct_llm_call(prompt_content, response)
+
+      # Store combined summary in task metadata
+      task.update!(metadata: (task.metadata || {}).merge({ "combined_summary" => combined_summary_content }))
+
+      combined_summary_content
+    rescue => e
+      Rails.logger.error "[SummarizerAgent] LLM Error in combine_summaries: #{e.message}"
+      "Error combining summaries: #{e.message}"
     end
-
-    # Store combined summary in task metadata
-    task.update!(
-      metadata: (task.metadata || {}).merge({
-        "combined_summary" => result.content
-      })
-    )
-
-    # Return the combined summary
-    result.content
   end
 
-  # Tool implementation: Generate insights
   def generate_insights(text = nil)
-    return "Error: No task available to access content" unless task
+    unless task
+      return "Error: Cannot generate insights - Agent not associated with a task."
+    end
 
-    # Use provided text or try to get the combined summary from metadata
     content = text || task.metadata&.dig("combined_summary") || task.description
+    if content.blank?
+       return "Error: No content available (text parameter, combined_summary metadata, or task description) to generate insights from."
+    end
 
-    # Create a prompt for the LLM to generate insights
-    prompt = <<~PROMPT
-      Based on the following content, please generate key insights, observations, and implications:
+    prompt_content = <<~PROMPT
+      Generate key insights, observations, and implications from the following content:
 
       CONTENT:
       #{content}
 
       INSTRUCTIONS:
-      1. Identify 3-5 significant insights or patterns in the content
-      2. Note any implications or conclusions that can be drawn
-      3. Highlight any surprising or counter-intuitive findings
-      4. Consider different perspectives on the information
-      5. Suggest potential applications or actions based on these insights
+      - Identify 3-5 significant insights/patterns.
+      - Note implications/conclusions.
+      - Highlight surprising findings.
+      - Consider different perspectives.
+      - Suggest potential applications/actions.
 
       FORMAT:
       KEY INSIGHTS:
-      1. [First insight with brief explanation]
-      2. [Second insight with brief explanation]
-      3. [Third insight with brief explanation]
+      1. [Insight 1]
+      2. [Insight 2]
 
       IMPLICATIONS:
       - [Implication 1]
-      - [Implication 2]
-      - [Implication 3]
+      ...
     PROMPT
 
-    # Use a thinking model for insight generation
-    thinking_model = Regent::LLM.new(REGENT_MODEL_DEFAULTS[:thinking], temperature: 0.4)
-    result = thinking_model.invoke(prompt)
+    begin
+      # Use agent's LLM
+      response = @llm.chat(messages: [ { role: "user", content: prompt_content } ])
+      insights_content = response.chat_completion # or response.content
 
-    # Log this LLM call
-    if agent_activity
-      agent_activity.llm_calls.create!(
-        provider: "openrouter",
-        model: REGENT_MODEL_DEFAULTS[:thinking],
-        prompt: prompt,
-        response: result.content,
-        tokens_used: (result.input_tokens || 0) + (result.output_tokens || 0)
-      )
+      # Manually log the LLM call
+      log_direct_llm_call(prompt_content, response)
+
+      # Store insights in task metadata
+      task.update!(metadata: (task.metadata || {}).merge({ "insights" => insights_content }))
+
+      insights_content
+    rescue => e
+      Rails.logger.error "[SummarizerAgent] LLM Error in generate_insights: #{e.message}"
+      "Error generating insights: #{e.message}"
     end
-
-    # Store insights in task metadata
-    task.update!(
-      metadata: (task.metadata || {}).merge({
-        "insights" => result.content
-      })
-    )
-
-    # Return the insights
-    result.content
   end
 
-  # Tool implementation: Compile final summary
   def compile_final_summary
-    return "Error: No task available to access content" unless task
-
-    # Get all the components we've generated
-    combined_summary = task.metadata&.dig("combined_summary") || ""
-    key_points = task.metadata&.dig("key_points") || []
-    insights = task.metadata&.dig("insights") || ""
-
-    # Format the components
-    formatted_key_points = key_points.join("\n\n")
-
-    # Create a composite of all our work or use what we have
-    if combined_summary.present? && insights.present?
-      base_content = "COMBINED SUMMARY:\n#{combined_summary}\n\nKEY POINTS:\n#{formatted_key_points}\n\nINSIGHTS:\n#{insights}"
-    elsif combined_summary.present?
-      base_content = "COMBINED SUMMARY:\n#{combined_summary}\n\nKEY POINTS:\n#{formatted_key_points}"
-    else
-      return "Insufficient content to compile a final summary. Please use the other tools first."
+    unless task
+      return "Error: Cannot compile summary - Agent not associated with a task."
     end
 
-    # Create a prompt for the LLM to compile the final summary
-    prompt = <<~PROMPT
-      Please compile a comprehensive final summary using all the component parts:
+    combined_summary = task.metadata&.dig("combined_summary") || ""
+    # Assuming key_points are stored as an array of strings
+    key_points_texts = task.metadata&.dig("key_points") || []
+    formatted_key_points = key_points_texts.join("\n\n") # Combine multiple extractions
+    insights = task.metadata&.dig("insights") || ""
+
+    base_content = ""
+    base_content += "COMBINED SUMMARY:\n#{combined_summary}\n\n" if combined_summary.present?
+    base_content += "KEY POINTS:\n#{formatted_key_points}\n\n" if formatted_key_points.present?
+    base_content += "INSIGHTS:\n#{insights}\n\n" if insights.present?
+
+    if base_content.blank?
+      return "Insufficient content found in task metadata (combined_summary, key_points, insights) to compile a final summary. Please use other tools first."
+    end
+
+    prompt_content = <<~PROMPT
+      Compile a comprehensive final summary using the following component parts:
 
       #{base_content}
 
       INSTRUCTIONS:
-      1. Create a structured final summary that integrates all of the above information
-      2. Begin with an executive summary (1-2 paragraphs)
-      3. Include all key points organized by theme or topic
-      4. Incorporate important insights and implications
-      5. Conclude with recommendations or next steps if applicable
+      - Create a structured final summary integrating all information.
+      - Begin with an executive summary (1-2 paragraphs).
+      - Include key points organized by theme.
+      - Incorporate important insights/implications.
+      - Conclude with recommendations if applicable.
 
-      FORMAT YOUR RESPONSE AS:
-
+      FORMAT:
       # FINAL SUMMARY: #{task.title}
 
       ## Executive Summary
-      [Concise overview of the entire content]
+      [Concise overview]
 
       ## Key Findings
-      [Organized presentation of all key information]
+      [Organized key points/info]
 
       ## Insights & Implications
-      [Analysis of what the findings mean]
+      [Analysis and meaning]
 
-      ## Conclusions
-      [Final thoughts and recommendations]
+      ## Conclusion
+      [Final thoughts/recommendations]
     PROMPT
 
-    # Use a thinking model for final compilation
-    thinking_model = Regent::LLM.new(REGENT_MODEL_DEFAULTS[:thinking], temperature: 0.3)
-    result = thinking_model.invoke(prompt)
+    begin
+      # Use agent's LLM
+      response = @llm.chat(messages: [ { role: "user", content: prompt_content } ])
+      final_summary_content = response.chat_completion # or response.content
 
-    # Log this LLM call
-    if agent_activity
-      agent_activity.llm_calls.create!(
-        provider: "openrouter",
-        model: REGENT_MODEL_DEFAULTS[:thinking],
-        prompt: prompt,
-        response: result.content,
-        tokens_used: (result.input_tokens || 0) + (result.output_tokens || 0)
-      )
-    end
+      # Manually log the LLM call
+      log_direct_llm_call(prompt_content, response)
 
-    # Store the final summary in the task result
-    task.update!(result: result.content)
+      # Store the final summary in the task result
+      task.update!(result: final_summary_content)
+      task.complete! if task.may_complete?
 
-    # Mark task as complete if possible
-    if task.may_complete?
-      task.complete!
+      # Publish completion event if it's a subtask
+      if task.parent_id
+        Event.publish(
+          "research_subtask_completed", # Or a generic subtask_completed?
+          { subtask_id: task.id, parent_id: task.parent_id, result: final_summary_content }
+        )
+      end
 
-      # Publish completion event
-      Event.publish(
-        "research_subtask_completed",
-        {
-          subtask_id: task.id,
-          result: result.content
-        }
-      )
-
-      "Final summary compiled and task marked as complete"
-    else
-      "Final summary compiled but task could not be marked complete from its current state"
+      final_summary_content
+    rescue => e
+      Rails.logger.error "[SummarizerAgent] LLM Error in compile_final_summary: #{e.message}"
+      "Error compiling final summary: #{e.message}"
     end
   end
+  # --- End Tool Implementations ---
 end

@@ -1,0 +1,163 @@
+<div class="container mx-auto px-4 py-8">
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+      <div class="px-6 py-5 border-b border-gray-200">
+        <div class="flex justify-between items-center">
+          <h1 class="text-2xl font-bold text-gray-900"><%= @task.title %></h1>
+          <%= status_badge(@task.state) %>
+        </div>
+      </div>
+      
+      <div class="px-6 py-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div>
+            <p class="text-sm text-gray-500">Type</p>
+            <p class="font-medium"><%= @task.task_type.humanize %></p>
+          </div>
+          
+          <% if @task.project %>
+            <div>
+              <p class="text-sm text-gray-500">Project</p>
+              <p class="font-medium">
+                <%= link_to @task.project.name, @task.project, class: "text-indigo-600 hover:text-indigo-900" %>
+              </p>
+            </div>
+          <% end %>
+          
+          <div>
+            <p class="text-sm text-gray-500">Created</p>
+            <p class="font-medium"><%= time_ago_in_words(@task.created_at) %> ago</p>
+          </div>
+          
+          <% if @task.parent %>
+            <div>
+              <p class="text-sm text-gray-500">Parent Task</p>
+              <p class="font-medium">
+                <%= link_to @task.parent.title, @task.parent, class: "text-indigo-600 hover:text-indigo-900" %>
+              </p>
+            </div>
+          <% end %>
+        </div>
+  
+        <% if @task.description.present? %>
+          <div class="mb-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-2">Description</h2>
+            <div class="bg-gray-50 rounded-md p-4 prose prose-sm max-w-none">
+              <%= simple_format(@task.description) %>
+            </div>
+          </div>
+        <% end %>
+        
+        <% if @task.metadata.present? %>
+          <div class="mb-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-2">Metadata</h2>
+            <div class="bg-gray-50 rounded-md p-4 overflow-x-auto">
+              <pre class="text-sm text-gray-800"><%= JSON.pretty_generate(@task.metadata) %></pre>
+            </div>
+          </div>
+        <% end %>
+        
+        <% llm_stats = @task.llm_call_stats %>
+        <% if llm_stats[:count] > 0 %>
+          <div class="mb-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-2">LLM Usage</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="bg-indigo-50 p-4 rounded text-center">
+                <div class="text-xl font-bold text-indigo-700"><%= llm_stats[:count] %></div>
+                <div class="text-sm text-gray-600">Total Calls</div>
+              </div>
+              
+              <div class="bg-indigo-50 p-4 rounded text-center">
+                <div class="text-xl font-bold text-indigo-700">$<%= sprintf('%.4f', llm_stats[:total_cost]) %></div>
+                <div class="text-sm text-gray-600">Total Cost</div>
+              </div>
+              
+              <div class="bg-indigo-50 p-4 rounded text-center">
+                <div class="text-xl font-bold text-indigo-700"><%= number_to_human(llm_stats[:total_tokens]) %></div>
+                <div class="text-sm text-gray-600">Total Tokens</div>
+              </div>
+              
+              <div class="bg-indigo-50 p-4 rounded text-center">
+                <div class="text-xl font-bold text-indigo-700"><%= llm_stats[:models].keys.first&.split('/')&.last || 'N/A' %></div>
+                <div class="text-sm text-gray-600">Primary Model</div>
+              </div>
+            </div>
+          </div>
+        <% end %>
+        
+        <div class="flex flex-wrap gap-3 border-t border-gray-200 pt-5">
+          <% if @task.pending? %>
+            <%= button_to "Start Task", activate_task_path(@task), method: :post, 
+                class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" %>
+          <% elsif @task.active? %>
+            <%= button_to "Pause Task", pause_task_path(@task), method: :post, 
+                class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500" %>
+          <% elsif @task.paused? %>
+            <%= button_to "Resume Task", resume_task_path(@task), method: :post, 
+                class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" %>
+          <% end %>
+          
+          <%= link_to "Edit Task", edit_task_path(@task), 
+              class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+          
+          <%= link_to "Back to Dashboard", dashboard_path, 
+              class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+        </div>
+      </div>
+    </div>
+  
+    <% if @task.agent_activities.any? %>
+      <div class="mt-6 bg-white shadow rounded-lg overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-200">
+          <h2 class="text-lg font-medium text-gray-900">Agent Activities</h2>
+        </div>
+        
+        <div class="divide-y divide-gray-200">
+          <% @task.agent_activities.order(created_at: :desc).each do |activity| %>
+            <div class="p-6">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-base font-medium text-gray-900">
+                  <%= link_to activity.agent_type, agent_activity_path(activity), class: "hover:text-indigo-600" %>
+                </h3>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                  <%= activity.status == 'running' ? 'bg-green-100 text-green-800' : 
+                     activity.status == 'completed' ? 'bg-blue-100 text-blue-800' : 
+                     activity.status == 'failed' ? 'bg-red-100 text-red-800' : 
+                     activity.status == 'paused' ? 'bg-yellow-100 text-yellow-800' : 
+                     'bg-gray-100 text-gray-800' %>">
+                  <%= activity.status.capitalize %>
+                </span>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm mb-3">
+                <p class="text-gray-600"><strong>Started:</strong> <%= time_ago_in_words(activity.created_at) %> ago</p>
+                <% if activity.completed_at %>
+                  <p class="text-gray-600"><strong>Completed:</strong> <%= time_ago_in_words(activity.completed_at) %> ago</p>
+                <% end %>
+              </div>
+              
+              <% if activity.result.present? %>
+                <div class="mt-3">
+                  <button class="inline-flex items-center text-xs font-medium text-indigo-600 hover:text-indigo-900" 
+                          data-controller="collapsible"
+                          data-action="click->collapsible#toggle" 
+                          data-collapsible-target="trigger"
+                          data-collapsible-id-value="activity-result-<%= activity.id %>">
+                    <span>View Result</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  <div id="activity-result-<%= activity.id %>" class="hidden mt-3 bg-gray-50 p-3 rounded-md">
+                    <pre class="whitespace-pre-wrap text-sm text-gray-800"><%= activity.result %></pre>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

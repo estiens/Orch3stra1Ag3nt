@@ -6,6 +6,7 @@ group :test do
 end
 
 gem "aasm"
+gem "view_component"
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "~> 8.0.2"
@@ -80,7 +81,7 @@ gem "open_router"
 
 # agents
 
-gem "regent", github: "estiens/regent"
+gem "langchainrb"
 gem "dry-schema"
 gem "dry-validation"
 
@@ -104,3 +105,5 @@ gem "google_search_results"
 # Vector search
 gem "pgvector", "~> 0.2.1"  # PostgreSQL vector operations
 gem "neighbor", "~> 0.3.0"  # Better pgvector integration with Rails
+
+gem "sequel", "~> 5.91"

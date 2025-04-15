@@ -1,0 +1,124 @@
+/* Modern Dashboard Styles */
+
+/* Scrollbar styling */
+.max-h-scrollable::-webkit-scrollbar {
+  width: 6px;
+}
+
+.max-h-scrollable::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.max-h-scrollable::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 10px;
+}
+
+.max-h-scrollable::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Animation for new items */
+@keyframes highlight {
+  0% { background-color: rgba(79, 70, 229, 0.1); }
+  100% { background-color: transparent; }
+}
+
+.highlight {
+  animation: highlight 2s ease-out;
+}
+
+/* Line clamp for truncating text */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Badge Styles */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+}
+
+.badge-success {
+  background-color: #10b981;
+  color: white;
+}
+
+.badge-primary {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.badge-warning {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.badge-danger {
+  background-color: #ef4444;
+  color: white;
+}
+
+.badge-secondary {
+  background-color: #6b7280;
+  color: white;
+}
+
+/* Collapsible sections */
+[data-controller="collapsible"] svg {
+  transition: transform 0.2s ease-in-out;
+}
+
+[data-controller="collapsible"].open svg {
+  transform: rotate(180deg);
+}
+
+/* Pre and code formatting */
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.whitespace-pre-wrap {
+  white-space: pre-wrap;
+}
+
+/* Empty state styling */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  color: #6b7280;
+  background-color: #f9fafb;
+  border-radius: 0.5rem;
+}
+
+.empty-state svg {
+  color: #d1d5db;
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 1rem;
+}
+
+/* Dashboard section transitions */
+.dashboard-section {
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.dashboard-section:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}

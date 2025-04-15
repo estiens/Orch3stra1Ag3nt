@@ -85,7 +85,7 @@ class EventBus
     handlers.each do |handler_class|
       begin
         # Check if BaseAgent is defined before checking inheritance
-        if defined?(BaseAgent) && !handler_class.is_a?(RSpec::Mocks::Double) && handler_class < BaseAgent
+        if defined?(BaseAgent) && handler_class.is_a?(Class) && handler_class < BaseAgent
           # Dispatch to an agent job
           handler_options = {
             purpose: "Process #{event_type} event",
@@ -109,7 +109,8 @@ class EventBus
         end
       rescue => e
         Rails.logger.error("Error dispatching event #{event_type} to #{handler_class}: #{e.message}")
-        # Avoid failing all handlers if one fails
+        # Mark event as processed with error
+        event.record_processing_attempt!(e) if event.respond_to?(:record_processing_attempt!)
       end
     end
   end

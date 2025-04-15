@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_04_13_050001) do
+ActiveRecord::Schema[8.0].define(version: 2025_04_15_045810) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -46,6 +46,24 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_13_050001) do
     t.index ["event_type"], name: "index_events_on_event_type"
   end
 
+  create_table "human_input_requests", force: :cascade do |t|
+    t.bigint "task_id", null: false
+    t.bigint "agent_activity_id"
+    t.text "question", null: false
+    t.boolean "required", default: false
+    t.string "status", default: "pending", null: false
+    t.text "response"
+    t.datetime "responded_at"
+    t.string "answered_by"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "expires_at"
+    t.index ["agent_activity_id"], name: "index_human_input_requests_on_agent_activity_id"
+    t.index ["status"], name: "index_human_input_requests_on_status"
+    t.index ["task_id", "status"], name: "index_human_input_requests_on_task_id_and_status"
+    t.index ["task_id"], name: "index_human_input_requests_on_task_id"
+  end
+
   create_table "human_interventions", force: :cascade do |t|
     t.text "description", null: false
     t.string "urgency", default: "normal", null: false
@@ -68,17 +86,19 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_13_050001) do
 
   create_table "llm_calls", force: :cascade do |t|
     t.bigint "agent_activity_id", null: false
+    t.string "provider", default: "openrouter"
+    t.string "model"
+    t.text "prompt"
+    t.text "response"
+    t.integer "tokens_used", default: 0
     t.text "request_payload"
     t.text "response_payload"
     t.float "duration"
     t.decimal "cost"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.string "provider", default: "openrouter"
-    t.string "model"
-    t.text "prompt"
-    t.text "response"
-    t.integer "tokens_used", default: 0
+    t.integer "prompt_tokens", default: 0
+    t.integer "completion_tokens", default: 0
     t.index ["agent_activity_id"], name: "index_llm_calls_on_agent_activity_id"
   end
 
@@ -208,11 +228,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_13_050001) do
     t.index ["scheduled_at", "priority", "job_id"], name: "index_solid_queue_dispatch_all"
   end
 
-  create_table "solid_queue_schemas", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-  end
-
   create_table "solid_queue_semaphores", force: :cascade do |t|
     t.string "key", null: false
     t.integer "value", default: 1, null: false
@@ -228,9 +243,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_13_050001) do
     t.string "title"
     t.text "description"
     t.string "state"
+    t.text "notes"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.text "notes"
     t.integer "parent_id"
     t.string "task_type", default: "general"
     t.json "metadata"
@@ -251,19 +266,24 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_13_050001) do
     t.string "source_url"
     t.string "source_title"
     t.jsonb "metadata", default: {}, null: false
-    t.vector "embedding", limit: 1536
+    t.vector "embedding", limit: 1024, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.bigint "project_id"
+    t.tsvector "content_tsv"
+    t.index ["collection", "content"], name: "unique_collection_content", unique: true
     t.index ["collection"], name: "index_vector_embeddings_on_collection"
+    t.index ["content_tsv"], name: "index_vector_embeddings_on_content_tsv", using: :gin
     t.index ["content_type"], name: "index_vector_embeddings_on_content_type"
-    t.index ["embedding"], name: "vector_embeddings_embedding_idx", using: :ivfflat
+    t.index ["embedding"], name: "index_vector_embeddings_on_embedding", opclass: :vector_l2_ops, using: :hnsw
     t.index ["project_id"], name: "index_vector_embeddings_on_project_id"
     t.index ["task_id"], name: "index_vector_embeddings_on_task_id"
   end
 
   add_foreign_key "agent_activities", "tasks"
   add_foreign_key "events", "agent_activities"
+  add_foreign_key "human_input_requests", "agent_activities"
+  add_foreign_key "human_input_requests", "tasks"
   add_foreign_key "human_interventions", "agent_activities"
   add_foreign_key "llm_calls", "agent_activities"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

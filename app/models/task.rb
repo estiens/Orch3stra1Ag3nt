@@ -1,8 +1,11 @@
 class Task < ApplicationRecord
+  include DashboardBroadcaster
+
   validates :title, presence: true
 
   has_many :agent_activities, dependent: :destroy
-  has_many :events, dependent: :destroy
+  # Events are associated with agent_activities, not directly with tasks
+  # has_many :events, dependent: :destroy
 
   # Project association
   belongs_to :project, optional: true
@@ -12,7 +15,7 @@ class Task < ApplicationRecord
   has_many :subtasks, class_name: "Task", foreign_key: "parent_id", dependent: :destroy
 
   # Task types
-  TASK_TYPES = %w[general research code analysis review orchestration].freeze
+  TASK_TYPES = %w[general research code analysis review search orchestration].freeze
 
   # Store metadata as JSON
   # serialize :metadata, JSON
@@ -30,12 +33,40 @@ class Task < ApplicationRecord
   aasm column: "state" do
     state :pending, initial: true
     state :active
+    state :paused
     state :waiting_on_human
     state :completed
     state :failed
 
     event :activate do
-      transitions from: :pending, to: :active
+      transitions from: [ :pending, :paused ], to: :active
+      after do
+        # Publish event for dashboard updates
+        if agent_activities.any?
+          agent_activities.last.publish_event("task_activated", { task_id: id, task_title: title })
+        else
+          # Create a temporary agent activity if needed for the event
+          temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
+          temp_activity.publish_event("task_activated", { task_id: id, task_title: title })
+        end
+
+        # Enqueue the task for processing if it was activated
+        enqueue_for_processing
+      end
+    end
+
+    event :pause do
+      transitions from: :active, to: :paused
+      after do
+        # Publish event for dashboard updates
+        if agent_activities.any?
+          agent_activities.last.publish_event("task_paused", { task_id: id, task_title: title })
+        else
+          # Create a temporary agent activity if needed for the event
+          temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
+          temp_activity.publish_event("task_paused", { task_id: id, task_title: title })
+        end
+      end
     end
 
     event :wait_on_human do
@@ -43,11 +74,48 @@ class Task < ApplicationRecord
     end
 
     event :complete do
-      transitions from: [ :active, :waiting_on_human ], to: :completed
+      transitions from: [ :active, :waiting_on_human, :paused ], to: :completed
+      after do
+        # Publish event for dashboard updates
+        if agent_activities.any?
+          agent_activities.last.publish_event("task_completed", { task_id: id, task_title: title })
+        else
+          # Create a temporary agent activity if needed for the event
+          temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
+          temp_activity.publish_event("task_completed", { task_id: id, task_title: title })
+        end
+      end
     end
 
     event :fail do
-      transitions from: [ :pending, :active, :waiting_on_human ], to: :failed
+      transitions from: [ :pending, :active, :waiting_on_human, :paused ], to: :failed
+      after do
+        # Publish event for dashboard updates
+        if agent_activities.any?
+          agent_activities.last.publish_event("task_failed", { task_id: id, task_title: title, error: metadata&.dig("error_message") })
+        else
+          # Create a temporary agent activity if needed for the event
+          temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
+          temp_activity.publish_event("task_failed", { task_id: id, task_title: title, error: metadata&.dig("error_message") })
+        end
+      end
+    end
+
+    event :resume do
+      transitions from: :paused, to: :active
+      after do
+        # Publish event for dashboard updates
+        if agent_activities.any?
+          agent_activities.last.publish_event("task_resumed", { task_id: id, task_title: title })
+        else
+          # Create a temporary agent activity if needed for the event
+          temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
+          temp_activity.publish_event("task_resumed", { task_id: id, task_title: title })
+        end
+
+        # Enqueue the task for processing when resumed
+        enqueue_for_processing
+      end
     end
   end
 
@@ -115,6 +183,72 @@ class Task < ApplicationRecord
       collection: collection,
       metadata: metadata.merge(task_id: id, task_title: title)
     )
+  end
+
+  # Access events through agent_activities (helper method)
+  def events
+    Event.where(agent_activity_id: agent_activities.pluck(:id))
+  end
+
+  # Get LLM call statistics for this task
+  def llm_call_stats
+    activity_ids = agent_activities.pluck(:id)
+    calls = LlmCall.where(agent_activity_id: activity_ids)
+
+    {
+      count: calls.count,
+      total_cost: calls.sum(:cost).round(4),
+      total_tokens: calls.sum(:prompt_tokens).to_i + calls.sum(:completion_tokens).to_i,
+      models: calls.group(:model).count
+    }
+  end
+
+  # Task dependencies methods
+  def depends_on_task_ids
+    metadata&.dig("depends_on_task_ids") || []
+  end
+
+  def depends_on_task_ids=(ids)
+    self.metadata ||= {}
+    self.metadata["depends_on_task_ids"] = Array(ids).map(&:to_i)
+    save if persisted?
+  end
+
+  # Check if all dependencies are satisfied
+  def dependencies_satisfied?
+    return true if depends_on_task_ids.empty?
+
+    completed_ids = Task.where(id: depends_on_task_ids, state: "completed").pluck(:id)
+    depends_on_task_ids.all? { |id| completed_ids.include?(id) }
+  end
+
+  # Enqueue this task for processing based on its type
+  def enqueue_for_processing
+    return unless active?
+
+    # Don't enqueue if the project is paused
+    if project && project.status == "paused"
+      Rails.logger.info "[Task #{id}] Not enqueueing because project #{project.id} is paused"
+      return false
+    end
+
+    case task_type
+    when "research"
+      ResearchCoordinatorAgent.enqueue("Process research task", { task_id: id })
+    when "code"
+      CodeResearcherAgent.enqueue("Process code task", { task_id: id })
+    when "orchestration"
+      OrchestratorAgent.enqueue("Process orchestration task", { task_id: id })
+    when "analysis"
+      WebResearcherAgent.enqueue("Process analysis task", { task_id: id })
+    when "search"
+      WebResearcherAgent.enqueue("Process search task", { task_id: id })
+    when "review"
+      SummarizerAgent.enqueue("Process review task", { task_id: id })
+    else
+      # Default to coordinator for general tasks
+      CoordinatorAgent.enqueue("Process general task", { task_id: id })
+    end
   end
 
   private

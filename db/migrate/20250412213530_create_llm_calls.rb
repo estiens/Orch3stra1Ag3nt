@@ -11,6 +11,8 @@ class CreateLlmCalls < ActiveRecord::Migration[8.0]
       t.text :response_payload
       t.float :duration
       t.decimal :cost
+      t.integer :prompt_tokens, default: 0
+      t.integer :completion_tokens, default: 0
 
       t.timestamps
     end
