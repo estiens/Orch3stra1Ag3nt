@@ -9,10 +9,10 @@ module Contextable
     # Define associations if they don't exist
     belongs_to :task, optional: true unless method_defined?(:task)
     belongs_to :agent_activity, optional: true unless method_defined?(:agent_activity)
-    
+
     # Define project association if it doesn't exist and task association exists
     belongs_to :project, optional: true unless method_defined?(:project)
-    
+
     # Define helper methods to access context
     before_validation :propagate_context, if: :new_record?
   end
@@ -75,13 +75,13 @@ module Contextable
   # Propagate context from associations
   def propagate_context
     # If we have a task but no project, get project from task
-    if respond_to?(:project_id=) && respond_to?(:task) && task.present? && task.project_id.present? && 
+    if respond_to?(:project_id=) && respond_to?(:task) && task.present? && task.project_id.present? &&
        (self.try(:project_id).blank?)
       self.project_id = task.project_id
     end
 
     # If we have an agent_activity but no task, get task from agent_activity
-    if respond_to?(:task_id=) && respond_to?(:agent_activity) && agent_activity.present? && agent_activity.task_id.present? && 
+    if respond_to?(:task_id=) && respond_to?(:agent_activity) && agent_activity.present? && agent_activity.task_id.present? &&
        (self.try(:task_id).blank?)
       self.task_id = agent_activity.task_id
     end

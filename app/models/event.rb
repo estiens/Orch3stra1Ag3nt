@@ -66,7 +66,7 @@ class Event < ApplicationRecord
     # Check if schema exists and validate data against it
     if EventSchemaRegistry.schema_exists?(event_type)
       schema = EventSchemaRegistry.schema_for(event_type)
-      
+
       # Check required fields
       missing_fields = []
       schema[:required].each do |field|
@@ -74,7 +74,7 @@ class Event < ApplicationRecord
           missing_fields << field
         end
       end
-      
+
       if missing_fields.any?
         Rails.logger.error("Event.publish: Missing required fields for '#{event_type}': #{missing_fields.join(', ')}")
         return nil
@@ -187,7 +187,7 @@ class Event < ApplicationRecord
   # Validate this event against its schema
   def validate_against_schema
     return unless has_schema?
-    
+
     errors = EventSchemaRegistry.validate_event(self)
     errors.each do |error|
       self.errors.add(:data, error)

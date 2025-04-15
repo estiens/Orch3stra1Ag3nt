@@ -243,7 +243,7 @@ class CoordinatorAgent < BaseAgent
 
       # Check if the task is waiting on human input
       is_waiting = task.waiting_on_human?
-      
+
       # Only activate the task if it's waiting on human input
       if is_waiting
         # The task should be in waiting_on_human state, so activate it to resume processing
@@ -431,7 +431,7 @@ class CoordinatorAgent < BaseAgent
           parent_task_id: task.id
         }
       }
-      
+
       # Only add project_id if it exists to match test expectations
       agent_options[:project_id] = subtask.project_id if subtask.project_id.present?
 
@@ -491,7 +491,7 @@ class CoordinatorAgent < BaseAgent
 
     # Get complexity from metadata if available
     complexity = subtask.metadata&.dig("complexity") || "complex"
-    
+
     # Prepare options for the sub-coordinator
     coordinator_options = {
       task_id: subtask.id,
@@ -511,19 +511,19 @@ class CoordinatorAgent < BaseAgent
     # Create more detailed instructions based on the subtask complexity
     instructions = <<~INSTRUCTIONS
       # COMPLEX SUBTASK DECOMPOSITION
-      
+
       This is a complex subtask that requires further decomposition into smaller, more atomic subtasks.
-      
+
       ## Subtask: #{subtask.title}
-      
+
       #{subtask.description}
-      
+
       ## Decomposition Instructions
       1. Break this subtask down into highly atomic, focused sub-subtasks
       2. Make each sub-subtask as specific and focused as possible
       3. Ensure each sub-subtask has clear success criteria
       4. Assign specialized agents to each sub-subtask based on requirements
-      
+
       ## Important Notes
       - This is a level #{coordinator_options[:metadata][:nesting_level]} nested coordinator
       - Focus on creating ATOMIC units of work that can be completed independently
@@ -1020,7 +1020,7 @@ class CoordinatorAgent < BaseAgent
     # Check if this is a sub-coordinator and get nesting level
     is_sub_coordinator = task.metadata&.dig("is_sub_coordinator") == true
     nesting_level = task.metadata&.dig("nesting_level") || 0
-    
+
     # Log the coordinator start with context
     coordinator_type = is_sub_coordinator ? "Sub-Coordinator (Level #{nesting_level})" : "Root Coordinator"
     Rails.logger.info "[#{coordinator_type}-#{task.id}] Starting run with event_type: #{event_type || 'none'}"
@@ -1066,10 +1066,10 @@ class CoordinatorAgent < BaseAgent
     end
 
     @session_data[:output] = result_message
-    
+
     # Log completion with context
     Rails.logger.info "[#{coordinator_type}-#{task.id}] Completed run with result: #{result_message.truncate(100)}"
-    
+
     after_run(result_message) # This run finishes, event handlers will trigger next run if needed
     result_message
   end
@@ -1189,15 +1189,15 @@ class CoordinatorAgent < BaseAgent
       # This is a key improvement - we'll try to assign up to 3 subtasks at once
       assigned_count = 0
       assignment_results = []
-      
+
       # Sort eligible subtasks by priority and then by complexity (simpler first)
       sorted_subtasks = sort_subtasks_by_priority_and_complexity(eligible_subtasks)
-      
+
       # Try to assign up to 3 subtasks (or fewer if there aren't that many)
       sorted_subtasks.first(3).each do |next_subtask|
         # Skip if we've already assigned 3 subtasks
         break if assigned_count >= 3
-        
+
         # Determine if this subtask needs a sub-coordinator or a regular agent
         agent_type = next_subtask.metadata&.dig("suggested_agent") || determine_best_agent_for_subtask(next_subtask)
         complexity = next_subtask.metadata&.dig("complexity") || "simple"
@@ -1208,11 +1208,11 @@ class CoordinatorAgent < BaseAgent
         else
           assign_result = assign_subtask(next_subtask.id, agent_type, "Assigning eligible subtask in parallel")
         end
-        
+
         assignment_results << assign_result
         assigned_count += 1
       end
-      
+
       if assigned_count > 0
         return "#{status_report}\n\nAssigned #{assigned_count} eligible subtasks in parallel:\n\n#{assignment_results.join("\n\n")}"
       end
@@ -1222,21 +1222,21 @@ class CoordinatorAgent < BaseAgent
     active_count = task.subtasks.where(state: "active").count
     "#{status_report}\n\nContinuing to monitor #{active_count} active subtasks. No new subtasks are eligible for assignment yet."
   end
-  
+
   # Helper method to sort subtasks by priority and complexity
   def sort_subtasks_by_priority_and_complexity(subtasks)
     # Priority order: high > normal > low
     priority_order = { "high" => 0, "normal" => 1, "low" => 2 }
-    
+
     # Complexity order: simple > moderate > complex
     complexity_order = { "simple" => 0, "moderate" => 1, "complex" => 2 }
-    
+
     subtasks.sort_by do |subtask|
       priority = subtask.priority || "normal"
       complexity = subtask.metadata&.dig("complexity") || "simple"
-      
+
       # Sort first by priority, then by complexity (simpler first)
-      [priority_order[priority] || 99, complexity_order[complexity] || 99]
+      [ priority_order[priority] || 99, complexity_order[complexity] || 99 ]
     end
   end
 
@@ -1425,7 +1425,7 @@ class CoordinatorAgent < BaseAgent
       description = description_match[1].strip
       priority = priority_match[1].downcase.strip
       agent_type = agent_match ? agent_match[1].strip : "ResearcherAgent"
-      
+
       # If complexity is "complex", suggest CoordinatorAgent
       complexity = complexity_match ? complexity_match[1].downcase.strip : "simple"
       if complexity == "complex" && agent_type != "CoordinatorAgent"

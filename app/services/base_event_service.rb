@@ -22,7 +22,7 @@ class BaseEventService
   # @param result [Object] optional result of the processing
   def log_event_success(event, handler, result = nil)
     logger.info("#{handler} successfully processed event: #{event.event_type} [#{event.id}]")
-    
+
     if result
       if result.is_a?(String) && result.length > 100
         logger.debug("#{handler} result: #{result[0..100]}...")
@@ -48,10 +48,10 @@ class BaseEventService
   # @param success [Boolean] whether processing was successful
   def record_event_metrics(event, start_time, success)
     duration = Time.current - start_time
-    
+
     # Log processing time
     logger.info("Event #{event.id} processed in #{duration.round(2)}s (success: #{success})")
-    
+
     # Here you could add more sophisticated metrics collection
     # For example, sending to a monitoring service or storing in the database
   end
@@ -65,7 +65,7 @@ class BaseEventService
     log_event_processing(event, handler)
     start_time = Time.current
     success = false
-    
+
     begin
       # Execute the provided block
       result = yield
@@ -87,17 +87,17 @@ class BaseEventService
   # @return [Boolean] true if valid, raises error if invalid
   def validate_event_data(event, required_fields)
     data = event.data
-    
+
     missing_fields = required_fields.select do |field|
       data[field.to_s].nil? && data[field.to_sym].nil?
     end
-    
+
     if missing_fields.any?
       error_msg = "Event #{event.id} missing required fields: #{missing_fields.join(', ')}"
       logger.error(error_msg)
       raise ArgumentError, error_msg
     end
-    
+
     true
   end
 end

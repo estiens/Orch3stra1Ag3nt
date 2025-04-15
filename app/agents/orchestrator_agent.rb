@@ -271,7 +271,7 @@ class OrchestratorAgent < BaseAgent
       # Parse input context if provided
       context = input.is_a?(Hash) ? input[:context] : nil
       purpose_override = context&.dig(:purpose_override)
-      
+
       # Log the purpose if provided
       if purpose_override
         Rails.logger.info "[OrchestratorAgent-#{agent_activity&.id}] Run purpose: #{purpose_override}"
@@ -287,9 +287,9 @@ class OrchestratorAgent < BaseAgent
 
       # Analyze the results and take appropriate actions
       actions_taken = []
-      
+
       # Check for coordinator queue depth issues
-      if system_analysis.include?("coordinator queue") && system_analysis.include?("high") && 
+      if system_analysis.include?("coordinator queue") && system_analysis.include?("high") &&
          (system_analysis.include?("bottleneck") || system_analysis.include?("overloaded"))
         # Adjust priorities of pending coordinator tasks
         priority_adjustments = determine_priority_adjustments("coordinator")
@@ -299,31 +299,31 @@ class OrchestratorAgent < BaseAgent
           actions_taken << "Adjusted coordinator task priorities: #{adjustment_str}"
         end
       end
-      
+
       # Check for resource constraints
-      if resource_analysis.include?("CONSTRAINTS") && 
+      if resource_analysis.include?("CONSTRAINTS") &&
          (resource_analysis.include?("critical") || resource_analysis.include?("severe"))
         # Extract the constraints
         constraints = resource_analysis.match(/CONSTRAINTS:\s*(.*?)(?=\n\n|\nRECOMMENDATIONS|\z)/m)&.[](1)
         if constraints
           # Escalate critical resource issues
-          escalate_result = execute_tool(:escalate_to_human, 
+          escalate_result = execute_tool(:escalate_to_human,
             "CRITICAL RESOURCE CONSTRAINTS: #{constraints.strip}", "high")
           actions_taken << "Escalated critical resource constraints to human operators"
         end
       end
-      
+
       # Check for stalled projects
       if system_analysis.include?("stalled project") || system_analysis.include?("inactive project")
         # Extract project IDs if available
         project_ids = system_analysis.scan(/project\s+ID[:\s]+(\d+)/i).flatten.uniq
-        
+
         project_ids.each do |project_id|
           recoordinate_result = execute_tool(:recoordinate_project, project_id)
           actions_taken << "Initiated recoordination for potentially stalled project #{project_id}"
         end
       end
-      
+
       # If we took actions, summarize them
       if actions_taken.any?
         result_message = "System/Resource analysis complete. Actions taken:\n- #{actions_taken.join("\n- ")}"
@@ -347,25 +347,25 @@ class OrchestratorAgent < BaseAgent
     after_run(result_message)
     result_message
   end
-  
+
   # Helper method to determine priority adjustments for tasks
   def determine_priority_adjustments(queue_type)
     adjustments = {}
-    
+
     case queue_type
     when "coordinator"
       # Find coordinator tasks that are pending but not yet assigned
       pending_tasks = Task.where(state: "pending")
                           .joins(:metadata)
-                          .where("metadata->>'suggested_agent' = ? OR metadata->>'assigned_agent' = ?", 
+                          .where("metadata->>'suggested_agent' = ? OR metadata->>'assigned_agent' = ?",
                                 "CoordinatorAgent", "CoordinatorAgent")
                           .limit(5)
-      
+
       # Prioritize tasks with dependencies
       pending_tasks.each do |task|
         # Check if this task has many dependents
         dependent_count = Task.where("depends_on_task_ids @> ARRAY[?]::integer[]", task.id).count
-        
+
         if dependent_count > 2
           adjustments[task.id] = "high" # Many things depend on this
         elsif task.project_id && Project.find(task.project_id).status == "active"
@@ -375,7 +375,7 @@ class OrchestratorAgent < BaseAgent
         end
       end
     end
-    
+
     adjustments
   end
   # --- End Core Logic ---
@@ -390,12 +390,12 @@ class OrchestratorAgent < BaseAgent
     waiting_tasks = Task.where(state: :waiting_on_human).count
     completed_tasks = Task.where(state: :completed).count
     failed_tasks = Task.where(state: :failed).count
-    
+
     # Get coordinator-specific metrics
     root_coordinators = Task.where(parent_id: nil).count
     # Use where with JSON query instead of trying to join on metadata
     sub_coordinators = Task.where("metadata->>'is_sub_coordinator' = ?", "true").count
-    
+
     # Get agent activity metrics
     active_agents = AgentActivity.where(status: "running").count
     agent_types = {}
@@ -405,42 +405,42 @@ class OrchestratorAgent < BaseAgent
       Rails.logger.error "[OrchestratorAgent] Error getting agent types: #{e.message}"
       agent_types = { error: "Failed to get agent types" }
     end
-    
+
     # Get queue metrics
     total_queued_jobs = SolidQueue::Job.where(finished_at: nil).count
     queue_stats = {}
     SolidQueue::Job.where(finished_at: nil).group(:queue_name).count.each do |queue, count|
       queue_stats[queue] = count
     end
-    
+
     # Get error metrics
     recent_errors = Event.where(event_type: "agent_error").recent.limit(5)
     error_summary = recent_errors.map { |e| "#{e.data['error_type']}: #{e.data['error_message']&.truncate(50)}" }.join("\n")
-    
+
     # Get project metrics
     active_projects = Project.where(status: "active").count
     paused_projects = Project.where(status: "paused").count
     completed_projects = Project.where(status: "completed").count
-    
+
     # Compile all metrics
     system_data = {
-      tasks: { 
-        active: active_tasks, 
-        waiting_on_human: waiting_tasks, 
-        completed: completed_tasks, 
-        failed: failed_tasks 
+      tasks: {
+        active: active_tasks,
+        waiting_on_human: waiting_tasks,
+        completed: completed_tasks,
+        failed: failed_tasks
       },
       coordination: {
         root_coordinators: root_coordinators,
         sub_coordinators: sub_coordinators
       },
-      agents: { 
+      agents: {
         active: active_agents,
         by_type: agent_types
       },
-      queues: { 
-        total_pending: total_queued_jobs, 
-        by_queue: queue_stats 
+      queues: {
+        total_pending: total_queued_jobs,
+        by_queue: queue_stats
       },
       projects: {
         active: active_projects,
@@ -496,20 +496,20 @@ class OrchestratorAgent < BaseAgent
   # Tool implementation: Spawn a coordinator agent for a task
   def spawn_coordinator(task_id, priority = nil)
     task = Task.find(task_id)
-    
+
     # Determine if this is a root task or a subtask
     is_root_task = task.parent_id.nil?
     task_type = is_root_task ? "root task" : "subtask"
-    
+
     # Create a more specific purpose based on task context
     purpose = if is_root_task && task.project_id
                 "Coordinate execution of project root task: #{task.title}"
-              elsif is_root_task
+    elsif is_root_task
                 "Coordinate execution of independent task: #{task.title}"
-              else
+    else
                 "Coordinate execution of subtask: #{task.title}"
-              end
-    
+    end
+
     options = {
       task_id: task.id,
       parent_activity_id: agent_activity&.id,
@@ -531,10 +531,10 @@ class OrchestratorAgent < BaseAgent
     # Add specific instructions for the coordinator based on task type
     instructions = if is_root_task
                      "This is a #{task.project_id ? 'project root task' : 'standalone task'} that requires strategic decomposition into atomic subtasks. Break it down into highly focused subtasks, and consider using nested coordinators for complex subtasks.\n\n"
-                   else
+    else
                      "This is a subtask that requires further decomposition. Break it down into smaller, more atomic subtasks to ensure precise execution.\n\n"
-                   end
-    
+    end
+
     instructions += "#{task.title}\n\n#{task.description}"
 
     CoordinatorAgent.enqueue(instructions, options)
@@ -840,20 +840,20 @@ class OrchestratorAgent < BaseAgent
         # PROJECT RE-COORDINATION TASK
 
         ## Project: #{project.name} (ID: #{project_id})
-        
+
         Current Status:
         - Completion: #{completion_percentage}% (#{completed_tasks}/#{total_tasks} tasks)
         - Active tasks: #{active_tasks}
         - Pending tasks: #{pending_tasks}
         - Failed tasks: #{failed_tasks}
-        
+
         ## Instructions
         1. Use the recoordinate_project tool with project_id: #{project_id} to analyze the current state
         2. Evaluate completed tasks and their results
         3. Identify any bottlenecks or issues
         4. Determine appropriate next steps
         5. Consider creating new atomic subtasks if needed
-        
+
         ## Important
         - Focus on creating highly atomic, focused subtasks
         - Use nested coordinators for complex work

@@ -252,11 +252,11 @@ RSpec.describe OrchestratorAgent do
         # Create event objects for the tasks
         task1_events = double("Task1Events")
         task2_events = double("Task2Events")
-        
+
         # Allow the tasks to receive the events method
         allow(task1).to receive(:events).and_return(task1_events)
         allow(task2).to receive(:events).and_return(task2_events)
-        
+
         # Set expectations for update! and events.create!
         expect(task1).to receive(:update!).with(priority: "high")
         expect(task1_events).to receive(:create!).with(

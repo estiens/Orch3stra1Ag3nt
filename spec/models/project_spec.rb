@@ -83,30 +83,30 @@ RSpec.describe Project, type: :model do
         task_type: "orchestration",
         priority: "high"
       )
-      
+
       # Set up the task creation expectation
       expect(project.tasks).to receive(:create!).and_return(task)
-      
+
       # Set up the agent activity creation expectation
       dummy_activity = double("AgentActivity")
       expect(task.agent_activities).to receive(:first_or_create!).with(
         agent_type: "SystemEventPublisher",
         status: "completed"
       ).and_return(dummy_activity)
-      
+
       # Set up the event publishing expectation
       expect(dummy_activity).to receive(:publish_event).with(
         "project_created",
         hash_including(project_id: project.id),
         hash_including(priority: Event::HIGH_PRIORITY)
       )
-      
+
       # Set up the task activation expectation
       expect(task).to receive(:activate!)
-      
+
       # Call the method
       result = project.kickoff!
-      
+
       # Verify the results
       expect(result).to eq(task)
       expect(project.reload.status).to eq("active")

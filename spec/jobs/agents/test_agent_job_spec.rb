@@ -7,7 +7,7 @@ RSpec.describe "TestAgent (async via AgentJob)", type: :job do
     # Stub the AgentSpawningService to avoid actual spawning
     allow(AgentSpawningService).to receive(:spawn_for_task).and_return(true)
     allow(AgentSpawningService).to receive(:spawn_for_event).and_return(true)
-    
+
     # Stub the enqueue_for_processing method to avoid spawning agents in tests
     allow_any_instance_of(Task).to receive(:enqueue_for_processing).and_return(true)
   end

@@ -7,7 +7,7 @@ class EventSchemaRegistry
 
   # Class methods - delegates to instance
   class << self
-    delegate :register_schema, :validate_event, :schema_for, :registered_schemas, 
+    delegate :register_schema, :validate_event, :schema_for, :registered_schemas,
              :register_standard_schemas, :schema_exists?, to: :instance
   end
 
@@ -64,23 +64,23 @@ class EventSchemaRegistry
   def validate_event(event)
     event_type = event.event_type
     data = event.data || {}
-    
+
     # If no schema exists, consider it valid but log a warning
     unless schema_exists?(event_type)
       Rails.logger.warn("No schema registered for event type: #{event_type}")
       return []
     end
-    
+
     schema = schema_for(event_type)
     errors = []
-    
+
     # Check required fields
     schema[:required].each do |field|
       if data[field.to_s].nil? && data[field.to_sym].nil?
         errors << "Missing required field: #{field}"
       end
     end
-    
+
     errors
   end
 

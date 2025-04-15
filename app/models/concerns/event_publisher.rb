@@ -21,7 +21,7 @@ module EventPublisher
     # Create merged options with context and priority if provided
     merged_options = ctx.dup
     merged_options[:priority] = options[:priority] if options[:priority].present?
-    
+
     # Override with any explicitly provided options
     merged_options.merge!(options.slice(:agent_activity_id, :task_id, :project_id))
 
@@ -45,11 +45,11 @@ module EventPublisher
       Rails.logger.warn("#{self.class.name}#publish_event: Cannot publish event '#{event_type}' without agent_activity_id")
       return nil
     end
-    
+
     # Check if schema exists and validate data against it
     if EventSchemaRegistry.schema_exists?(event_type)
       schema = EventSchemaRegistry.schema_for(event_type)
-      
+
       # Check required fields
       missing_fields = []
       schema[:required].each do |field|
@@ -57,7 +57,7 @@ module EventPublisher
           missing_fields << field
         end
       end
-      
+
       if missing_fields.any?
         Rails.logger.error("#{self.class.name}#publish_event: Missing required fields for '#{event_type}': #{missing_fields.join(', ')}")
         return nil

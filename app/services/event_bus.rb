@@ -6,7 +6,7 @@ class EventBus
 
   # Class methods - delegates to instance
   class << self
-    delegate :publish, :register_handler, :handlers_for, :clear_handlers!, 
+    delegate :publish, :register_handler, :handlers_for, :clear_handlers!,
              :register_standard_handlers, :handler_registry, to: :instance
 
     # Alias for register_handler to maintain backward compatibility with tests
@@ -31,7 +31,7 @@ class EventBus
       # Only add the handler if it's not already registered for this event type
       unless @handlers[event_type.to_s].include?(handler)
         @handlers[event_type.to_s] << handler
-        
+
         # Store metadata about this handler
         @handler_metadata["#{event_type}:#{handler}"] = {
           description: description || "No description provided",
@@ -59,7 +59,7 @@ class EventBus
   def handler_registry
     @mutex.synchronize do
       result = {}
-      
+
       @handlers.each do |event_type, handlers|
         result[event_type] = handlers.map do |handler|
           {
@@ -68,7 +68,7 @@ class EventBus
           }
         end
       end
-      
+
       result
     end
   end
@@ -80,27 +80,27 @@ class EventBus
       @handler_metadata.clear
     end
   end
-  
+
   # Register standard handlers for common events
   def register_standard_handlers
     # This method registers system-level handlers that should always be present
     # These are handlers for core functionality, not business logic
     Rails.logger.info("Registering standard event handlers")
-    
+
     # Register a logging handler for all events if available
     if defined?(EventLoggingHandler)
-      register_handler("*", EventLoggingHandler, 
-                      description: "Logs all events to the database", 
+      register_handler("*", EventLoggingHandler,
+                      description: "Logs all events to the database",
                       priority: 100)
     end
-    
+
     # Register a metrics/monitoring handler if available
     if defined?(EventMetricsHandler)
       register_handler("*", EventMetricsHandler,
                       description: "Collects metrics for all events",
                       priority: 90)
     end
-    
+
     # Register a debugging handler in development environment
     if Rails.env.development? && defined?(EventDebugHandler)
       register_handler("*", EventDebugHandler,

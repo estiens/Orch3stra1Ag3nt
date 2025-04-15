@@ -4,13 +4,13 @@
 # This initializer runs before event_registry.rb to set up the core system
 Rails.application.config.after_initialize do
   # Only run in server/console environments, not during asset precompilation
-  if defined?(Rails::Server) || Rails.const_defined?('Console')
+  if defined?(Rails::Server) || Rails.const_defined?("Console")
     Rails.logger.info("Event system core initialized")
-    
+
     # Register system-level handlers that aren't specific to business logic
     # These are handlers that should always be registered regardless of application state
     EventBus.register_standard_handlers
-    
+
     # Clear any existing handlers from test runs if in development mode
     # This prevents duplicate handlers when reloading in development
     if Rails.env.development?

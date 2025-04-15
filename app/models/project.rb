@@ -68,7 +68,7 @@ class Project < ApplicationRecord
               task_id: orchestration_task.id,
               priority: priority
             },
-            { 
+            {
               priority: Event::HIGH_PRIORITY,
               project_id: id,
               task_id: orchestration_task.id
