@@ -437,6 +437,8 @@ GEM
     rubyntlm (0.6.5)
       base64
     securerandom (0.4.1)
+    sequel (5.91.0)
+      bigdecimal
     shoulda-matchers (6.4.0)
       activesupport (>= 5.2.0)
     solid_cable (3.0.7)
@@ -557,6 +559,7 @@ DEPENDENCIES
   rspec-rails
   rubocop-rails-omakase
   ruby-openai (~> 8.1)
+  sequel (~> 5.91)
   shoulda-matchers (~> 6.0)
   solid_cable
   solid_cache

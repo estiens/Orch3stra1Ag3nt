@@ -12,7 +12,7 @@ class CreateVectorEmbeddings < ActiveRecord::Migration[8.0]
       t.string :source_url                                   # URL source if available
       t.string :source_title                                 # Title of the source
       t.jsonb :metadata, null: false, default: {}            # Additional metadata
-      t.vector :embedding, limit: 1536, null: false          # OpenAI ada-002 model dimensionality
+      t.vector :embedding, limit: 1024, null: false          # OpenAI ada-002 model dimensionality
       t.timestamps
     end
 

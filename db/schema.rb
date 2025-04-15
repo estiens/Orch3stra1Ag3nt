@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_04_14_222918) do
+ActiveRecord::Schema[8.0].define(version: 2025_04_15_045810) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -266,11 +266,14 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_14_222918) do
     t.string "source_url"
     t.string "source_title"
     t.jsonb "metadata", default: {}, null: false
-    t.vector "embedding", limit: 1536, null: false
+    t.vector "embedding", limit: 1024, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.bigint "project_id"
+    t.tsvector "content_tsv"
+    t.index ["collection", "content"], name: "unique_collection_content", unique: true
     t.index ["collection"], name: "index_vector_embeddings_on_collection"
+    t.index ["content_tsv"], name: "index_vector_embeddings_on_content_tsv", using: :gin
     t.index ["content_type"], name: "index_vector_embeddings_on_content_type"
     t.index ["embedding"], name: "index_vector_embeddings_on_embedding", opclass: :vector_l2_ops, using: :hnsw
     t.index ["project_id"], name: "index_vector_embeddings_on_project_id"

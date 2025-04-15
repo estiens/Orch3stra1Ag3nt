@@ -12,7 +12,7 @@ class SummarizerAgent < BaseAgent
   end
 
   # --- Tools ---
-  tool :summarize_text, "Summarize a piece of text, condensing it while preserving key information" do |text, max_length = "medium"|
+  tool :summarize_texts, "Summarize a text or an array of texts, condensing it while preserving key information (args: text: <string|array>, max_length: <short|medium|long default(medium))" do |text:, max_length: "medium"|
     summarize_text(text, max_length)
   end
 
