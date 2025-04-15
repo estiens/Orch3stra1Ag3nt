@@ -64,16 +64,15 @@ class CoordinatorAgent < BaseAgent
     return unless subtask
 
     parent_task = subtask.parent
-    return unless parent_task && task && parent_task.id == task.id # Ensure event is for *this* coordinator's task
+    return unless parent_task
 
-    Rails.logger.info "[CoordinatorAgent #{agent_activity&.id}] Subtask #{subtask_id} completed. Evaluating next steps."
+    Rails.logger.info "[CoordinatorAgent] Subtask #{subtask_id} completed. Evaluating next steps."
 
     # Initiate a new coordinator run to evaluate progress and determine next actions
     self.class.enqueue(
       "Evaluate progress after subtask #{subtask_id} (#{subtask.title}) completed",
       {
-        task_id: task.id,
-        agent_activity_id: agent_activity.id,
+        task_id: parent_task.id,
         context: {
           event_type: "subtask_completed",
           subtask_id: subtask_id,
@@ -92,17 +91,16 @@ class CoordinatorAgent < BaseAgent
     return unless subtask
 
     parent_task = subtask.parent
-    return unless parent_task && task && parent_task.id == task.id
+    return unless parent_task
 
     error = event.data["error"] || "Unknown error"
-    Rails.logger.error "[CoordinatorAgent #{agent_activity&.id}] Subtask #{subtask_id} failed: #{error}"
+    Rails.logger.error "[CoordinatorAgent] Subtask #{subtask_id} failed: #{error}"
 
     # Initiate a new coordinator run specifically to handle the failure
     self.class.enqueue(
       "Handle failure of subtask #{subtask_id} (#{subtask.title}): #{error}",
       {
-        task_id: task.id,
-        agent_activity_id: agent_activity.id,
+        task_id: parent_task.id,
         context: {
           event_type: "subtask_failed",
           subtask_id: subtask_id,
@@ -115,17 +113,20 @@ class CoordinatorAgent < BaseAgent
   # Handle human input required
   def handle_human_input_required(event)
     task_id = event.data["task_id"]
-    return if task_id.blank? || task&.id != task_id # Ensure event is for *this* coordinator's task
+    return if task_id.blank?
+
+    # Find the task directly
+    task = Task.find_by(id: task_id)
+    return unless task
 
     question = event.data["question"]
-    Rails.logger.warn "[CoordinatorAgent #{agent_activity&.id}] Human input required: #{question}"
+    Rails.logger.warn "[CoordinatorAgent] Human input required: #{question}"
 
     # Initiate a new coordinator run to assess alternatives while waiting for human input
     self.class.enqueue(
       "Assess alternatives while waiting for human input on task #{task_id}",
       {
-        task_id: task.id,
-        agent_activity_id: agent_activity.id,
+        task_id: task_id,
         context: {
           event_type: "human_input_required",
           question: question
@@ -140,27 +141,27 @@ class CoordinatorAgent < BaseAgent
       # Extract relevant data from the event
       tool_name = event.data["tool"]
       result_preview = event.data["result_preview"]
+      agent_activity_id = event.agent_activity_id
 
-      # Only process events for this agent's activity
-      return unless event.agent_activity_id == agent_activity&.id
+      # Only process events for agent activities
+      return unless agent_activity_id
+
+      # Find the agent activity
+      activity = AgentActivity.find_by(id: agent_activity_id)
+      return unless activity && activity.task_id
 
       # Log the tool execution
-      Rails.logger.info "[CoordinatorAgent #{agent_activity&.id}] Tool execution completed: #{tool_name}"
+      Rails.logger.info "[CoordinatorAgent] Tool execution completed: #{tool_name}"
 
-      # Handle specific tool completions if needed
-      case tool_name
-      when "create_subtask"
-        # Check for errors in subtask creation
-        if result_preview.to_s.include?("Error")
-          Rails.logger.error "[CoordinatorAgent #{agent_activity&.id}] Subtask creation failed: #{result_preview}"
-          # Potentially try to recover or notify about the error
-        end
-      when "assign_subtask"
-        # Handle subtask assignment completion
-        if result_preview.to_s.include?("Error") || result_preview.to_s.include?("Warning")
-          Rails.logger.warn "[CoordinatorAgent #{agent_activity&.id}] Subtask assignment issue: #{result_preview}"
-        end
-      end
+      # Enqueue a job to process this event with the proper task_id
+      self.class.enqueue(
+        "Process event: tool_execution_finished",
+        {
+          task_id: activity.task_id,
+          purpose: "Process tool_execution_finished event",
+          event_id: event.id
+        }
+      )
     rescue => e
       # Safely handle any errors during event processing
       Rails.logger.error "[CoordinatorAgent] Error handling tool execution event: #{e.message}"
@@ -186,9 +187,13 @@ class CoordinatorAgent < BaseAgent
 
       # Get the parent task (which this coordinator is handling)
       parent_task_id = completed_task.parent_id
-      return unless parent_task_id && parent_task_id == task&.id
+      return unless parent_task_id
 
-      Rails.logger.info "[CoordinatorAgent #{agent_activity&.id}] Subtask #{completed_task.id} completed via agent activity #{agent_activity_id}"
+      # Find the coordinator's task that matches the parent task
+      coordinator_task = Task.find_by(id: parent_task_id)
+      return unless coordinator_task
+
+      Rails.logger.info "[CoordinatorAgent] Subtask #{completed_task.id} completed via agent activity #{agent_activity_id}"
 
       # Process as a subtask completed event
       # Reuse the subtask_completed handler logic
@@ -201,7 +206,15 @@ class CoordinatorAgent < BaseAgent
         }
       )
 
-      handle_subtask_completed(subtask_completed_event)
+      # Instead of calling handle_subtask_completed directly, enqueue a new job with the proper task_id
+      self.class.enqueue(
+        "Process event: agent_completed",
+        {
+          task_id: coordinator_task.id,
+          purpose: "Process agent_completed event",
+          event_id: subtask_completed_event.id
+        }
+      )
     rescue => e
       Rails.logger.error "[CoordinatorAgent] Error handling agent_completed event: #{e.message}"
     end
@@ -215,10 +228,14 @@ class CoordinatorAgent < BaseAgent
       input_task_id = event.data["task_id"]
       response = event.data["response"]
 
-      # Skip if this doesn't relate to our task
-      return unless task && input_task_id == task.id
+      # Skip if no task ID
+      return if input_task_id.blank?
 
-      Rails.logger.info "[CoordinatorAgent #{agent_activity&.id}] Human input provided for task #{task.id}: #{response&.truncate(100)}"
+      # Find the task directly
+      task = Task.find_by(id: input_task_id)
+      return unless task
+
+      Rails.logger.info "[CoordinatorAgent] Human input provided for task #{task.id}: #{response&.truncate(100)}"
 
       # Reload task to get current state
       task.reload
@@ -226,14 +243,25 @@ class CoordinatorAgent < BaseAgent
       # If task is waiting on human input, try to activate it
       if task.waiting_on_human? && task.may_activate?
         task.activate!
-        update_task_status("Resuming task after human input: #{response&.truncate(50)}")
+        
+        # Create a temporary agent activity to update task status
+        temp_activity = AgentActivity.create!(
+          task: task,
+          agent_type: "CoordinatorAgent",
+          status: "completed",
+          metadata: { purpose: "Update task status after human input" }
+        )
+        
+        # Use the task model directly to update status
+        task.update!(
+          notes: "#{task.notes}\n[#{Time.current.strftime("%Y-%m-%d %H:%M")} Coordinator Update]: Resuming task after human input: #{response&.truncate(50)}".strip
+        )
 
         # Start a new coordinator run to continue processing
         self.class.enqueue(
           "Resume after human input provided",
           {
             task_id: task.id,
-            agent_activity_id: agent_activity&.id,
             context: {
               event_type: "task_resumed",
               input_request_id: request_id,
