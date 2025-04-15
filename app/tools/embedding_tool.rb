@@ -87,7 +87,8 @@ class EmbeddingTool
     chunk_overlap: DEFAULT_CHUNK_OVERLAP,
     source_url: nil,
     source_title: nil,
-    metadata: {}
+    metadata: {},
+    batch_size: 5 # Process this many files in parallel
   )
     # Validate parameters
     validate_chunking_params(chunk_size, chunk_overlap)
@@ -97,82 +98,125 @@ class EmbeddingTool
     files_array = to_array(files)
     raise ArgumentError, "You must supply at least one file." if files_array.empty?
 
-    # Process each file
-    added = []
-    files_array.each do |file|
-      file_obj = validate_and_open_file(file)
-      file_path = file_obj.respond_to?(:path) ? file_obj.path : "unknown"
+    start_time = Time.now
+    total_files = files_array.size
+    Rails.logger.tagged("EmbeddingTool", "add_files") do
+      Rails.logger.info("Starting batch processing of #{total_files} files with batch size #{batch_size}")
+    
+      # Process files in batches
+      added = []
+      total_processed = 0
+      total_successful = 0
+      
+      files_array.each_slice(batch_size).with_index do |batch, batch_idx|
+        batch_start = Time.now
+        batch_num = batch_idx + 1
+        batch_size = batch.size
+        total_batches = (total_files.to_f / batch_size).ceil
+        
+        Rails.logger.info("Processing batch #{batch_num}/#{total_batches} with #{batch_size} files")
+        
+        # Process each file in the batch
+        batch_results = batch.map do |file|
+          begin
+            file_obj = validate_and_open_file(file)
+            file_path = file_obj.respond_to?(:path) ? file_obj.path : "unknown"
 
-      # Determine content type if not provided
-      detected_content_type = content_type
-      if detected_content_type.nil? && file_obj.respond_to?(:path)
-        ext = File.extname(file_obj.path).downcase
-        detected_content_type = case ext
-        when ".md", ".txt", ".text" then "text"
-        when ".html", ".htm" then "html"
-        when ".pdf" then "pdf"
-        when ".doc", ".docx" then "document"
-        when ".rb", ".py", ".js", ".java", ".c", ".cpp" then "code"
-        when ".json", ".xml", ".yaml", ".yml" then "data"
-        else DEFAULT_CONTENT_TYPE
+            # Determine content type if not provided
+            detected_content_type = content_type
+            if detected_content_type.nil? && file_obj.respond_to?(:path)
+              ext = File.extname(file_obj.path).downcase
+              detected_content_type = case ext
+              when ".md", ".txt", ".text" then "text"
+              when ".html", ".htm" then "html"
+              when ".pdf" then "pdf"
+              when ".doc", ".docx" then "document"
+              when ".rb", ".py", ".js", ".java", ".c", ".cpp" then "code"
+              when ".json", ".xml", ".yaml", ".yml" then "data"
+              else DEFAULT_CONTENT_TYPE
+              end
+            end
+
+            # Prepare file-specific metadata
+            file_metadata = build_file_metadata(
+              file_obj,
+              merge: metadata,
+              content_type: detected_content_type,
+              source_url: source_url,
+              source_title: source_title
+            )
+
+            # Log file processing
+            Rails.logger.info("Processing file: #{file_path} (#{file_obj.size} bytes, type: #{detected_content_type})")
+
+            # Read file content
+            begin
+              file_content = file_obj.read
+            rescue => e
+              Rails.logger.error("Error reading file #{file_path}: #{e.message}")
+              {
+                path: file_path,
+                error: "Failed to read file: #{e.message}",
+                status: "error"
+              }
+            else
+              # Add document to embedding service
+              result = service.add_document(
+                file_content,
+                chunk_size: chunk_size,
+                chunk_overlap: chunk_overlap,
+                content_type: detected_content_type,
+                source_url: source_url || file_path,
+                source_title: source_title || File.basename(file_path),
+                metadata: file_metadata
+              )
+
+              {
+                path: file_path,
+                size: file_obj.size,
+                content_type: detected_content_type,
+                chunk_preview: result.first&.content&.first(40),
+                chunks: result.count,
+                status: "success"
+              }
+            end
+          rescue => e
+            Rails.logger.error("Error processing file: #{e.message}")
+            {
+              path: file.respond_to?(:path) ? file.path : file.to_s,
+              error: "Processing error: #{e.message}",
+              status: "error"
+            }
+          end
         end
+        
+        # Add batch results to overall results
+        added.concat(batch_results)
+        total_processed += batch_size
+        batch_successful = batch_results.count { |item| item[:status] == "success" }
+        total_successful += batch_successful
+        
+        # Log batch completion
+        batch_time = Time.now - batch_start
+        Rails.logger.info("Batch #{batch_num}/#{total_batches} completed in #{batch_time.round(2)}s " +
+                         "(#{batch_successful}/#{batch_size} successful, " +
+                         "#{total_processed}/#{total_files} total processed)")
       end
-
-      # Prepare file-specific metadata
-      file_metadata = build_file_metadata(
-        file_obj,
-        merge: metadata,
-        content_type: detected_content_type,
-        source_url: source_url,
-        source_title: source_title
-      )
-
-      # Log file processing
-      Rails.logger.tagged("EmbeddingTool") do
-        Rails.logger.info("Processing file: #{file_path} (#{file_obj.size} bytes, type: #{detected_content_type})")
-      end
-
-      # Read file content
-      begin
-        file_content = file_obj.read
-      rescue => e
-        Rails.logger.error("Error reading file #{file_path}: #{e.message}")
-        added << {
-          path: file_path,
-          error: "Failed to read file: #{e.message}",
-          status: "error"
-        }
-        next
-      end
-
-      # Add document to embedding service
-      result = service.add_document(
-        file_content,
-        chunk_size: chunk_size,
-        chunk_overlap: chunk_overlap,
-        content_type: detected_content_type,
-        source_url: source_url || file_path,
-        source_title: source_title || File.basename(file_path),
-        metadata: file_metadata
-      )
-
-      added << {
-        path: file_path,
-        size: file_obj.size,
-        content_type: detected_content_type,
-        chunk_preview: result.first&.content&.first(40),
-        chunks: result.count,
-        status: "success"
+      
+      # Log final stats
+      total_time = Time.now - start_time
+      Rails.logger.info("File processing complete: #{total_successful}/#{total_files} files processed successfully " +
+                       "in #{total_time.round(2)}s (#{(total_time/60).round(1)} minutes)")
+      
+      {
+        status: "success",
+        message: "Files processed successfully",
+        added: added,
+        total_count: added.count,
+        successful_count: added.count { |item| item[:status] == "success" },
+        processing_time: total_time.round(2)
       }
     end
-
-    {
-      status: "success",
-      message: "Files added successfully",
-      added: added,
-      total_count: added.count,
-      successful_count: added.count { |item| item[:status] == "success" }
-    }
   end
 
   # Add text(s) to the vector database

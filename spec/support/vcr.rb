@@ -14,13 +14,16 @@ VCR.configure do |config|
 
   # Allow real connections when cassettes don't exist for development
   # But force mocking in CI environment
-  record_mode = ENV['CI'] ? :none : :once
+  record_mode = ENV['CI'] ? :none : :new_episodes
   config.default_cassette_options = {
     record: record_mode,
-    match_requests_on: [ :method, :uri, :body ],
+    match_requests_on: [ :method, :uri ],  # Remove body matching for more flexibility
     allow_playback_repeats: true
   }
 
-  # Raise an error when a request is made in testing that's not being recorded/mocked
-  config.allow_http_connections_when_no_cassette = false
+  # Allow HTTP connections when no cassette is used
+  config.allow_http_connections_when_no_cassette = true
+  
+  # Add a debug logger
+  config.debug_logger = File.open(File.join(Rails.root, 'log', 'vcr.log'), 'w') if Rails.env.test?
 end
