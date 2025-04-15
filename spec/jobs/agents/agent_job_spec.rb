@@ -35,6 +35,9 @@ RSpec.describe Agents::AgentJob, type: :job do
     end
 
     it "creates an agent_activity record" do
+      # First clear any existing activities to ensure clean test state
+      AgentActivity.where(task_id: task.id).destroy_all
+      
       expect {
         described_class.new.perform(agent_class, agent_prompt, options)
       }.to change(AgentActivity, :count).by(1)

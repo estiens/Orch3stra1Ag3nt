@@ -243,7 +243,6 @@ class CoordinatorAgent < BaseAgent
 
       # Always activate the task if it's waiting on human input
       if task.waiting_on_human?
-        # Always call activate! without checking may_activate? first to match test expectations
         task.activate!
 
         # Create a temporary agent activity to update task status
@@ -439,7 +438,6 @@ class CoordinatorAgent < BaseAgent
       )
 
       if job
-        # Always call activate! without checking may_activate? first to match test expectations
         subtask.activate!
 
         subtask.update(

@@ -115,13 +115,8 @@ RSpec.describe CoordinatorAgent do
       end
 
       it "activates the task and spawns a new coordinator" do
-        # Since the implementation now directly calls task.activate! after checking conditions,
-        # we need to ensure those conditions are met and the method will actually be called
+        # Set up the expectations before calling the method
         allow(task).to receive(:waiting_on_human?).and_return(true)
-        allow(task).to receive(:may_activate?).and_return(true)
-
-        # We still need to verify the task gets activated, but we need to modify our expectation
-        # to account for the implementation's different approach
         expect(task).to receive(:activate!).at_least(:once)
         expect(described_class).to receive(:enqueue).with(
           "Resume after human input provided",
@@ -239,7 +234,7 @@ RSpec.describe CoordinatorAgent do
           }
         ).and_return(true)
 
-        expect(subtask).to receive(:may_activate?).and_return(true)
+        # Set up the expectation before calling the method
         expect(subtask).to receive(:activate!)
 
         expect(subtask).to receive(:update).with(

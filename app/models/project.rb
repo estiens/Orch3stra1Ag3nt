@@ -40,83 +40,47 @@ class Project < ApplicationRecord
         update!(status: "active")
 
         # Create the initial orchestration task
-        # For the specific test case, we need to handle it differently
-        # but without using Rails.env.test?
-        orchestration_task = nil
-        
-        # Check if this is the test project
-        if name == "Test Project" && tasks.none?
-          # This is likely the test case - create a task that will satisfy the test
-          orchestration_task = Task.new(
-            id: 123,
-            title: "Project Orchestration: #{name}",
-            description: "Initial task to plan and coordinate project: #{description}",
-            task_type: "orchestration",
-            priority: "high",
-            metadata: {
-              project_kickoff: true,
-              project_settings: settings,
-              kickoff_time: Time.current
-            }
-          )
-          
-          # Save it to the database to make project.tasks.count work
-          # Skip validations if needed to ensure it's saved
-          tasks << orchestration_task
-        else
-          # Normal case - create a real task
-          orchestration_task = tasks.create!(
-            title: "Project Orchestration: #{name}",
-            description: "Initial task to plan and coordinate project: #{description}",
-            task_type: "orchestration",
-            priority: "high",
-            metadata: {
-              project_kickoff: true,
-              project_settings: settings,
-              kickoff_time: Time.current
-            }
-          )
-        end
+        orchestration_task = tasks.create!(
+          title: "Project Orchestration: #{name}",
+          description: "Initial task to plan and coordinate project: #{description}",
+          task_type: "orchestration",
+          priority: "high",
+          metadata: {
+            project_kickoff: true,
+            project_settings: settings,
+            kickoff_time: Time.current
+          }
+        )
 
         # Publish event to trigger OrchestratorAgent with system_event flag
         begin
-          # For the test case, we don't need to actually publish the event
-          # The test will mock the dummy_activity and expect publish_event to be called
-          # For all other cases, we need to create the activity and publish the event
-          
-          # Check if this is the test project without using Rails.env.test?
-          if name != "Test Project" || orchestration_task.persisted?
-            # Normal case - find or create a dummy agent activity for the event
-            dummy_activity = orchestration_task.agent_activities.first_or_create!(
-              agent_type: "SystemEventPublisher",
-              status: "completed"
-            )
+          # Find or create a dummy agent activity for the event
+          dummy_activity = orchestration_task.agent_activities.first_or_create!(
+            agent_type: "SystemEventPublisher",
+            status: "completed"
+          )
 
-            # Publish through the dummy activity
-            dummy_activity.publish_event(
-              "project_created",
-              {
-                project_id: id,
-                task_id: orchestration_task.id,
-                priority: priority
-              },
-              { 
-                priority: Event::HIGH_PRIORITY,
-                project_id: id,
-                task_id: orchestration_task.id
-              }
-            )
-          end
+          # Publish through the dummy activity
+          dummy_activity.publish_event(
+            "project_created",
+            {
+              project_id: id,
+              task_id: orchestration_task.id,
+              priority: priority
+            },
+            { 
+              priority: Event::HIGH_PRIORITY,
+              project_id: id,
+              task_id: orchestration_task.id
+            }
+          )
         rescue => e
           # Log but continue if event publishing fails
           Rails.logger.error("Failed to publish project_created event: #{e.message}")
         end
 
         # Activate the task to start processing
-        # Only activate if it's a persisted task (not our test mock)
-        if orchestration_task.persisted?
-          orchestration_task.activate!
-        end
+        orchestration_task.activate!
 
         # Return the orchestration task
         orchestration_task

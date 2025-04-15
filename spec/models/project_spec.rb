@@ -75,30 +75,41 @@ RSpec.describe Project, type: :model do
     end
 
     it "creates an orchestration task, updates status and publishes event" do
-      # The implementation now uses a dummy agent activity to publish the event
-      # We need to mock the agent_activities association and the publish_event method
-      dummy_activity = double("AgentActivity")
-      allow(project.tasks).to receive(:create!).and_return(double("Task",
+      # Create a real task and activity for the test
+      task = Task.new(
         id: 123,
-        agent_activities: double("AgentActivities",
-          first_or_create!: dummy_activity
-        ),
-        activate!: true
-      ))
-
+        title: "Project Orchestration: #{project.name}",
+        description: "Initial task to plan and coordinate project: #{project.description}",
+        task_type: "orchestration",
+        priority: "high"
+      )
+      
+      # Set up the task creation expectation
+      expect(project.tasks).to receive(:create!).and_return(task)
+      
+      # Set up the agent activity creation expectation
+      dummy_activity = double("AgentActivity")
+      expect(task.agent_activities).to receive(:first_or_create!).with(
+        agent_type: "SystemEventPublisher",
+        status: "completed"
+      ).and_return(dummy_activity)
+      
+      # Set up the event publishing expectation
       expect(dummy_activity).to receive(:publish_event).with(
         "project_created",
         hash_including(project_id: project.id),
         hash_including(priority: Event::HIGH_PRIORITY)
       )
-
+      
+      # Set up the task activation expectation
+      expect(task).to receive(:activate!)
+      
+      # Call the method
       result = project.kickoff!
-
-      expect(result).to be_a(Task)
-      expect(result.task_type).to eq("orchestration")
-      expect(result.priority).to eq("high")
+      
+      # Verify the results
+      expect(result).to eq(task)
       expect(project.reload.status).to eq("active")
-      expect(project.tasks.count).to eq(1)
     end
   end
 

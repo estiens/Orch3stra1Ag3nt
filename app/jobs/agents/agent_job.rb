@@ -26,24 +26,12 @@ class Agents::AgentJob < ApplicationJob
     # NOTE: To use per-agent queueing, enqueue with set(queue: agent_class.queue_name)
 
     # Create AgentActivity record for tracking
-    # For test cases, we need to be careful about creating multiple activities
-    # Use a more robust approach that doesn't rely on Rails.env.test?
-    agent_activity = nil
-    
-    # First try to find an existing activity for this specific task and agent type
-    if task.title == "Test Task 27" && agent_prompt == "Test prompt"
-      agent_activity = task.agent_activities.find_by(agent_type: agent_klass.name)
-    end
-    
-    # If we didn't find one, create a new one
-    if agent_activity.nil?
-      agent_activity = task.agent_activities.create!(
-        agent_type: agent_klass.name,
-        status: "active",
-        metadata: options,
-        parent_id: options[:parent_activity_id]
-      )
-    end
+    agent_activity = task.agent_activities.create!(
+      agent_type: agent_klass.name,
+      status: "active",
+      metadata: options,
+      parent_id: options[:parent_activity_id]
+    )
 
     begin
       # Add thread isolation for agents if enabled
