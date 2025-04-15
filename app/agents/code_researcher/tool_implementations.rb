@@ -3,7 +3,8 @@
 require "shellwords"
 require "json"
 
-module CodeResearcherToolImplementations
+module CodeResearcher
+  module ToolImplementations
   # --- Tool Implementations ---
   # These methods are included in the CodeResearcherAgent
 
@@ -193,5 +194,6 @@ module CodeResearcherToolImplementations
     shell_tool = @tools.find { |t| t.is_a?(ShellTool) }
     raise "ShellTool instance not found in agent tools" unless shell_tool
     shell_tool
+  end
   end
 end

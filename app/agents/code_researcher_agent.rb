@@ -8,8 +8,8 @@ require_relative "code_researcher/tool_implementations" # Load tool implementati
 # CodeResearcherAgent: Specializes in researching and understanding code
 # Used for finding code examples, patterns, and documentation
 class CodeResearcherAgent < BaseAgent
-  include CodeResearcherPrompts # Include the prompts
-  include CodeResearcherToolImplementations # Include the tool implementations
+  include CodeResearcher::Prompts # Include the prompts
+  include CodeResearcher::ToolImplementations # Include the tool implementations
 
   MAX_ITERATIONS = 50 # Safety break for the autonomous loop
   MAX_CONSECUTIVE_TOOL_ERRORS = 3 # Safety break for tool errors

@@ -1,11 +1,12 @@
 # frozen_string_literal: true
 
-module CodeResearcherPrompts
-  def main_loop_prompt(question:, current_notes:, examined_dirs_history:, previous_commands_history:, last_result_display:, formatted_tools:, format_instructions:, iterations:, max_iterations:)
-    <<~PROMPT
-    # ROLE AND GOAL
-    You are a meticulous Automated Code Explorer. Your primary objective is to systematically navigate and understand the codebase to gather information that comprehensively answers the user's question.
-    USER QUESTION: #{question}
+module CodeResearcher
+  module Prompts
+    def main_loop_prompt(question:, current_notes:, examined_dirs_history:, previous_commands_history:, last_result_display:, formatted_tools:, format_instructions:, iterations:, max_iterations:)
+      <<~PROMPT
+      # ROLE AND GOAL
+      You are a meticulous Automated Code Explorer. Your primary objective is to systematically navigate and understand the codebase to gather information that comprehensively answers the user's question.
+      USER QUESTION: #{question}
 
     # ANTI-REPETITION DIRECTIVE
     You MUST avoid redundant actions. Do NOT:
@@ -205,5 +206,6 @@ module CodeResearcherPrompts
       Use clear, technical language with concrete examples from the codebase.
       Structure information hierarchically with proper markdown headings and formatting.
     PROMPT
+  end
   end
 end
