@@ -1,5 +1,7 @@
-# Provides pub/sub functionality for the agent system
-# Acts as a central event dispatcher for the application
+# frozen_string_literal: true
+
+# EventBus: Backward compatibility adapter for the legacy event system
+# Provides a bridge between the old event system and Rails Event Store
 class EventBus
   # Singleton pattern for the EventBus
   include Singleton
@@ -90,22 +92,22 @@ class EventBus
     # Register a logging handler for all events if available
     if defined?(EventLoggingHandler)
       register_handler("*", EventLoggingHandler,
-                      description: "Logs all events to the database",
-                      priority: 100)
+                     description: "Logs all events to the database",
+                     priority: 100)
     end
 
     # Register a metrics/monitoring handler if available
     if defined?(EventMetricsHandler)
       register_handler("*", EventMetricsHandler,
-                      description: "Collects metrics for all events",
-                      priority: 90)
+                     description: "Collects metrics for all events",
+                     priority: 90)
     end
 
     # Register a debugging handler in development environment
     if Rails.env.development? && defined?(EventDebugHandler)
       register_handler("*", EventDebugHandler,
-                      description: "Provides debug information for events in development",
-                      priority: 110)
+                     description: "Provides debug information for events in development",
+                     priority: 110)
     end
   end
 
@@ -113,20 +115,52 @@ class EventBus
   # @param event [Event] the event to publish
   # @param async [Boolean] whether to process the event asynchronously
   def publish(event, async: true)
-    event_type = event.is_a?(Event) ? event.event_type : event[:event_type]
+    # Figure out what kind of event we have
+    if event.is_a?(Event)
+      # We have a legacy Event record
+      event_type = event.event_type
+      data = event.data
+      metadata = {
+        agent_activity_id: event.agent_activity_id,
+        task_id: event.task_id,
+        project_id: event.project_id
+      }
+    elsif event.is_a?(Hash)
+      # We have a hash with event data
+      event_type = event[:event_type]
+      data = event[:data] || {}
+      metadata = {
+        agent_activity_id: event[:agent_activity_id],
+        task_id: event[:task_id],
+        project_id: event[:project_id]
+      }
 
-    # Ensure we have an actual event object
-    event = Event.create!(event) unless event.is_a?(Event)
+      # Create an Event record for legacy handlers
+      event = Event.create!(
+        event_type: event_type,
+        data: data,
+        agent_activity_id: metadata[:agent_activity_id],
+        task_id: metadata[:task_id],
+        project_id: metadata[:project_id]
+      )
+    else
+      # We have a Rails Event Store event
+      event_type = event.event_type
+      data = event.data
+      metadata = event.metadata
+
+      # Create an Event record for legacy handlers
+      event = Event.create!(
+        event_type: event_type,
+        data: data,
+        agent_activity_id: metadata[:agent_activity_id],
+        task_id: metadata[:task_id],
+        project_id: metadata[:project_id]
+      )
+    end
 
     # Log event publishing
-    Rails.logger.info("Publishing event: #{event_type} [#{event.id}]")
-
-    handlers = handlers_for(event_type)
-
-    if handlers.empty?
-      Rails.logger.info("No handlers registered for event: #{event_type}")
-      return
-    end
+    Rails.logger.info("Legacy EventBus publishing event: #{event_type} [#{event.id}]")
 
     if async
       # Process asynchronously via a job
@@ -134,6 +168,13 @@ class EventBus
     else
       # Process synchronously
       dispatch_event(event)
+    end
+
+    # Also publish through the new EventService if it's not already coming from there
+    # This ensures both systems receive the event
+    # BUT only if we're not already receiving an RES event to avoid loops
+    unless event.is_a?(RailsEventStore::Event)
+      EventService.publish(event_type, data, metadata)
     end
 
     event

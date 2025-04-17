@@ -1,19 +1,60 @@
-# config/initializers/event_subscriptions.rb
+# frozen_string_literal: true
 
-Rails.application.config.after_initialize do
-  # Subscribe listeners to the EventBus
-  Rails.logger.info "Registering EventBus handlers..."
+# Event Subscriptions Initializer
+# Registers all event handlers with the RailsEventStore
+Rails.application.config.to_prepare do
+  # Only run in server/console environments, not during asset precompilation
+  if defined?(Rails::Server) || Rails.const_defined?("Console")
+    Rails.logger.info("Initializing Rails Event Store subscriptions...")
 
-  listener = ToolExecutionLogger.new
+    # Subscribe handlers to events
+    Rails.configuration.event_store.tap do |store|
+      # Tool execution events
+      if defined?(ToolExecutionHandler)
+        store.subscribe(
+          ToolExecutionHandler,
+          to: [
+            ToolEvents::ToolExecutionStartedEvent,
+            ToolEvents::ToolExecutionFinishedEvent,
+            ToolEvents::ToolExecutionErrorEvent
+          ]
+        )
+        Rails.logger.info("Registered ToolExecutionHandler with Rails Event Store")
+      end
 
-  # Register the listener instance for specific events
-  EventBus.register_handler("tool_execution_started", listener)
-  EventBus.register_handler("tool_execution_finished", listener)
-  EventBus.register_handler("tool_execution_error", listener)
+      # Dashboard event handler for real-time updates
+      if defined?(DashboardEventHandler)
+        # Register through our adapter for now
+        # We'll transition to direct RES subscriptions later
+        # This uses the legacy events for now
+        listener = DashboardEventHandler.new
 
-  # Add other subscriptions here if needed
-  # Example:
-  # EventBus.register_handler('some_other_event', SomeOtherHandler.new)
+        # Legacy registrations through EventBus
+        EventBus.register_handler("task_activated", listener)
+        EventBus.register_handler("task_paused", listener)
+        EventBus.register_handler("task_resumed", listener)
+        EventBus.register_handler("task_completed", listener)
+        EventBus.register_handler("task_failed", listener)
+        EventBus.register_handler("project_activated", listener)
+        EventBus.register_handler("project_paused", listener)
+        EventBus.register_handler("project_resumed", listener)
+        EventBus.register_handler("project_completed", listener)
+        EventBus.register_handler("human_input_requested", listener)
+        EventBus.register_handler("human_input_provided", listener)
+        EventBus.register_handler("human_input_ignored", listener)
+        EventBus.register_handler("agent_activity_created", listener)
+        EventBus.register_handler("agent_activity_completed", listener)
+        EventBus.register_handler("agent_activity_failed", listener)
+        EventBus.register_handler("llm_call_completed", listener)
 
-  Rails.logger.info "EventBus handlers registered."
+        Rails.logger.info("Registered DashboardEventHandler with Legacy EventBus")
+      end
+
+      # Add other handler registrations here
+      # Example:
+      # store.subscribe(SomeOtherHandler, to: [SomeEvent, AnotherEvent])
+    end
+
+    Rails.logger.info("Rails Event Store subscriptions initialized")
+  end
 end

@@ -1,3 +1,7 @@
+# frozen_string_literal: true
+
+# Event: Active Record model for storing legacy events and providing backward compatibility
+# This model is still used for dashboard broadcasting and historical queries
 class Event < ApplicationRecord
   include DashboardBroadcaster
   include Contextable
@@ -8,12 +12,6 @@ class Event < ApplicationRecord
 
   # Validations
   validates :event_type, presence: true
-
-  # Don't validate presence of data since an empty hash is valid
-  # validates :data, presence: true
-
-  # Note: We're not using serialize :data, JSON because it's causing errors
-  # Instead we'll handle serialization/deserialization manually
 
   # Use Rails 7's serialized_hash attribute for cleaner data handling
   serialize :data, coder: JSON
@@ -31,12 +29,6 @@ class Event < ApplicationRecord
     super(value.is_a?(Hash) ? value : {})
   end
 
-  # No need for the ensure_json_data method anymore as the serializer handles it
-  # Remove the callback as well
-
-  # Callback to publish the event when created
-  after_create :publish_to_event_bus
-
   # Scopes for querying events
   scope :unprocessed, -> { where(processed_at: nil) }
   scope :processed, -> { where.not(processed_at: nil) }
@@ -53,73 +45,24 @@ class Event < ApplicationRecord
   CRITICAL_PRIORITY = 30
 
   # Create and publish an event in one step
+  # This method now uses the new EventService
   def self.publish(event_type, data = {}, options = {})
-    # Check if this is a system event (specified by a flag)
-    is_system_event = options.delete(:system_event) || false
+    # Convert options to metadata format
+    metadata = {}
+    metadata[:agent_activity_id] = options[:agent_activity_id] if options[:agent_activity_id]
+    metadata[:task_id] = options[:task_id] if options[:task_id]
+    metadata[:project_id] = options[:project_id] if options[:project_id]
+    metadata[:system_event] = options[:system_event] || false
 
-    # # Validate agent_activity_id early to provide better error messages
-    # if options[:agent_activity_id].blank? && !is_system_event
-    #   Rails.logger.warn("Event.publish: Cannot publish event '#{event_type}' without agent_activity_id")
-    #   return nil
-    # end
-
-    # Check if schema exists and validate data against it
-    if EventSchemaRegistry.schema_exists?(event_type)
-      schema = EventSchemaRegistry.schema_for(event_type)
-
-      # Check required fields
-      missing_fields = []
-      schema[:required].each do |field|
-        if data[field.to_s].nil? && data[field.to_sym].nil?
-          missing_fields << field
-        end
-      end
-
-      if missing_fields.any?
-        Rails.logger.error("Event.publish: Missing required fields for '#{event_type}': #{missing_fields.join(', ')}")
-        return nil
-      end
-    else
-      Rails.logger.warn("Event.publish: No schema registered for event type '#{event_type}'")
-    end
-
-    begin
-      # Build event attributes
-      event_attrs = {
-        event_type: event_type,
-        data: data,
-        priority: options[:priority] || NORMAL_PRIORITY
-      }
-
-      # Add context attributes
-      event_attrs[:agent_activity_id] = options[:agent_activity_id] unless is_system_event
-      event_attrs[:task_id] = options[:task_id] if options[:task_id].present?
-      event_attrs[:project_id] = options[:project_id] if options[:project_id].present?
-
-      # For system events, we need to bypass the agent_activity validation
-      if is_system_event
-        # Create with validation disabled, then manually validate
-        event = new(event_attrs)
-        event.save(validate: false)
-
-        # Log system event creation
-        Rails.logger.info("Created system event: #{event_type} [#{event.id}]")
-      else
-        # Normal event creation with validations
-        event = create!(event_attrs)
-      end
-
-      # Event is published through the after_create callback
-      event
-    rescue ActiveRecord::RecordInvalid => e
-      Rails.logger.error("Event.publish: Failed to create event '#{event_type}': #{e.message}")
-      nil
-    end
+    # Publish through EventService
+    # This will also create a legacy Event record
+    EventService.publish(event_type, data, metadata)
   end
 
   # Process this event through the EventBus
   # This is used for testing and for reprocessing events
   def process
+    # For backward compatibility, use the old EventBus
     EventBus.instance.dispatch_event(self)
     mark_processed!
     self
@@ -196,7 +139,8 @@ class Event < ApplicationRecord
 
   private
 
-  def publish_to_event_bus
-    EventBus.publish(self)
-  end
+  # We no longer need this callback as we publish through EventService directly
+  # def publish_to_event_bus
+  #   EventBus.publish(self)
+  # end
 end

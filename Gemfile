@@ -85,6 +85,9 @@ gem "langchainrb"
 gem "dry-schema"
 gem "dry-validation"
 
+# event system
+gem "rails_event_store"
+
 # web scraping
 
 gem "httparty", "~> 0.21"
