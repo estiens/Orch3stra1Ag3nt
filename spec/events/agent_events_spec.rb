@@ -17,10 +17,9 @@ RSpec.shared_examples 'a valid event' do
   end
 end
 
-# Skip legacy event record creation tests as we're fully migrating to Rails Event Store
+# Legacy event record creation tests are removed as we're fully migrating to Rails Event Store
 RSpec.shared_examples 'legacy event record creation' do
-  # These tests are now skipped as we're fully migrating to Rails Event Store
-  pending 'skipped as part of RES migration'
+  # No tests - this is just a placeholder to avoid breaking existing references
 end
 
 RSpec.shared_examples 'metadata accessors' do

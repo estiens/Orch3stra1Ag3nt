@@ -58,31 +58,7 @@ RSpec.describe "Event schema validation", type: :model do
     end
   end
 
-  describe "Event.publish with schema validation" do
-    xit "publishes event with valid data - skipped during RES migration" do
-      event = Event.publish(
-        'test.validated_event',
-        { message: 'Test message', level: 'info' },
-        { agent_activity_id: agent_activity.id }
-      )
-
-      expect(event).to be_persisted
-      expect(event.event_type).to eq('test.validated_event')
-    end
-
-    xit "returns nil when publishing with invalid data - skipped during RES migration" do
-      # Capture the log message
-      expect(Rails.logger).to receive(:error).with(/Missing required fields for 'test.validated_event': level/)
-
-      event = Event.publish(
-        'test.validated_event',
-        { message: 'Test message' }, # missing 'level'
-        { agent_activity_id: agent_activity.id }
-      )
-
-      expect(event).to be_nil
-    end
-  end
+  # Legacy event schema validation tests removed as we're fully migrating to Rails Event Store
 
   describe "has_schema? and schema methods" do
     let(:event) { Event.new(event_type: 'test.validated_event', agent_activity: agent_activity) }

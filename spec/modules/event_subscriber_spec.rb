@@ -84,26 +84,7 @@ RSpec.describe EventSubscriber do
       }.to raise_error(ArgumentError, "Must provide either a method name or a block")
     end
 
-    xit 'allows multiple subscribers to listen to the same event - skipped during RES migration' do
-      # Define classes inline with unique names
-      first_subscriber = Class.new do
-        include EventSubscriber
-        subscribe_to 'shared_event', :process
-        def self.process(event); end
-        def self.name; "FirstSubscriber"; end
-      end
-
-      second_subscriber = Class.new do
-        include EventSubscriber
-        subscribe_to 'shared_event', :process
-        def self.process(event); end
-        def self.name; "SecondSubscriber"; end
-      end
-
-      handlers = EventBus.handlers_for('shared_event')
-      expect(handlers).to include(first_subscriber)
-      expect(handlers).to include(second_subscriber)
-    end
+    # Legacy event subscriber tests removed as we're fully migrating to Rails Event Store
   end
 
   describe 'processing' do

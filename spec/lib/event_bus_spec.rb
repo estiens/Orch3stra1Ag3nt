@@ -64,22 +64,7 @@ RSpec.describe EventBus do
   end
 
   describe '#publish' do
-    xit 'creates an event record - skipped during RES migration' do
-      # Create event data with a properly formatted hash
-      event_data = { event_type: 'test_event', data: { key: 'value' }, agent_activity_id: agent_activity.id }
-
-      # Force stringify the hash to match our expected format
-      expected_json = { key: 'value' }.to_json
-
-      expect {
-        @bus.publish(event_data, async: false)
-      }.to change(Event, :count).by(1)
-
-      event = Event.last
-      expect(event.event_type).to eq('test_event')
-      # Use something more permissive for testing JSON data
-      expect(event.data['key']).to eq('value')
-    end
+    # Legacy event bus tests removed as we're fully migrating to Rails Event Store
 
     # Skip these tests that are failing due to ActiveJob or mocking issues
     # In a real environment we should set up ActiveJob properly for testing

@@ -60,8 +60,5 @@ RSpec.describe BaseEvent, type: :event do
     end
   end
 
-  # These tests are now skipped as we're fully migrating to Rails Event Store
-  describe '#create_legacy_event_record' do
-    pending "skipped as part of RES migration"
-  end
+  # Legacy event record creation tests are removed as we're fully migrating to Rails Event Store
 end

@@ -39,14 +39,7 @@ RSpec.describe Event, type: :model do
     end
   end
 
-  describe 'publishing' do
-    xit 'publishes itself to the EventBus after creation - skipped during RES migration' do
-      event = Event.new(event_type: 'test_event', agent_activity: agent_activity, data: { foo: 'bar' })
-
-      expect(EventBus).to receive(:publish).with(event)
-      event.save!
-    end
-  end
+  # Legacy event publishing tests removed as we're fully migrating to Rails Event Store
 
   describe '#to_s' do
     it 'returns a string representation with event type and ID' do

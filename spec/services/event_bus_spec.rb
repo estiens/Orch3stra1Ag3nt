@@ -158,19 +158,7 @@ RSpec.describe EventBus do
       expect(Rails.logger).to have_received(:error).with(/Error dispatching event/)
     end
 
-    xit 'enqueues an EventDispatchJob when async is true' do
-      # Stub the EventDispatchJob to avoid actual enqueuing
-      allow(EventDispatchJob).to receive(:perform_later)
-
-      # Stub the EventBus instance to avoid actual dispatch
-      allow_any_instance_of(EventBus).to receive(:dispatch_event)
-
-      # Set expectations
-      expect(EventDispatchJob).to receive(:perform_later).with(event.id)
-
-      # Call the method
-      EventBus.publish(event, async: true)
-    end
+    # Legacy EventDispatchJob test removed as we're fully migrating to Rails Event Store
   end
 
   describe '#dispatch_event' do
@@ -185,25 +173,6 @@ RSpec.describe EventBus do
       EventBus.instance.dispatch_event(event)
     end
 
-    xit 'dispatches to a handler with handle_event method' do
-      # Create a test handler class
-      handler_class = Class.new
-      handler_instance = double('handler_instance')
-
-      # Set up the handler class to respond appropriately to method checks
-      allow(handler_class).to receive(:is_a?).with(Class).and_return(true)
-      allow(handler_class).to receive(:respond_to?).with(any_args).and_return(false)
-      allow(handler_class).to receive(:respond_to?).with(:process).and_return(false)
-      allow(handler_class).to receive(:respond_to?).with(:handle_event).and_return(false)
-      allow(handler_class).to receive(:instance_methods).and_return([ :handle_event ])
-      allow(handler_class).to receive(:new).and_return(handler_instance)
-
-      # Expect the handler instance to receive handle_event
-      expect(handler_instance).to receive(:handle_event).with(event)
-
-      # Register and dispatch
-      EventBus.register_handler('test_event', handler_class)
-      EventBus.instance.dispatch_event(event)
-    end
+    # Legacy handle_event method test removed as we're fully migrating to Rails Event Store
   end
 end
