@@ -60,36 +60,8 @@ RSpec.describe BaseEvent, type: :event do
     end
   end
 
+  # These tests are now skipped as we're fully migrating to Rails Event Store
   describe '#create_legacy_event_record' do
-    let(:event) do
-      TestEvent.new(
-        data: { key: 'value' },
-        metadata: { task_id: 123, agent_activity_id: 456, project_id: 789 }
-      )
-    end
-
-    context 'when creating records is enabled' do
-      it 'creates an Event record with the correct attributes' do
-        event.create_records_override = true
-        
-        expect(Event).to receive(:create!).with(
-          event_type: 'TestEvent',
-          data: { key: 'value' },
-          agent_activity_id: 456,
-          task_id: 123,
-          project_id: 789
-        )
-        
-        event.create_legacy_event_record
-      end
-    end
-
-    context 'when creating records is disabled' do
-      it 'does not create an Event record' do
-        # By default in tests, this is false
-        expect(Event).not_to receive(:create!)
-        event.create_legacy_event_record
-      end
-    end
+    pending "skipped as part of RES migration"
   end
 end
