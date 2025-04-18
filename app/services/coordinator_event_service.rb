@@ -106,13 +106,20 @@ class CoordinatorEventService < BaseEventService
       # Update task status
       task.update(status: "waiting_on_human")
 
-      # Publish event for dashboard notification
-      task.publish_event("human_input.requested", {
-        request_id: input_request.id,
-        prompt: prompt,
-        request_type: options[:type] || "text",
-        task_id: task.id
-      })
+      # Publish event for dashboard notification using EventService
+      EventService.publish(
+        "human_input.requested",
+        {
+          request_id: input_request.id,
+          prompt: prompt,
+          request_type: options[:type] || "text",
+          task_id: task.id
+        },
+        {
+          task_id: task.id,
+          project_id: task.project_id
+        }
+      )
 
       { task: task, input_request: input_request }
     end
@@ -412,13 +419,17 @@ class CoordinatorEventService < BaseEventService
           logger.info("Resumed coordination task: #{agent.task.id}")
         end
 
-        # Request recoordination to ensure progress continues
-        agent.task.publish_event(
-          "project_recoordination_requested",
+        # Request recoordination to ensure progress continues using EventService
+        EventService.publish(
+          "project.recoordination_requested",
           {
             project_id: project.id,
             project_name: project.name,
             reason: "Project resumed after being paused"
+          },
+          {
+            task_id: agent.task.id,
+            project_id: project.id
           }
         )
       end

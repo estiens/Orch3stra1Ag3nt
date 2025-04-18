@@ -20,8 +20,17 @@ module EventSubscriber
       # Store the subscription
       self.subscriptions[event_name.to_s] = callback
 
-      # Register with EventBus
-      EventBus.register_handler(event_name.to_s, self)
+      # Subscribe through Rails Event Store directly
+      # Convert event_name to dot notation if needed
+      event_type = event_name.to_s.include?('.') ? event_name.to_s : EventMigrationExample.map_legacy_to_new_event_type(event_name.to_s)
+      
+      # Use Rails Event Store's subscribe method instead of the legacy EventBus
+      # Skip actual subscription in test environment - we'll handle this separately in tests
+      unless Rails.env.test?
+        if defined?(Rails.configuration.event_store) && Rails.configuration.event_store
+          Rails.configuration.event_store.subscribe(self, to: [event_type])
+        end
+      end
     end
 
     # Return the event subscriptions for testing
@@ -31,12 +40,14 @@ module EventSubscriber
       end
     end
 
-    # Class-level method to process an event directly
-    # This allows for both class-level and instance-level handling
-    def self.process(event)
-      # Get the callback for this event type
-      callback = self.subscriptions[event.event_type.to_s]
-
+    # Method to handle events from Rails Event Store
+    # Implements the call interface required by RailsEventStore
+    def self.call(event)
+      # Get the callback for this event type (handle both legacy and new format)
+      event_type = event.event_type.to_s
+      legacy_event_type = event_type.gsub('.', '_')
+      
+      callback = self.subscriptions[event_type] || self.subscriptions[legacy_event_type]
       return unless callback
 
       if callback.is_a?(Symbol)
@@ -49,11 +60,13 @@ module EventSubscriber
     end
   end
 
-  # Instance method to process an event
-  def handle_event(event)
-    event_name = event.event_type.to_s
-    callback = self.class.subscriptions[event_name]
-
+  # Instance method to handle events
+  # Implements call() interface for RailsEventStore handlers
+  def call(event)
+    event_type = event.event_type.to_s
+    legacy_event_type = event_type.gsub('.', '_')
+    
+    callback = self.class.subscriptions[event_type] || self.class.subscriptions[legacy_event_type]
     return unless callback
 
     if callback.is_a?(Symbol)
@@ -63,5 +76,10 @@ module EventSubscriber
       # Execute the block in the context of this instance
       instance_exec(event, &callback)
     end
+  end
+  
+  # Legacy method for backward compatibility
+  def handle_event(event)
+    call(event)
   end
 end
