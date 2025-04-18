@@ -28,29 +28,56 @@ We have successfully completed the initial implementation of the event system re
 
 ## Next Steps
 
-1. **Implement More Event Types**
-   - Create event classes for agent events, system events, and other event types
-   - Update existing event consumers to use the new classes
+1. **Implement More Event Types** ✅
+   - Created event classes for agent events (AgentStartedEvent, AgentCompletedEvent, etc.)
+   - Created event classes for system events (SystemStartupEvent, SystemShutdownEvent, etc.)
+   - Added proper schema validation using Dry::Schema
+   - Implemented consistent event type naming convention (e.g., "agent.started", "system.error")
 
-2. **Refactor Existing Event Consumers**
-   - Transition from using `Event.publish` to `EventService.publish`
-   - Update handlers to handle RailsEventStore events
+2. **Refactor Existing Event Consumers** ✅
+   - Created example service showing how to transition from `Event.publish` to `EventService.publish`
+   - Created mapping between old and new event types 
+   - Added handlers for agent events and system events
+   - Updated EventPublisher concern to use EventService instead of Event.publish
+   - Updated BaseAgent to use EventService for event publishing
+   - Updated CoordinatorAgent and its event handlers to use EventService.publish
+   - Updated event handler subscriptions to handle both legacy and new event formats
+   - Updated DashboardEventHandler to work with both legacy and new event types
+   - Updated all tests to work with the new event system
 
-3. **Add More Event Projections**
-   - Implement event projections for common queries
-   - Add a way to rebuild projections if needed
+3. **Add More Event Projections** ✅
+   - Implemented EventCounterProjection as an example
+   - Created ProjectionManager service for managing projections
+   - Added support for rebuilding projections
+   - Added initialization in the application startup
 
-4. **Update Event Subscription System**
-   - Fully transition from legacy EventBus to RailsEventStore subscriptions
-   - Add more handlers for different event types
+4. **Update Event Subscription System** ✅
+   - Updated event_subscriptions.rb to include new event types
+   - Added handlers for different event types (ToolExecutionHandler, AgentEventHandler, SystemEventHandler)
+   - Added framework for transitioning from legacy EventBus to RailsEventStore subscriptions
 
-5. **Add More Documentation**
-   - Document the event system architecture
-   - Add examples for creating new events and handlers
+5. **Add More Documentation** ✅
+   - Added README.md in app/events with system architecture documentation
+   - Added README.md in app/projections with usage examples
+   - Added example code for migrating from old to new event system
+   - Added inline documentation in all new classes
 
-6. **Performance Testing**
-   - Test with high volume of events
-   - Optimize if needed
+6. **Remaining Migration Tasks** ✅
+   - Updated all instances of Event.publish to use EventService.publish
+   - Updated EventSubscriber to work with RailsEventStore directly
+   - Updated CoordinatorAgent to use the new event system consistently
+   - Removed legacy EventBus registration system
+   - Removed event_bus_setup.rb, event_system.rb and event_registry.rb files
+   - Added configuration option to disable legacy Event record creation
+   - Updated tests to skip legacy event system expectations
+   
+   Next steps:
+   - Set Rails.configuration.create_event_records = false in production once confirmed stable
+   - Remove legacy Event model and database table after transition period
+
+7. **Performance Testing** (Not Started)
+   - TODO: Test with high volume of events
+   - TODO: Optimize if needed
 
 ## Architecture Notes
 
