@@ -121,8 +121,8 @@ class Agents::AgentJob < ApplicationJob
       )
 
       # Emit a system-wide error event for possible automatic recovery
-      Event.publish(
-        "agent_error",
+      EventService.publish(
+        "agent.error",
         {
           agent_class: agent_klass.name,
           task_id: task.id,

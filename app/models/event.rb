@@ -44,8 +44,9 @@ class Event < ApplicationRecord
   HIGH_PRIORITY = 20
   CRITICAL_PRIORITY = 30
 
-  # Create and publish an event in one step
-  # This method now uses the new EventService
+  # Create and publish an event in one step (DEPRECATED)
+  # This method now delegates to EventService.publish
+  # Use EventService.publish directly instead
   def self.publish(event_type, data = {}, options = {})
     # Convert options to metadata format
     metadata = {}
@@ -53,6 +54,12 @@ class Event < ApplicationRecord
     metadata[:task_id] = options[:task_id] if options[:task_id]
     metadata[:project_id] = options[:project_id] if options[:project_id]
     metadata[:system_event] = options[:system_event] || false
+    
+    # Add priority from options if present
+    metadata[:priority] = options[:priority] if options[:priority]
+    
+    # Convert legacy event type to new dot notation format
+    event_type = EventMigrationExample.map_legacy_to_new_event_type(event_type)
 
     # Publish through EventService
     # This will also create a legacy Event record

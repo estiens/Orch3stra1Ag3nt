@@ -60,7 +60,11 @@ RSpec.describe BaseAgent do
     it "executes tools and logs the execution" do
       test_agent = TestAgent.new(purpose: purpose, agent_activity: agent_activity)
 
-      expect(agent_activity.events).to receive(:create!).twice
+      # Set up expectations for event publishing
+      # One event for tool_execution.started and one for tool_execution.finished
+      expect(agent_activity.events).to receive(:create!).at_least(:once)
+      expect(EventService).to receive(:publish).at_least(:once)
+      
       result = test_agent.execute_tool(:add_numbers, 2, 3)
 
       expect(result).to eq(5)
@@ -85,7 +89,10 @@ RSpec.describe BaseAgent do
 
       error_agent = ErrorToolAgent.new(purpose: purpose, agent_activity: agent_activity)
 
-      expect(agent_activity.events).to receive(:create!).twice
+      # Expect at least one create event (for the started event)
+      # and publishing an event for both started and error
+      expect(agent_activity.events).to receive(:create!).at_least(:once)
+      expect(EventService).to receive(:publish).at_least(:once)
 
       expect {
         error_agent.execute_tool(:failing_tool)

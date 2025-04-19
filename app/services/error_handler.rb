@@ -141,8 +141,8 @@ class ErrorHandler
     }
 
     # Create an event for this error
-    Event.publish(
-      "agent_error_occurred",
+    EventService.publish(
+      "agent.error_occurred",
       event_data,
       priority: Event::HIGH_PRIORITY
     )

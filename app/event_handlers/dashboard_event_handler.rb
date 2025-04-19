@@ -1,25 +1,49 @@
 class DashboardEventHandler
-  # Central handler method called by EventBus
+  include BaseHandler
+  
+  # Handler method called by RailsEventStore (new approach)
+  def call(event)
+    event_type = event.event_type
+    
+    # Convert dot notation to legacy format for backward compatibility
+    legacy_event_type = event_type.to_s.gsub('.', '_')
+    
+    # Process different event types
+    process_event_type(legacy_event_type)
+    
+    # Log the event for debugging
+    Rails.logger.info "DashboardEventHandler processed event: #{event_type}"
+  end
+  
+  # Legacy handler method called by EventBus (for backward compatibility)
   def handle_event(event)
     # Process different event types
-    case event.event_type.to_s
-    when "task_activated", "task_paused", "task_resumed", "task_completed", "task_failed"
-      broadcast_tasks_update
-    when "project_activated", "project_paused", "project_resumed", "project_completed"
-      broadcast_projects_update
-    when "human_input_requested", "human_input_provided", "human_input_ignored"
-      broadcast_human_input_requests_update
-    when "agent_activity_created", "agent_activity_completed", "agent_activity_failed"
-      broadcast_agent_activities_update
-    when "llm_call_completed"
-      broadcast_llm_calls_update
-    end
-
+    process_event_type(event.event_type.to_s)
+    
     # Log the event for debugging
     Rails.logger.info "DashboardEventHandler processed event: #{event.event_type}"
   end
-
+  
   private
+  
+  def process_event_type(event_type)
+    case event_type
+    when "task_activated", "task_paused", "task_resumed", "task_completed", "task_failed",
+         "task.activated", "task.paused", "task.resumed", "task.completed", "task.failed"
+      broadcast_tasks_update
+    when "project_activated", "project_paused", "project_resumed", "project_completed",
+         "project.activated", "project.paused", "project.resumed", "project.completed"
+      broadcast_projects_update
+    when "human_input_requested", "human_input_provided", "human_input_ignored",
+         "human_input.requested", "human_input.provided", "human_input.ignored"
+      broadcast_human_input_requests_update
+    when "agent_activity_created", "agent_activity_completed", "agent_activity_failed",
+         "agent_activity.created", "agent_activity.completed", "agent_activity.failed"
+      broadcast_agent_activities_update
+    when "llm_call_completed", "llm_call.completed"
+      broadcast_llm_calls_update
+    end
+  end
 
   def broadcast_tasks_update
     Turbo::StreamsChannel.broadcast_replace_to(

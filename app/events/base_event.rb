@@ -33,10 +33,16 @@ class BaseEvent < RailsEventStore::Event
   
   # Creates an Event record for backward compatibility and dashboard updates
   # This ensures existing functionality continues to work while we transition
+  # This method can be disabled by setting Rails.configuration.create_event_records = false
   def create_legacy_event_record
     # Skip in test environment unless explicitly enabled
     return true if Rails.env.test? && !explicitly_create_records?
     
+    # Skip if event records are disabled in the configuration
+    return true if Rails.configuration.respond_to?(:create_event_records) && 
+                   Rails.configuration.create_event_records == false
+    
+    # Create the legacy event record
     Event.create!(
       event_type: event_type,
       data: data,

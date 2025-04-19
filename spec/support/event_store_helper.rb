@@ -1,60 +1,64 @@
 # frozen_string_literal: true
 
-# Support for testing with Rails Event Store
+# Helper module for testing with Rails Event Store
 module EventStoreHelper
-  @@event_store = nil
-  @@create_event_records = nil
-  
-  # Mock event store methods for RailsEventStore
-  module EventStoreMock
-    def self.included(base)
-      # Override Rails.configuration.event_store and Rails.configuration.create_event_records
-      # in the test environment only for classes that include this module
-      
-      base.class_eval do
-        def self.event_store
-          EventStoreHelper.event_store
-        end
-        
-        def self.create_legacy_event_record
-          # No-op for testing
-          true
-        end
+  # Configure a real test instance of Rails Event Store
+  def self.configure_test_event_store
+    # Create a simple mock object for event_store
+    require 'rspec/mocks'
+    test_event_store = Object.new
+    def test_event_store.publish(*args); true; end
+    def test_event_store.subscribe(*args); true; end
+    def test_event_store.subscribers; []; end
+    def test_event_store.unsubscribe(*args); true; end
+
+    # Set this as the Rails.configuration.event_store for tests
+    Rails.configuration.event_store = test_event_store
+
+    # Configuration flag for legacy events - we'll stub Event.create! separately
+    Rails.configuration.create_event_records = true
+
+    # Return the event store for test assertions
+    test_event_store
+  end
+
+  # Reset everything between tests
+  def self.reset
+    # Clear all subscriptions if event store is configured
+    if defined?(Rails.configuration.event_store) && !Rails.configuration.event_store.nil?
+      Rails.configuration.event_store.tap do |es|
+        es.subscribers.each { |sub| es.unsubscribe(sub) } rescue nil
       end
     end
   end
-  
-  # Class methods for the helper
-  def self.event_store
-    if @@event_store.nil?
-      @@event_store = double('EventStore')
-      allow(@@event_store).to receive(:publish).and_return(true)
-      allow(@@event_store).to receive(:subscribe).and_return(true)
-    end
-    @@event_store
-  end
-  
-  def self.create_event_records
-    @@create_event_records ||= false
-  end
-  
-  def self.create_event_records=(value)
-    @@create_event_records = value
-  end
-  
+
   # Instance methods for the tests
   def setup_test_event_store
-    # Allow BaseEvent to access event_store without Rails.configuration
-    BaseEvent.send(:include, EventStoreMock)
+    # Ensure we have an event store configured
+    EventStoreHelper.configure_test_event_store if Rails.configuration.event_store.nil?
     
-    # Set create_event_records for the test
-    EventStoreHelper.create_event_records = true
-    
-    # Stub Event creation 
+    # Stub Event creation for legacy compatibility
     allow(Event).to receive(:create!).and_return(double('Event'))
   end
 end
 
+# Configure the test event store before test execution
 RSpec.configure do |config|
   config.include EventStoreHelper
+  
+  config.before(:suite) do
+    begin
+      EventStoreHelper.configure_test_event_store
+    rescue => e
+      puts "Error setting up EventStoreHelper: #{e.message}"
+    end
+  end
+
+  config.after(:each) do
+    begin
+      EventStoreHelper.reset
+    rescue => e
+      puts "Error in EventStoreHelper.reset: #{e.message}"
+    end
+  end
 end
