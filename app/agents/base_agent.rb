@@ -1,5 +1,6 @@
 class BaseAgent
   include SolidQueueManagement
+  include UsesPrompts
 
   # Core attributes for all agents
   attr_reader :llm, :tools, :purpose, :session_data, :task, :agent_activity, :context
@@ -244,16 +245,18 @@ class BaseAgent
   # ===== LLM Logging =====
 
   # Log a direct LLM call for tracking and analysis
-  # @param prompt [String, Array] The prompt sent to the LLM
+  # @param prompt [String, Array, Hash] The prompt sent to the LLM, or a hash with content and prompt object
   # @param llm_response [Object] The response from the LLM
   def log_direct_llm_call(prompt, llm_response)
     return unless @agent_activity && llm_response
 
     start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    prompt_content = prompt.is_a?(Hash) ? prompt[:content] : prompt
+    prompt_obj = prompt.is_a?(Hash) ? prompt[:prompt] : nil
 
     begin
       # Extract metadata from prompt and response
-      metadata = extract_llm_call_metadata(prompt, llm_response)
+      metadata = extract_llm_call_metadata(prompt_content, llm_response)
 
       # Calculate duration and cost
       duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time
@@ -263,8 +266,8 @@ class BaseAgent
         metadata[:completion_tokens]
       )
 
-      # Create the LLM call record
-      create_llm_call_record(metadata, duration, cost)
+      # Create the LLM call record with prompt_id if available
+      create_llm_call_record(metadata, duration, cost, prompt_obj)
     rescue => e
       Rails.logger.error "[BaseAgent] Failed to log direct LLM call: #{e.message}"
     end
@@ -382,7 +385,7 @@ class BaseAgent
 
     # Create both a legacy event record and a new event using EventService
     @agent_activity.events.create!(event_type: event_type, data: data)
-    
+
     # Also publish via EventService for new consumers
     publish_event(event_type, data)
   rescue => e
@@ -473,11 +476,12 @@ class BaseAgent
   end
 
   # Create an LLM call record
-  def create_llm_call_record(metadata, duration, cost)
+  def create_llm_call_record(metadata, duration, cost, prompt_obj = nil)
     @agent_activity.llm_calls.create!(
       provider: metadata[:provider],
       model: metadata[:model_name],
-      prompt: metadata[:prompt_text],
+      # Deprecated: Do not store full prompt text; use prompt_id instead
+      # prompt: metadata[:prompt_text],
       response: metadata[:response_text],
       prompt_tokens: metadata[:prompt_tokens],
       completion_tokens: metadata[:completion_tokens],
@@ -485,7 +489,8 @@ class BaseAgent
       request_payload: metadata[:request_payload] || "null",
       response_payload: metadata[:response_payload],
       duration: duration,
-      cost: cost
+      cost: cost,
+      prompt_id: prompt_obj&.id
     )
   end
 

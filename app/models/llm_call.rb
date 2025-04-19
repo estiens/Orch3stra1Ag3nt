@@ -3,6 +3,7 @@ class LlmCall < ApplicationRecord
   include Contextable
 
   belongs_to :agent_activity
+  belongs_to :prompt, optional: true
 
   # Validations
   validates :provider, presence: true
@@ -47,6 +48,7 @@ class LlmCall < ApplicationRecord
     # Adjust limits based on your database type
     max_length = 65_000
 
+    # TODO: Remove prompt text truncation after full migration to prompt_id
     self.prompt = prompt.to_s.truncate(max_length) if prompt.to_s.length > max_length
     self.response = response.to_s.truncate(max_length) if response.to_s.length > max_length
 
