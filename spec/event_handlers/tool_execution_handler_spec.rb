@@ -8,7 +8,7 @@ module ToolEvents
     def self.event_type
       'tool_execution.started'
     end
-    
+
     def event_type
       'tool_execution.started'
     end
@@ -18,7 +18,7 @@ module ToolEvents
     def self.event_type
       'tool_execution.finished'
     end
-    
+
     def event_type
       'tool_execution.finished'
     end
@@ -28,7 +28,7 @@ module ToolEvents
     def self.event_type
       'tool_execution.error'
     end
-    
+
     def event_type
       'tool_execution.error'
     end
@@ -39,7 +39,7 @@ class UnknownEvent < BaseEvent
   def self.event_type
     'unknown_event'
   end
-  
+
   def event_type
     'unknown_event'
   end

@@ -42,7 +42,7 @@ end
 RSpec.describe 'Agent Events' do
   let(:event_data) do
     {
-      data: { 
+      data: {
         agent_type: 'TestAgent',
         agent_id: 'test-123',
         purpose: 'Testing'
@@ -57,30 +57,30 @@ RSpec.describe 'Agent Events' do
     subject(:event) do
       # Create a mock event with the right interface
       mock_event = double("AgentStartedEvent")
-      
+
       # Set up the data and metadata accessors
       allow(mock_event).to receive(:data).and_return(event_data[:data])
       allow(mock_event).to receive(:metadata).and_return(event_data[:metadata])
-      
+
       # Set up the standard methods we're testing
       allow(mock_event).to receive(:valid?).and_return(true)
       allow(mock_event).to receive(:validation_errors).and_return([])
       allow(mock_event).to receive(:task_id).and_return(event_data[:metadata][:task_id])
       allow(mock_event).to receive(:agent_activity_id).and_return(event_data[:metadata][:agent_activity_id])
       allow(mock_event).to receive(:project_id).and_return(event_data[:metadata][:project_id])
-      
+
       # Mock the create_legacy_event_record method
       allow(mock_event).to receive(:event_type).and_return(described_class.event_type)
       allow(mock_event).to receive(:create_legacy_event_record).and_return(true)
       allow(mock_event).to receive(:explicitly_create_records?).and_return(false)
-      
+
       mock_event
     end
 
     it_behaves_like 'a valid event'
     it_behaves_like 'legacy event record creation'
     it_behaves_like 'metadata accessors'
-    
+
     it 'returns the correct event type' do
       expect(described_class.event_type).to eq('agent.started')
     end
@@ -106,7 +106,7 @@ RSpec.describe 'Agent Events' do
     it_behaves_like 'a valid event'
     it_behaves_like 'legacy event record creation'
     it_behaves_like 'metadata accessors'
-    
+
     it 'returns the correct event type' do
       expect(described_class.event_type).to eq('agent.completed')
     end
@@ -132,7 +132,7 @@ RSpec.describe 'Agent Events' do
     it_behaves_like 'a valid event'
     it_behaves_like 'legacy event record creation'
     it_behaves_like 'metadata accessors'
-    
+
     it 'returns the correct event type' do
       expect(described_class.event_type).to eq('agent.paused')
     end
@@ -158,7 +158,7 @@ RSpec.describe 'Agent Events' do
     it_behaves_like 'a valid event'
     it_behaves_like 'legacy event record creation'
     it_behaves_like 'metadata accessors'
-    
+
     it 'returns the correct event type' do
       expect(described_class.event_type).to eq('agent.resumed')
     end
@@ -184,7 +184,7 @@ RSpec.describe 'Agent Events' do
     it_behaves_like 'a valid event'
     it_behaves_like 'legacy event record creation'
     it_behaves_like 'metadata accessors'
-    
+
     it 'returns the correct event type' do
       expect(described_class.event_type).to eq('agent.requested_human')
     end

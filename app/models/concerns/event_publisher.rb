@@ -76,7 +76,7 @@ module EventPublisher
     def publish_event(event_type, data = {}, options = {})
       # Convert legacy event type to new dot notation format if needed
       event_type = EventMigrationExample.map_legacy_to_new_event_type(event_type)
-      
+
       # Delegate to EventService.publish since we don't have instance context
       EventService.publish(event_type, data, options)
     end

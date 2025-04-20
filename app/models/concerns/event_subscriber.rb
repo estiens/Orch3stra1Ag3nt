@@ -22,13 +22,13 @@ module EventSubscriber
 
       # Subscribe through Rails Event Store directly
       # Convert event_name to dot notation if needed
-      event_type = event_name.to_s.include?('.') ? event_name.to_s : EventMigrationExample.map_legacy_to_new_event_type(event_name.to_s)
-      
+      event_type = event_name.to_s.include?(".") ? event_name.to_s : EventMigrationExample.map_legacy_to_new_event_type(event_name.to_s)
+
       # Use Rails Event Store's subscribe method instead of the legacy EventBus
       # Skip actual subscription in test environment - we'll handle this separately in tests
       unless Rails.env.test?
         if defined?(Rails.configuration.event_store) && Rails.configuration.event_store
-          Rails.configuration.event_store.subscribe(self, to: [event_type])
+          Rails.configuration.event_store.subscribe(self, to: [ event_type ])
         end
       end
     end
@@ -45,8 +45,8 @@ module EventSubscriber
     def self.call(event)
       # Get the callback for this event type (handle both legacy and new format)
       event_type = event.event_type.to_s
-      legacy_event_type = event_type.gsub('.', '_')
-      
+      legacy_event_type = event_type.gsub(".", "_")
+
       callback = self.subscriptions[event_type] || self.subscriptions[legacy_event_type]
       return unless callback
 
@@ -64,8 +64,8 @@ module EventSubscriber
   # Implements call() interface for RailsEventStore handlers
   def call(event)
     event_type = event.event_type.to_s
-    legacy_event_type = event_type.gsub('.', '_')
-    
+    legacy_event_type = event_type.gsub(".", "_")
+
     callback = self.class.subscriptions[event_type] || self.class.subscriptions[legacy_event_type]
     return unless callback
 
@@ -77,7 +77,7 @@ module EventSubscriber
       instance_exec(event, &callback)
     end
   end
-  
+
   # Legacy method for backward compatibility
   def handle_event(event)
     call(event)
