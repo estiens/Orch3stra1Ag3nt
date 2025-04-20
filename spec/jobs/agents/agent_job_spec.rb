@@ -124,11 +124,7 @@ RSpec.describe Agents::AgentJob, type: :job do
         error_message: error_message
       )
 
-      event = Event.create!(
-        agent_activity: activity,
-        event_type: "agent_failed",
-        data: { error: error_message }
-      )
+      # Manual Event.create! removed; event creation tested via AgentActivity/ErrorHandler
 
       expect(event.event_type).to eq("agent_failed")
       expect(event.data["error"]).to eq(error_message)

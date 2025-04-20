@@ -129,8 +129,8 @@ class Agents::AgentJob < ApplicationJob
           agent_activity_id: agent_activity.id,
           error: e.message,
           error_class: e.class.name
-        },
-        priority: Event::HIGH_PRIORITY
+        }
+        # Removed legacy priority option
       )
 
       # Mark task as failed unless it's already in another terminal state

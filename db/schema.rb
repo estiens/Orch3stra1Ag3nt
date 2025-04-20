@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_04_16_234951) do
+ActiveRecord::Schema[8.0].define(version: 2025_04_20_182852) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -76,27 +76,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_16_234951) do
     t.index ["task_id"], name: "index_events_on_task_id"
   end
 
-  create_table "human_input_requests", force: :cascade do |t|
-    t.bigint "task_id", null: false
-    t.bigint "agent_activity_id"
-    t.text "question", null: false
-    t.boolean "required", default: false
-    t.string "status", default: "pending", null: false
-    t.text "response"
-    t.datetime "responded_at"
-    t.string "answered_by"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.datetime "expires_at"
-    t.index ["agent_activity_id"], name: "index_human_input_requests_on_agent_activity_id"
-    t.index ["status"], name: "index_human_input_requests_on_status"
-    t.index ["task_id", "status"], name: "index_human_input_requests_on_task_id_and_status"
-    t.index ["task_id"], name: "index_human_input_requests_on_task_id"
-  end
-
-  create_table "human_interventions", force: :cascade do |t|
-    t.text "description", null: false
-    t.string "urgency", default: "normal", null: false
+  create_table "human_interactions", force: :cascade do |t|
+    t.text "description"
+    t.string "urgency", default: "normal"
     t.string "status", default: "pending", null: false
     t.text "resolution"
     t.bigint "agent_activity_id"
@@ -108,10 +90,22 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_16_234951) do
     t.string "dismissed_by"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["agent_activity_id"], name: "index_human_interventions_on_agent_activity_id"
-    t.index ["status", "urgency"], name: "index_human_interventions_on_status_and_urgency"
-    t.index ["status"], name: "index_human_interventions_on_status"
-    t.index ["urgency"], name: "index_human_interventions_on_urgency"
+    t.string "interaction_type", null: false
+    t.bigint "task_id"
+    t.text "question"
+    t.text "response"
+    t.boolean "required", default: false, null: false
+    t.datetime "expires_at"
+    t.datetime "responded_at"
+    t.string "answered_by"
+    t.index ["agent_activity_id"], name: "index_human_interactions_on_agent_activity_id"
+    t.index ["expires_at"], name: "index_human_interactions_on_expires_at"
+    t.index ["interaction_type"], name: "index_human_interactions_on_interaction_type"
+    t.index ["status", "urgency"], name: "index_human_interactions_on_status_and_urgency"
+    t.index ["status"], name: "index_human_interactions_on_status"
+    t.index ["task_id", "status"], name: "index_human_interactions_on_task_id_and_status"
+    t.index ["task_id"], name: "index_human_interactions_on_task_id"
+    t.index ["urgency"], name: "index_human_interactions_on_urgency"
   end
 
   create_table "llm_calls", force: :cascade do |t|
@@ -129,6 +123,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_16_234951) do
     t.datetime "updated_at", null: false
     t.integer "prompt_tokens", default: 0
     t.integer "completion_tokens", default: 0
+    t.integer "prompt_id"
     t.index ["agent_activity_id"], name: "index_llm_calls_on_agent_activity_id"
   end
 
@@ -146,6 +141,27 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_16_234951) do
     t.index ["name"], name: "index_projects_on_name"
     t.index ["priority"], name: "index_projects_on_priority"
     t.index ["status"], name: "index_projects_on_status"
+  end
+
+  create_table "prompt_categories", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "slug", null: false
+    t.text "description"
+    t.jsonb "metadata", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["slug"], name: "index_prompt_categories_on_slug", unique: true
+  end
+
+  create_table "prompts", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "slug", null: false
+    t.text "description"
+    t.boolean "active", default: true
+    t.jsonb "metadata", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["slug"], name: "index_prompts_on_slug", unique: true
   end
 
   create_table "solid_queue_blocked_executions", force: :cascade do |t|
@@ -315,10 +331,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_16_234951) do
   add_foreign_key "events", "agent_activities"
   add_foreign_key "events", "projects"
   add_foreign_key "events", "tasks"
-  add_foreign_key "human_input_requests", "agent_activities"
-  add_foreign_key "human_input_requests", "tasks"
-  add_foreign_key "human_interventions", "agent_activities"
+  add_foreign_key "human_interactions", "agent_activities"
+  add_foreign_key "human_interactions", "tasks"
   add_foreign_key "llm_calls", "agent_activities"
+  add_foreign_key "llm_calls", "prompts"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

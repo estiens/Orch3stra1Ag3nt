@@ -1,31 +1,31 @@
 class DashboardEventHandler
   include BaseHandler
-  
+
   # Handler method called by RailsEventStore (new approach)
   def call(event)
     event_type = event.event_type
-    
+
     # Convert dot notation to legacy format for backward compatibility
-    legacy_event_type = event_type.to_s.gsub('.', '_')
-    
+    legacy_event_type = event_type.to_s.gsub(".", "_")
+
     # Process different event types
     process_event_type(legacy_event_type)
-    
+
     # Log the event for debugging
     Rails.logger.info "DashboardEventHandler processed event: #{event_type}"
   end
-  
+
   # Legacy handler method called by EventBus (for backward compatibility)
   def handle_event(event)
     # Process different event types
     process_event_type(event.event_type.to_s)
-    
+
     # Log the event for debugging
     Rails.logger.info "DashboardEventHandler processed event: #{event.event_type}"
   end
-  
+
   private
-  
+
   def process_event_type(event_type)
     case event_type
     when "task_activated", "task_paused", "task_resumed", "task_completed", "task_failed",
@@ -68,7 +68,7 @@ class DashboardEventHandler
       "dashboard",
       target: "human-input-requests-container",
       partial: "dashboard/human_input_requests",
-      locals: { human_input_requests: HumanInputRequest.where(status: "pending").order(created_at: :desc).limit(10) }
+      locals: { human_input_requests: HumanInteraction.input_requests.pending.order(created_at: :desc).limit(10) }
     )
   end
 

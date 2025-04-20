@@ -41,9 +41,19 @@ module ResearchCoordinator
           # If called directly, manual logging might be needed, but tools are preferred.
 
           # Publish system-wide event
-          Event.publish(
+          EventService.publish(
             "research_subtask_created",
-            { subtask_id: subtask.id, parent_id: task.id, title: title, methods: methods }
+            { # Data payload
+              # subtask_id moved to metadata
+              # parent_id moved to metadata
+              title: title,
+              methods: methods
+            },
+            { # Metadata
+              subtask_id: subtask.id,
+              parent_id: task.id,
+              task_id: subtask.id # Also include task_id for consistency if needed
+            }
           )
 
           "Created research subtask '#{title}' (ID: #{subtask.id}) for task #{task.id}"
@@ -88,7 +98,6 @@ module ResearchCoordinator
           # Event logging within activity handled by callbacks if called via tool
 
           # Publish system-wide event (optional, maybe redundant with callback log)
-          # Event.publish("researcher_assigned", { ... })
 
           "Assigned research subtask #{subtask_id} ('#{subtask.title}') to #{researcher_type}."
         rescue NameError

@@ -276,12 +276,6 @@ class WebResearcherAgent < BaseAgent
       task.complete! if task.may_complete?
 
       # Publish event if this is a subtask (handled in BaseAgent now? No, compile should publish)
-      if task.parent_id
-        Event.publish(
-          "research_subtask_completed",
-          { subtask_id: task.id, parent_id: task.parent_id, result: compiled_result }
-        )
-      end
 
       compiled_result
     rescue => e

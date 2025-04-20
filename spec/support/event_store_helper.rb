@@ -15,8 +15,8 @@ module EventStoreHelper
     # Set this as the Rails.configuration.event_store for tests
     Rails.configuration.event_store = test_event_store
 
-    # Configuration flag for legacy events - we'll stub Event.create! separately
-    Rails.configuration.create_event_records = true
+    # Rails.configuration.create_event_records is set in initializers/config/event_system.rb
+    # No longer needed here
 
     # Return the event store for test assertions
     test_event_store
@@ -36,16 +36,15 @@ module EventStoreHelper
   def setup_test_event_store
     # Ensure we have an event store configured
     EventStoreHelper.configure_test_event_store if Rails.configuration.event_store.nil?
-    
-    # Stub Event creation for legacy compatibility
-    allow(Event).to receive(:create!).and_return(double('Event'))
+
+    # Removed stub for legacy Event.create!
   end
 end
 
 # Configure the test event store before test execution
 RSpec.configure do |config|
   config.include EventStoreHelper
-  
+
   config.before(:suite) do
     begin
       EventStoreHelper.configure_test_event_store

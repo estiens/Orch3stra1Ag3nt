@@ -103,10 +103,20 @@ module Coordinator
             data: { subtask_id: subtask.id, parent_id: task.id, title: title, priority: normalized_priority }
           )
 
-          Event.publish(
+          EventService.publish(
             "subtask_created",
-            { subtask_id: subtask.id, parent_id: task.id, title: title, priority: normalized_priority },
-            { agent_activity_id: agent_activity&.id }
+            { # Data payload
+              # subtask_id moved to metadata
+              # parent_id moved to metadata
+              title: title,
+              priority: normalized_priority
+            },
+            { # Metadata
+              subtask_id: subtask.id,
+              parent_id: task.id,
+              task_id: subtask.id, # Include task_id for consistency
+              agent_activity_id: agent_activity&.id
+            }
           )
 
           "Created subtask '#{title}' (ID: #{subtask.id}, Priority: #{normalized_priority}) for task #{task.id}"
@@ -278,14 +288,20 @@ module Coordinator
           )
 
           # Publish event for the system
-          Event.publish(
+          EventService.publish(
             "sub_coordinator_created",
-            {
+            { # Data payload
+              # subtask_id moved to metadata
+              # parent_task_id moved to metadata
+              # parent_coordinator_id moved to metadata
+            },
+            { # Metadata
               subtask_id: subtask.id,
               parent_task_id: task.id,
-              parent_coordinator_id: agent_activity&.id
-            },
-            { agent_activity_id: agent_activity&.id }
+              parent_coordinator_id: agent_activity&.id,
+              task_id: subtask.id, # Include task_id for consistency
+              agent_activity_id: agent_activity&.id
+            }
           )
 
           "Created sub-coordinator for subtask #{subtask_id} ('#{subtask.title}'). This subtask will be further decomposed into smaller tasks."

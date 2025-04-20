@@ -97,8 +97,8 @@ RSpec.describe Project, type: :model do
       # Set up the event publishing expectation
       expect(dummy_activity).to receive(:publish_event).with(
         "project_created",
-        hash_including(project_id: project.id),
-        hash_including(priority: Event::HIGH_PRIORITY)
+        hash_including(project_id: project.id)
+        # Removed hash_including(priority: Event::HIGH_PRIORITY)
       )
 
       # Set up the task activation expectation

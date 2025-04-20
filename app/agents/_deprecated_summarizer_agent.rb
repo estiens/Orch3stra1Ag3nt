@@ -331,12 +331,6 @@ class SummarizerAgent < BaseAgent
       task.complete! if task.may_complete?
 
       # Publish completion event if it's a subtask
-      if task.parent_id
-        Event.publish(
-          "research_subtask_completed", # Or a generic subtask_completed?
-          { subtask_id: task.id, parent_id: task.parent_id, result: final_summary_content }
-        )
-      end
 
       final_summary_content
     rescue => e

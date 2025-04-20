@@ -32,12 +32,14 @@ module Coordinator
         end
 
         begin
-          input_request = HumanInputRequest.create!(
+          interaction = HumanInteraction.create!(
+            interaction_type: "input_request", # Specify type
             task: task,
             question: question,
             required: required,
             status: "pending",
             agent_activity: agent_activity
+            # context: {} # Add context if needed
           )
 
           if required && task.may_wait_on_human?
@@ -47,16 +49,23 @@ module Coordinator
             status_msg = "👤 Optional human input requested for task #{task.id} (will continue processing)"
           end
 
-          Event.publish(
+          EventService.publish(
             "human_input_requested",
-            { request_id: input_request.id, task_id: task.id, question: question, required: required },
-            {
-              agent_activity_id: agent_activity&.id,
-              priority: required ? Event::HIGH_PRIORITY : Event::NORMAL_PRIORITY
+            { # Data payload
+              # request_id moved to metadata
+              # task_id moved to metadata
+              question: question,
+              required: required
+            },
+            { # Metadata
+              request_id: interaction.id, # Use interaction.id
+              task_id: task.id,
+              agent_activity_id: agent_activity&.id
+              # Legacy priority option removed
             }
           )
 
-          "#{status_msg}: '#{question}' (Request ID: #{input_request.id})"
+          "#{status_msg}: '#{question}' (Request ID: #{interaction.id})" # Use interaction.id
         rescue => e
           Rails.logger.error "[CoordinatorAgent] Error requesting human input: #{e.message}"
           "Error requesting human input: #{e.message}"
@@ -88,10 +97,16 @@ module Coordinator
           if task.may_complete?
             task.complete!
 
-            Event.publish(
+            EventService.publish(
               "task_completed",
-              { task_id: task.id, result: summary },
-              { agent_activity_id: agent_activity&.id }
+              { # Data payload
+                # task_id moved to metadata
+                result: summary
+              },
+              { # Metadata
+                task_id: task.id,
+                agent_activity_id: agent_activity&.id
+              }
             )
 
             "✅ Task #{task.id} ('#{task.title}') successfully COMPLETED!"

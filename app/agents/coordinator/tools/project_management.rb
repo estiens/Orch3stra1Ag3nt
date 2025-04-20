@@ -40,7 +40,8 @@ module Coordinator
 
           # Collect information about tasks waiting on human input
           waiting_info = waiting_tasks.map do |t|
-            input_requests = HumanInputRequest.where(task_id: t.id, status: "pending")
+            # Find pending input requests for the task using the new model
+            input_requests = HumanInteraction.input_requests.where(task_id: t.id, status: "pending")
             {
               id: t.id,
               title: t.title,
@@ -145,48 +146,61 @@ module Coordinator
             justification = analysis.match(/JUSTIFICATION:\s*(.*?)(?=\n\n|\z)/m)&.[](1)&.strip || "Project requires human intervention based on analysis."
 
             # Create a human intervention request
-            intervention = HumanIntervention.create!(
+            intervention = HumanInteraction.create!(
+              interaction_type: "intervention", # Specify type
               description: "PROJECT ESCALATION: #{project.name}\n\n#{justification}",
               urgency: "high",
               status: "pending",
-              agent_activity_id: agent_activity&.id
+              agent_activity_id: agent_activity&.id # Keep existing logic
             )
 
-            Event.publish(
+            EventService.publish(
               "human_intervention_requested",
-              {
-                intervention_id: intervention.id,
+              { # Data payload
+                # intervention_id moved to metadata
                 description: "Project escalation: #{project.name}",
-                urgency: "high",
-                project_id: project.id
+                urgency: "high"
+                # project_id moved to metadata
               },
-              { priority: Event::HIGH_PRIORITY }
+              { # Metadata
+                intervention_id: intervention.id,
+                project_id: project.id
+                # Legacy priority option removed
+              }
             )
 
             "Escalated project #{project.name} to human operators. Intervention ID: #{intervention.id}"
           when "REPLAN"
             # Create a human input request for replanning
-            input_request = HumanInputRequest.create!(
+            interaction = HumanInteraction.create!(
+              interaction_type: "input_request", # Specify type
               task: task || root_tasks.first,
               question: "Project #{project.name} needs replanning. Analysis suggests:\n\n#{analysis}",
               required: true,
               status: "pending",
               agent_activity: agent_activity
+              # context: { project_id: project.id } # Add context if relevant
             )
 
-            Event.publish(
-              "human_input_requested",
-              {
-                request_id: input_request.id,
-                task_id: task&.id || root_tasks.first&.id,
+            EventService.publish(
+              "human_input_requested", # Keeping original event name for now
+              { # Data payload
+                # request_id moved to metadata
+                # task_id moved to metadata
                 question: "Project needs replanning",
-                required: true,
-                project_id: project.id
+                required: true
+                # project_id moved to metadata
               },
-              { agent_activity_id: agent_activity&.id, priority: Event::HIGH_PRIORITY }
+              { # Metadata
+                request_id: interaction.id, # Use interaction.id
+                task_id: task&.id || root_tasks.first&.id,
+                project_id: project.id,
+                agent_activity_id: agent_activity&.id
+                # Legacy priority option removed
+              }
             )
 
-            "Project #{project.name} needs replanning. Human input requested (ID: #{input_request.id})."
+            "Project #{project.name} needs replanning. Human input requested (ID: #{interaction.id})." # Use interaction.id
           else
             # Default action if parsing fails
             "Analyzed project #{project.name} (#{completed_tasks.count}/#{all_tasks.count} tasks completed). Unable to determine specific action from analysis."

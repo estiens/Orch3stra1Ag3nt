@@ -207,8 +207,8 @@ RSpec.describe OrchestratorAgent do
 
         expect(Event).to receive(:publish).with(
           "human_intervention_requested",
-          hash_including(intervention_id: intervention.id, description: "Critical issue", urgency: "high"),
-          hash_including(:priority)
+          hash_including(intervention_id: intervention.id, description: "Critical issue", urgency: "high")
+          # Removed hash_including(:priority)
         )
 
         result = agent.send(:escalate_to_human, "Critical issue", "high")
@@ -223,8 +223,8 @@ RSpec.describe OrchestratorAgent do
 
         expect(Event).to receive(:publish).with(
           "human_intervention_requested",
-          anything,
-          hash_including(priority: Event::CRITICAL_PRIORITY)
+          anything
+          # Removed hash_including(priority: Event::CRITICAL_PRIORITY)
         )
 
         agent.send(:escalate_to_human, "Critical issue", "critical")

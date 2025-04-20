@@ -20,22 +20,7 @@ class AgentActivity < ApplicationRecord
       error_message: error_message
     )
 
-    # Then try to publish the event, with error handling
-    begin
-      # Publish event for agent failure
-      publish_event(
-        "agent_failed",
-        {
-          task_id: task_id,
-          agent_type: agent_type,
-          error_message: error_message,
-          agent_activity_id: id
-        }
-      )
-    rescue => e
-      # Log the error but don't raise it, as this is already part of error handling
-      Rails.logger.error("[AgentActivity#mark_failed] Failed to publish agent_failed event: #{e.message}")
-    end
+    # Event publishing removed - handled by Task model's TaskFailedEvent
   end
 
   # Pause this agent activity
@@ -44,20 +29,7 @@ class AgentActivity < ApplicationRecord
 
     update(status: "paused")
 
-    # Publish event for agent paused with error handling
-    begin
-      publish_event(
-        "agent_paused",
-        {
-          task_id: task_id,
-          agent_type: agent_type,
-          agent_activity_id: id
-        }
-      )
-    rescue => e
-      # Log the error but don't raise it
-      Rails.logger.error("[AgentActivity#pause!] Failed to publish agent_paused event: #{e.message}")
-    end
+    # Event publishing removed - handled by Task model's TaskPausedEvent
 
     true
   end
@@ -68,20 +40,7 @@ class AgentActivity < ApplicationRecord
 
     update(status: "running")
 
-    # Publish event for agent resumed with error handling
-    begin
-      publish_event(
-        "agent_resumed",
-        {
-          task_id: task_id,
-          agent_type: agent_type,
-          agent_activity_id: id
-        }
-      )
-    rescue => e
-      # Log the error but don't raise it
-      Rails.logger.error("[AgentActivity#resume!] Failed to publish agent_resumed event: #{e.message}")
-    end
+    # Event publishing removed - handled by Task model's TaskResumedEvent
 
     true
   end

@@ -200,40 +200,43 @@ class CoordinatorEventService < BaseEventService
       logger.info("Human input provided for request: #{request_id}")
 
       # Find the input request
-      input_request = HumanInputRequest.find_by(id: request_id)
+      # Find the interaction (input request type)
+      interaction = HumanInteraction.find_by(id: request_id, interaction_type: "input_request")
 
-      if input_request.nil?
-        logger.error("Input request not found with ID: #{request_id}")
+      if interaction.nil?
+        logger.error("HumanInteraction (Input Request) not found with ID: #{request_id}")
         return nil
       end
 
-      # Update the input request
-      input_request.update(
-        response: input,
-        status: "completed",
-        responded_at: Time.current
-      )
+      # Update the interaction using its answer! method
+      # Assuming the event data 'input' corresponds to the response text
+      # TODO: Consider passing user_id if available from the event context
+      interaction.answer!(input)
 
       # Find the associated task
-      task = input_request.task
+      task = interaction.task # Use the interaction to find the task
 
       if task.nil?
-        logger.error("Task not found for input request: #{request_id}")
+        # Use interaction.id for logging consistency
+        logger.error("Task not found for HumanInteraction (Input Request): #{interaction.id}")
         return nil
       end
 
       # Resume the task with the provided input
+      # Note: The resume logic is now handled within interaction.answer! if needed.
+      # We might still need to process the input further depending on application logic.
       if task.status == "waiting_on_human"
-        logger.info("Resuming task with human input: #{task.id}")
-        task.resume!
-
-        # Process the human input for the task
-        process_human_input(task, input, input_request)
+        logger.info("Task #{task.id} was potentially resumed by HumanInteraction #{interaction.id}. Processing input.")
+        # task.resume! # This is now handled internally by answer! -> resume_task
+        # Process the human input for the task, using the interaction object
+        process_human_input(task, input, interaction)
       else
-        logger.warn("Task not in waiting_on_human status: #{task.id}, current status: #{task.status}")
+        # If the task wasn't waiting, maybe just log the input processing?
+        logger.warn("Task #{task.id} not in waiting_on_human status, but received input for HumanInteraction #{interaction.id}. Processing input.")
+        process_human_input(task, input, interaction) # Still process the input? Depends on logic.
       end
 
-      { task: task, input_request: input_request }
+      { task: task, interaction: interaction } # Return the interaction object
     end
   end
 

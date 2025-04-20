@@ -55,24 +55,28 @@ Rails.application.config.to_prepare do
       if defined?(DashboardEventHandler)
         # Register with RailsEventStore for all event types
         dashboard_handler = DashboardEventHandler.new
-        
+
         # Dashboard will listen to all events for broadcasting updates
         store.subscribe(
           dashboard_handler,
           to: [
-            # Task events
-            'task.activated', 'task.paused', 'task.resumed', 'task.completed', 'task.failed',
+            # Task events (using new classes)
+            TaskEvents::TaskActivatedEvent,
+            TaskEvents::TaskPausedEvent,
+            TaskEvents::TaskResumedEvent,
+            TaskEvents::TaskCompletedEvent,
+            TaskEvents::TaskFailedEvent,
             # Project events
-            'project.activated', 'project.paused', 'project.resumed', 'project.completed',
+            "project.activated", "project.paused", "project.resumed", "project.completed",
             # Human input events
-            'human_input.requested', 'human_input.provided', 'human_input.ignored',
+            "human_input.requested", "human_input.provided", "human_input.ignored",
             # Agent activity events
-            'agent_activity.created', 'agent_activity.completed', 'agent_activity.failed',
+            "agent_activity.created", "agent_activity.completed", "agent_activity.failed",
             # LLM call events
-            'llm_call.completed'
+            "llm_call.completed"
           ]
         )
-        
+
         Rails.logger.info("Registered DashboardEventHandler with Rails Event Store")
       end
 

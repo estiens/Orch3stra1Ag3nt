@@ -36,7 +36,6 @@ module ResearchCoordinator
           # Event logging handled by callbacks
 
           # Publish system event (optional)
-          # Event.publish("findings_consolidated", { task_id: task.id, subtask_count: completed_subtasks.count })
 
           consolidated_result
         rescue => e
@@ -63,13 +62,15 @@ module ResearchCoordinator
         end
 
         begin
-          input_request = HumanInputRequest.create!(
+          interaction = HumanInteraction.create!(
+            interaction_type: "input_request", # Specify type
             task: task,
             question: question,
             required: true, # Guidance is usually required
             status: "pending",
             agent_activity: agent_activity,
-            metadata: { context: context }
+            context: { context: context } # Use context instead of metadata? Check model.
+            # Assuming metadata was mapped to context. If not, adjust.
           )
 
           task.wait_on_human! if task.may_wait_on_human?
@@ -77,13 +78,22 @@ module ResearchCoordinator
           # Event log handled by callback
 
           # Publish system event
-          Event.publish(
+          EventService.publish(
             "research_guidance_requested",
-            { request_id: input_request.id, task_id: task.id, question: question, context: context },
-            priority: Event::HIGH_PRIORITY
+            { # Data payload
+              # request_id moved to metadata
+              # task_id moved to metadata
+              question: question,
+              context: context
+            },
+            { # Metadata
+              request_id: interaction.id, # Use interaction.id
+              task_id: task.id
+            }
+            # Legacy priority option removed
           )
 
-          "Research task #{task.id} is now waiting for human guidance on: '#{question}' (Request ID: #{input_request.id})"
+          "Research task #{task.id} is now waiting for human guidance on: '#{question}' (Request ID: #{interaction.id})" # Use interaction.id
         rescue => e
           Rails.logger.error "[ResearchCoordinatorAgent] Error requesting human guidance: #{e.message}"
           "Error requesting human guidance: #{e.message}"

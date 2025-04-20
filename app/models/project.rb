@@ -108,7 +108,7 @@ class Project < ApplicationRecord
               priority: priority
             },
             {
-              priority: Event::HIGH_PRIORITY,
+              # Removed legacy priority option
               project_id: id,
               task_id: orchestration_task.id
             }
@@ -219,15 +219,19 @@ class Project < ApplicationRecord
           )
         else
           # Create a system event if no agent activities exist
-          Event.publish(
+          EventService.publish(
             "project_paused",
-            {
-              project_id: id,
+            { # Data payload
+              # project_id moved to metadata
               project_name: name,
               paused_at: Time.current
             },
-            { priority: Event::HIGH_PRIORITY }
-          ) if defined?(Event)
+            { # Metadata
+              project_id: id
+            }
+            # Legacy priority option removed
+            # 'if defined?(Event)' removed
+          )
         end
       rescue => e
         # Log but don't fail if event publishing fails
@@ -288,15 +292,19 @@ class Project < ApplicationRecord
           )
         else
           # Create a system event if no agent activities exist
-          Event.publish(
+          EventService.publish(
             "project_resumed",
-            {
-              project_id: id,
+            { # Data payload
+              # project_id moved to metadata
               project_name: name,
               resumed_at: Time.current
             },
-            { priority: Event::HIGH_PRIORITY }
-          ) if defined?(Event)
+            { # Metadata
+              project_id: id
+            }
+            # Legacy priority option removed
+            # 'if defined?(Event)' removed
+          )
         end
       rescue => e
         # Log but don't fail if event publishing fails
@@ -304,14 +312,17 @@ class Project < ApplicationRecord
       end
 
       # Trigger project re-coordination
-      Event.publish(
+      EventService.publish(
         "project_recoordination_requested",
-        {
-          project_id: id,
+        { # Data payload
+          # project_id moved to metadata
           project_name: name,
           reason: "Project resumed after being paused"
         },
-        { priority: Event::HIGH_PRIORITY }
+        { # Metadata
+          project_id: id
+        }
+        # Legacy priority option removed
       )
 
       true

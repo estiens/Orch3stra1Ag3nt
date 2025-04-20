@@ -3,6 +3,6 @@
 # Event System Configuration
 # This file contains configuration settings for the event system
 
-# By default, create legacy Event records for backward compatibility
-# Set this to false when fully migrated to RailsEventStore
-Rails.configuration.create_event_records = true
+# Configuration flag indicating whether legacy Event records are created.
+# This should be false now that the migration to RailsEventStore is complete.
+Rails.configuration.create_event_records = false

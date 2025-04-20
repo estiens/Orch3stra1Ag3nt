@@ -41,14 +41,8 @@ class Task < ApplicationRecord
     event :activate do
       transitions from: [ :pending, :paused ], to: :active
       after do
-        # Publish event for dashboard updates
-        if agent_activities.any?
-          agent_activities.last.publish_event("task_activated", { task_id: id, task_title: title })
-        else
-          # Create a temporary agent activity if needed for the event
-          temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
-          temp_activity.publish_event("task_activated", { task_id: id, task_title: title })
-        end
+        # Publish event using EventService
+        EventService.publish(TaskEvents::TaskActivatedEvent.new(data: { task_id: id, task_title: title }))
 
         # Enqueue the task for processing if it was activated
         enqueue_for_processing
@@ -58,14 +52,8 @@ class Task < ApplicationRecord
     event :pause do
       transitions from: :active, to: :paused
       after do
-        # Publish event for dashboard updates
-        if agent_activities.any?
-          agent_activities.last.publish_event("task_paused", { task_id: id, task_title: title })
-        else
-          # Create a temporary agent activity if needed for the event
-          temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
-          temp_activity.publish_event("task_paused", { task_id: id, task_title: title })
-        end
+        # Publish event using EventService
+        EventService.publish(TaskEvents::TaskPausedEvent.new(data: { task_id: id, task_title: title }))
       end
     end
 
@@ -76,42 +64,24 @@ class Task < ApplicationRecord
     event :complete do
       transitions from: [ :active, :waiting_on_human, :paused ], to: :completed
       after do
-        # Publish event for dashboard updates
-        if agent_activities.any?
-          agent_activities.last.publish_event("task_completed", { task_id: id, task_title: title })
-        else
-          # Create a temporary agent activity if needed for the event
-          temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
-          temp_activity.publish_event("task_completed", { task_id: id, task_title: title })
-        end
+        # Publish event using EventService
+        EventService.publish(TaskEvents::TaskCompletedEvent.new(data: { task_id: id, task_title: title }))
       end
     end
 
     event :fail do
       transitions from: [ :pending, :active, :waiting_on_human, :paused ], to: :failed
       after do
-        # Publish event for dashboard updates
-        if agent_activities.any?
-          agent_activities.last.publish_event("task_failed", { task_id: id, task_title: title, error: metadata&.dig("error_message") })
-        else
-          # Create a temporary agent activity if needed for the event
-          temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
-          temp_activity.publish_event("task_failed", { task_id: id, task_title: title, error: metadata&.dig("error_message") })
-        end
+        # Publish event using EventService
+        EventService.publish(TaskEvents::TaskFailedEvent.new(data: { task_id: id, task_title: title, error_message: metadata&.dig("error_message") }))
       end
     end
 
     event :resume do
       transitions from: :paused, to: :active
       after do
-        # Publish event for dashboard updates
-        if agent_activities.any?
-          agent_activities.last.publish_event("task_resumed", { task_id: id, task_title: title })
-        else
-          # Create a temporary agent activity if needed for the event
-          temp_activity = agent_activities.create!(agent_type: "system", status: "completed")
-          temp_activity.publish_event("task_resumed", { task_id: id, task_title: title })
-        end
+        # Publish event using EventService
+        EventService.publish(TaskEvents::TaskResumedEvent.new(data: { task_id: id, task_title: title }))
 
         # Enqueue the task for processing when resumed
         enqueue_for_processing
@@ -153,7 +123,7 @@ class Task < ApplicationRecord
 
   # Check if this task has any pending human input requests
   def waiting_for_human_input?
-    HumanInputRequest.where(task_id: id, status: "pending").exists?
+    HumanInteraction.input_requests.where(task_id: id, status: "pending").exists?
   end
 
   # Default task type if not specified
@@ -185,10 +155,6 @@ class Task < ApplicationRecord
     )
   end
 
-  # Access events through agent_activities (helper method)
-  def events
-    Event.where(agent_activity_id: agent_activities.pluck(:id))
-  end
 
   # Get LLM call statistics for this task
   def llm_call_stats

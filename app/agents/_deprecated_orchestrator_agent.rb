@@ -414,8 +414,8 @@ class OrchestratorAgent < BaseAgent
     end
 
     # Get error metrics
-    recent_errors = Event.where(event_type: "agent_error").recent.limit(5)
-    error_summary = recent_errors.map { |e| "#{e.data['error_type']}: #{(e.data['error_message'] || 'No error message').truncate(50)}" }.join("\n")
+    # Removed legacy Event.where query for recent errors
+    error_summary = "Error summary unavailable (legacy Event model removed)"
 
     # Get project metrics
     active_projects = Project.where(status: "active").count
@@ -447,7 +447,7 @@ class OrchestratorAgent < BaseAgent
         paused: paused_projects,
         completed: completed_projects
       },
-      errors: { recent: error_summary }
+      errors: { recent: error_summary } # Note: Based on removed legacy Event model
     }
 
     # Create prompt for LLM analysis using the agent's @llm
@@ -559,25 +559,16 @@ class OrchestratorAgent < BaseAgent
 
   # Tool implementation: Escalate an issue to human operators
   def escalate_to_human(issue_description, urgency = "normal")
-    intervention = HumanIntervention.create!(
+    intervention = HumanInteraction.create!(
+      interaction_type: "intervention", # Specify type
       description: issue_description,
       urgency: urgency,
       status: "pending",
-      agent_activity_id: agent_activity&.id
+      agent_activity_id: agent_activity&.id # Keep existing logic
     )
 
     # Set the appropriate priority based on urgency
-    event_priority = if urgency == "critical"
-                      Event::CRITICAL_PRIORITY
-    else
-                      Event::HIGH_PRIORITY
-    end
-
-    Event.publish(
-      "human_intervention_requested",
-      { intervention_id: intervention.id, description: issue_description, urgency: urgency },
-      { priority: event_priority }
-    )
+    # Event.publish removed for "human_intervention_requested" as agent is deprecated
 
     "Escalated to human operators with #{urgency} urgency. Intervention ID: #{intervention.id}"
   rescue => e
@@ -875,17 +866,7 @@ class OrchestratorAgent < BaseAgent
         }
       )
 
-      # Publish an event for the system
-      Event.publish(
-        "project_recoordination_initiated",
-        {
-          project_id: project.id,
-          project_name: project.name,
-          target_task_id: target_task.id,
-          project_stats: coordinator_options[:metadata][:project_stats]
-        },
-        { agent_activity_id: agent_activity&.id }
-      )
+      # Event.publish removed for "project_recoordination_initiated" as agent is deprecated
 
       "Initiated re-coordination for project '#{project.name}' (ID: #{project_id}, #{completion_percentage}% complete). A CoordinatorAgent has been assigned to evaluate progress and determine next steps."
 
