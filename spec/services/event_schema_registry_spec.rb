@@ -51,7 +51,7 @@ RSpec.describe EventSchemaRegistry do
   end
 
   describe '.validate_event' do
-    let(:event) { instance_double(Event, event_type: 'test.event', data: { 'name' => 'Test' }) }
+    let(:event) { instance_double(BaseEvent, event_type: 'test.event', data: { 'name' => 'Test' }) }
 
     before do
       EventSchemaRegistry.register_schema(

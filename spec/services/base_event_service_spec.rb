@@ -2,7 +2,7 @@ require 'rails_helper'
 
 RSpec.describe BaseEventService do
   let(:service) { BaseEventService.new }
-  let(:event) { instance_double(Event, id: 1, event_type: 'test.event', data: {}) }
+  let(:event) { instance_double(BaseEvent, id: 1, event_type: 'test.event', data: {}) }
   let(:handler_name) { 'TestHandler' }
   let(:logger) { instance_double(ActiveSupport::Logger) }
 

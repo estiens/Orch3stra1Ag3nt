@@ -106,11 +106,6 @@ class Project < ApplicationRecord
               project_id: id,
               task_id: orchestration_task.id,
               priority: priority
-            },
-            {
-              # Removed legacy priority option
-              project_id: id,
-              task_id: orchestration_task.id
             }
           )
         rescue => e

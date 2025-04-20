@@ -235,9 +235,6 @@ class BaseAgent
     merged_options[:task_id] ||= @task.id if @task.present?
     merged_options[:project_id] ||= @task.project_id if @task&.project_id.present?
 
-    # Convert legacy event type to new dot notation format if needed
-    event_type = EventMigrationExample.map_legacy_to_new_event_type(event_type)
-
     # Publish event through the EventService
     EventService.publish(event_type, data, merged_options)
   end
@@ -379,14 +376,9 @@ class BaseAgent
       event_type = "tool_execution.error"
     else
       data[:result_preview] = tool_data[:result].to_s.truncate(500)
-      # Convert legacy event type to new dot notation format if needed
-      event_type = EventMigrationExample.map_legacy_to_new_event_type(event_type)
     end
 
-    # Create both a legacy event record and a new event using EventService
-    @agent_activity.events.create!(event_type: event_type, data: data)
-
-    # Also publish via EventService for new consumers
+    # Publish via EventService for new consumers
     publish_event(event_type, data)
   rescue => e
     Rails.logger.error "[BaseAgent] Failed to log tool event '#{event_type}' for tool '#{tool_data[:tool]}': #{e.message}"

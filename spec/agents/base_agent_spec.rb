@@ -60,12 +60,13 @@ RSpec.describe BaseAgent do
     it "executes tools and logs the execution" do
       test_agent = TestAgent.new(purpose: purpose, agent_activity: agent_activity)
 
-      # Set up expectations for event publishing
-      # One event for tool_execution.started and one for tool_execution.finished
-      expect(agent_activity.events).to receive(:create!).at_least(:once)
-      expect(EventService).to receive(:publish).at_least(:once)
-      
+      # Allow EventService.publish to be called (spying)
+      allow(EventService).to receive(:publish).and_return(instance_double(BaseEvent))
+
       result = test_agent.execute_tool(:add_numbers, 2, 3)
+
+      # Verify publish was called afterwards
+      expect(EventService).to have_received(:publish).at_least(:once)
 
       expect(result).to eq(5)
       expect(test_agent.session_data[:tool_executions].size).to eq(1)
@@ -90,9 +91,8 @@ RSpec.describe BaseAgent do
       error_agent = ErrorToolAgent.new(purpose: purpose, agent_activity: agent_activity)
 
       # Expect at least one create event (for the started event)
-      # and publishing an event for both started and error
-      expect(agent_activity.events).to receive(:create!).at_least(:once)
-      expect(EventService).to receive(:publish).at_least(:once)
+      # Expect EventService.publish to be called (simpler check)
+      expect(EventService).to receive(:publish).at_least(:once).and_return(instance_double(BaseEvent))
 
       expect {
         error_agent.execute_tool(:failing_tool)
@@ -181,11 +181,15 @@ RSpec.describe BaseAgent do
         hash_including(
           provider: "OpenAI",
           model: "openai/gpt-4",
-          prompt: prompt,
+          prompt_id: nil, # Use prompt_id instead of prompt
           response: "Hi there!",
           prompt_tokens: 10,
           completion_tokens: 5,
-          tokens_used: 15
+          tokens_used: 15,
+          cost: 0.0006, # Add expectation for cost
+          duration: 0.0, # Add expectation for duration
+          request_payload: "null", # Add expectation for request_payload
+          response_payload: "{\"id\":\"gen-123456\",\"model\":\"openai/gpt-4\",\"choices\":[{\"message\":{\"content\":\"Hi there!\"}}],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5,\"total_tokens\":15}}" # Add expectation for response_payload
         )
       )
 
@@ -202,18 +206,35 @@ RSpec.describe BaseAgent do
 
     it "handles missing or partial response data gracefully" do
       prompt = "Test prompt"
-      minimal_response = double("MinimalResponse", chat_completion: "Test response")
+      minimal_response = instance_double("MinimalResponse", chat_completion: "Test response")
 
-      expect(agent_activity.llm_calls).to receive(:create!).with(
-        hash_including(
-          provider: "openrouter",
-          model: "unknown",
-          prompt: prompt,
-          response: "Test response"
-        )
-      )
+      # Expect llm_calls.create! to be called with the correct arguments (updated for new schema)
+      expect(agent_activity.llm_calls).to receive(:create!).with(hash_including(
+        provider: "openrouter",
+        model: "unknown",
+        prompt_id: nil, # Expect prompt_id instead of prompt
+        response: "Test response",
+        prompt_tokens: 0, # Should default to 0 if nil
+        completion_tokens: 0, # Should default to 0 if nil
+        tokens_used: 0, # Should default to 0 if nil
+        cost: 0.0, # Should default to 0.0 if nil
+        duration: anything, # Check duration exists
+        request_payload: "null", # Should default to "null" if nil
+        response_payload: "null" # Should default to "null" if nil
+      ))
 
-      agent.send(:log_direct_llm_call, prompt, minimal_response)
+      # Simulate a response object that might be missing some methods by allowing them to return nil
+      allow(minimal_response).to receive(:model).and_return(nil)
+      allow(minimal_response).to receive(:provider).and_return(nil)
+      allow(minimal_response).to receive(:prompt_tokens).and_return(nil)
+      allow(minimal_response).to receive(:completion_tokens).and_return(nil)
+      allow(minimal_response).to receive(:total_tokens).and_return(nil)
+      allow(minimal_response).to receive(:raw_response).and_return(nil)
+
+      # Use a hash for the prompt to test prompt_id assignment
+      prompt_hash = { content: "Test prompt", prompt: nil } # No prompt object
+
+      agent.send(:log_direct_llm_call, prompt_hash, minimal_response)
     end
   end
 

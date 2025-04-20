@@ -10,10 +10,7 @@ class TestEvent < BaseEvent
 end
 
 RSpec.describe BaseEvent, type: :event do
-  before do
-    # Stub Event creation
-    allow(Event).to receive(:create!).and_return(double('Event'))
-  end
+  # No before block needed since we're not using Event model anymore
 
   describe 'metadata accessors' do
     let(:metadata) do
@@ -23,7 +20,7 @@ RSpec.describe BaseEvent, type: :event do
         project_id: 789
       }
     end
-    
+
     let(:event) { TestEvent.new(data: {}, metadata: metadata) }
 
     it 'provides access to task_id' do

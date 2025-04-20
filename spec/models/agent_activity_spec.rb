@@ -4,7 +4,6 @@ RSpec.describe AgentActivity, type: :model do
   describe "associations" do
     it { should belong_to(:task) }
     it { should have_many(:llm_calls).dependent(:destroy) }
-    it { should have_many(:events).dependent(:destroy) }
   end
 
   describe "validations" do

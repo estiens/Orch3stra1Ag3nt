@@ -208,10 +208,20 @@ class CoordinatorEventService < BaseEventService
         return nil
       end
 
-      # Update the interaction using its answer! method
-      # Assuming the event data 'input' corresponds to the response text
-      # TODO: Consider passing user_id if available from the event context
-      interaction.answer!(input)
+      # Publish an event indicating that human input has been processed
+      # A separate handler will update the interaction and task status
+      user_id = event.metadata["user_id"] # Assuming user_id might be in metadata
+
+      EventService.publish(
+        "human_input.processed",
+        {
+          request_id: request_id,
+          input: input,
+          task_id: interaction.task_id, # Get task_id from interaction
+          user_id: user_id # Include user_id if available
+        },
+        event.metadata # Pass along original metadata
+      )
 
       # Find the associated task
       task = interaction.task # Use the interaction to find the task
@@ -225,14 +235,14 @@ class CoordinatorEventService < BaseEventService
       # Resume the task with the provided input
       # Note: The resume logic is now handled within interaction.answer! if needed.
       # We might still need to process the input further depending on application logic.
-      if task.status == "waiting_on_human"
+      if task.state == "waiting_on_human"
         logger.info("Task #{task.id} was potentially resumed by HumanInteraction #{interaction.id}. Processing input.")
         # task.resume! # This is now handled internally by answer! -> resume_task
         # Process the human input for the task, using the interaction object
         process_human_input(task, input, interaction)
       else
         # If the task wasn't waiting, maybe just log the input processing?
-        logger.warn("Task #{task.id} not in waiting_on_human status, but received input for HumanInteraction #{interaction.id}. Processing input.")
+        logger.warn("Task #{task.id} not in waiting_on_human state, but received input for HumanInteraction #{interaction.id}. Processing input.")
         process_human_input(task, input, interaction) # Still process the input? Depends on logic.
       end
 

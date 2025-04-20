@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_04_20_182852) do
+ActiveRecord::Schema[8.0].define(version: 2025_04_20_190721) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -53,27 +53,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_20_182852) do
     t.index ["event_id"], name: "index_event_store_events_in_streams_on_event_id"
     t.index ["stream", "event_id"], name: "index_event_store_events_in_streams_on_stream_and_event_id", unique: true
     t.index ["stream", "position"], name: "index_event_store_events_in_streams_on_stream_and_position", unique: true
-  end
-
-  create_table "events", force: :cascade do |t|
-    t.bigint "agent_activity_id"
-    t.string "event_type"
-    t.text "data"
-    t.datetime "occurred_at"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.datetime "processed_at"
-    t.integer "processing_attempts", default: 0
-    t.string "processing_error"
-    t.integer "priority", default: 0
-    t.bigint "task_id"
-    t.bigint "project_id"
-    t.index ["agent_activity_id"], name: "index_events_on_agent_activity_id"
-    t.index ["event_type", "project_id"], name: "index_events_on_event_type_and_project_id"
-    t.index ["event_type", "task_id"], name: "index_events_on_event_type_and_task_id"
-    t.index ["event_type"], name: "index_events_on_event_type"
-    t.index ["project_id"], name: "index_events_on_project_id"
-    t.index ["task_id"], name: "index_events_on_task_id"
   end
 
   create_table "human_interactions", force: :cascade do |t|
@@ -328,9 +307,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_20_182852) do
 
   add_foreign_key "agent_activities", "tasks"
   add_foreign_key "event_store_events_in_streams", "event_store_events", column: "event_id", primary_key: "event_id"
-  add_foreign_key "events", "agent_activities"
-  add_foreign_key "events", "projects"
-  add_foreign_key "events", "tasks"
   add_foreign_key "human_interactions", "agent_activities"
   add_foreign_key "human_interactions", "tasks"
   add_foreign_key "llm_calls", "agent_activities"

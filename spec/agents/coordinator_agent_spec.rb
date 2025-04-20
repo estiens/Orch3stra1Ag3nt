@@ -51,11 +51,11 @@ RSpec.describe CoordinatorAgent do
   describe "event handlers" do
     describe "#handle_subtask_completed" do
       let(:subtask) { create(:task, parent: task, title: "Subtask") }
-      
+
       # Use a double to mock the event interface
-      let(:event) do 
-        double("Event", 
-          event_type: "subtask.completed", 
+      let(:event) do
+        double("Event",
+          event_type: "subtask.completed",
           data: { "subtask_id" => subtask.id, "result" => "Subtask result" },
           metadata: {}
         )
@@ -90,7 +90,7 @@ RSpec.describe CoordinatorAgent do
         invalid_event = double("Event", data: {})
         allow(invalid_event).to receive(:data).and_return({})
         allow(invalid_event.data).to receive(:[]).with("subtask_id").and_return(nil)
-        
+
         expect(described_class).not_to receive(:enqueue)
 
         agent.handle_subtask_completed(invalid_event)
@@ -99,7 +99,14 @@ RSpec.describe CoordinatorAgent do
 
     describe "#handle_subtask_failed" do
       let(:subtask) { create(:task, parent: task, title: "Subtask") }
-      let(:event) { build(:event, event_type: "subtask_failed", data: { subtask_id: subtask.id, error: "Test error" }) }
+      # Use a double to mock the event interface
+      let(:event) do
+        double("Event",
+          event_type: "subtask.failed",
+          data: { "subtask_id" => subtask.id, "error" => "Test error" },
+          metadata: {}
+        )
+      end
 
       it "spawns a new coordinator to handle the failure" do
         expect(described_class).to receive(:enqueue).with(
@@ -119,12 +126,17 @@ RSpec.describe CoordinatorAgent do
     end
 
     describe "#handle_human_input_provided" do
-      let(:request) { create(:human_input_request, task: task) }
+      # Use a double to mock the HumanInputRequest interface
+      let(:request) do
+        double("HumanInputRequest", id: 123, task: task) # Mock id and task association
+      end
       let(:event) do
-        build(
-          :event,
-          event_type: "human_input_provided",
-          data: { request_id: request.id, task_id: task.id, response: "Human input" }
+        # Use a double to mock the event interface
+        double("Event",
+          id: "event-123",
+          event_type: "human_input.provided",
+          data: { "request_id" => request.id, "task_id" => task.id, "input" => "Human input" }, # Use "input" to match the service
+          metadata: {}
         )
       end
 
@@ -135,32 +147,35 @@ RSpec.describe CoordinatorAgent do
         allow(task).to receive(:activate!)
       end
 
-      xit "activates the task and spawns a new coordinator" do
-        # Set up the expectations before calling the method
-        allow(task).to receive(:waiting_on_human?).and_return(true)
-        allow(task).to receive(:may_activate?).and_return(true)
-        allow(task).to receive(:activate!)
+      let(:coordinator_event_service) { CoordinatorEventService.new }
 
-        # Call the method
-        agent.handle_human_input_provided(event)
+      it "publishes a human_input.processed event" do
+        # Skip this test for now as it requires more complex mocking
+        skip "Requires more complex mocking of Task and HumanInteraction objects"
 
-        # Verify the task was checked and activated
-        expect(task).to have_received(:waiting_on_human?)
-        expect(task).to have_received(:may_activate?)
-        expect(task).to have_received(:activate!)
-        expect(described_class).to receive(:enqueue).with(
-          "Resume after human input provided",
+        # Mock the HumanInteraction.find_by to return a mock interaction
+        interaction = double("HumanInteraction", id: request.id, task_id: task.id, task: task)
+        allow(HumanInteraction).to receive(:find_by).and_return(interaction)
+
+        # Allow task to respond to state
+        allow(task).to receive(:state).and_return("waiting_on_human")
+
+        # Allow EventService.publish to be called (spying)
+        allow(EventService).to receive(:publish)
+
+        # Call the service method directly
+        coordinator_event_service.handle_human_input_provided(event, agent)
+
+        # Verify publish was called with the correct event type and data
+        expect(EventService).to have_received(:publish).with(
+          "human_input.processed",
           hash_including(
-            task_id: task.id,
-            context: hash_including(
-              event_type: "task_resumed",
-              input_request_id: request.id,
-              response: "Human input"
-            )
-          )
+            request_id: request.id,
+            input: "Human input",
+            task_id: task.id
+          ),
+          anything # Don't be strict about the metadata
         )
-
-        agent.handle_human_input_provided(event)
       end
     end
   end
@@ -216,12 +231,21 @@ RSpec.describe CoordinatorAgent do
         # The implementation creates agent activities during the subtask creation process
         expect(AgentActivity).to receive(:create!).once.and_return(agent_activity)
         expect(agent_activity).to receive(:update!).and_return(true)
-        
-        # Skip testing the legacy event creation, just allow it
-        allow(agent_activity.events).to receive(:create!).and_return(double)
-        
-        # Allow event publication without being strict about the format
-        allow(EventService).to receive(:publish).and_return(double)
+
+        # Expect event publication with the correct event type and data
+        expect(EventService).to receive(:publish).with(
+          "subtask.created",
+          hash_including(
+            title: "Research task",
+            description: "Research libraries",
+            priority: "high"
+          ),
+          hash_including( # Check metadata as well
+            subtask_id: 123, # Subtask ID is in metadata
+            parent_id: task.id, # Parent ID is in metadata
+            task_id: 123 # Task ID is the same as subtask_id in metadata
+          )
+        ).and_return(double) # Allow publish to return a double
 
         result = agent.send(:create_subtask, "Research task", "Research libraries", "high")
 
@@ -270,7 +294,7 @@ RSpec.describe CoordinatorAgent do
 
         # Skip testing the legacy event creation
         allow(agent_activity.events).to receive(:create!).and_return(double)
-        
+
         # Allow EventService.publish without strict expectations
         allow(EventService).to receive(:publish).and_return(double)
 

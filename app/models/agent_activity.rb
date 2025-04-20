@@ -10,7 +10,6 @@ class AgentActivity < ApplicationRecord
   has_ancestry
 
   has_many :llm_calls, dependent: :destroy
-  has_many :events, dependent: :destroy
 
   # Mark this activity as failed with an error message
   def mark_failed(error_message)
@@ -45,11 +44,12 @@ class AgentActivity < ApplicationRecord
     true
   end
 
-  # Helper to create events with proper context
-  def create_event(event_type, data = {})
-    events.create!(
-      event_type: event_type,
-      data: data
+  # Helper to publish events with proper context
+  def publish_event(event_type, data = {})
+    EventService.publish(
+      event_type,
+      data,
+      { agent_activity_id: id, task_id: task_id }
     )
   end
 end

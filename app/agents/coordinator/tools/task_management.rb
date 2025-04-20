@@ -98,24 +98,21 @@ module Coordinator
           # Create the required agent activity for the subtask
           subtask_agent_activity.update!(task: subtask)
 
-          agent_activity&.events.create!(
-            event_type: "subtask_created",
-            data: { subtask_id: subtask.id, parent_id: task.id, title: title, priority: normalized_priority }
-          )
-
           EventService.publish(
-            "subtask_created",
+            "subtask.created", # Use dot notation for consistency
             { # Data payload
               # subtask_id moved to metadata
               # parent_id moved to metadata
               title: title,
+              description: description, # Include description in event data
               priority: normalized_priority
             },
             { # Metadata
               subtask_id: subtask.id,
               parent_id: task.id,
               task_id: subtask.id, # Include task_id for consistency
-              agent_activity_id: agent_activity&.id
+              agent_activity_id: agent_activity&.id,
+              project_id: task.project_id # Include project_id if available
             }
           )
 
