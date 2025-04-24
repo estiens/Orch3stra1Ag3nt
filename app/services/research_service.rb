@@ -22,14 +22,17 @@ class ResearchService
     )
 
     # Publish the research task created event to trigger the coordinator
-    Event.publish(
+    EventService.publish(
       "research_task_created",
-      {
-        task_id: task.id,
+      { # Data payload
+        # task_id moved to metadata
         title: title,
-        priority: priority
+        priority: priority # Keep priority string in data
       },
-      priority: priority == "high" ? Event::HIGH_PRIORITY : Event::NORMAL_PRIORITY
+      { # Metadata
+        task_id: task.id # For stream routing and context
+      }
+      # Legacy priority option removed
     )
 
     # Log the research initiation

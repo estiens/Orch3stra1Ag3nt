@@ -39,3 +39,4 @@
 config/initializers/fix_key.rb
 .aider*
 .DS_Store
+./clinerules

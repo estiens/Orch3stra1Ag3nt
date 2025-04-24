@@ -76,8 +76,12 @@ GEM
       uri (>= 0.13.1)
     addressable (2.8.7)
       public_suffix (>= 2.0.2, < 7.0)
+    aggregate_root (2.16.0)
+      ruby_event_store (= 2.16.0)
     ancestry (4.3.3)
       activerecord (>= 5.2.6)
+    arkency-command_bus (0.4.1)
+      concurrent-ruby
     ast (2.4.3)
     baran (0.1.12)
     base64 (0.2.0)
@@ -368,6 +372,17 @@ GEM
     rails-html-sanitizer (1.6.2)
       loofah (~> 2.21)
       nokogiri (>= 1.15.7, != 1.16.7, != 1.16.6, != 1.16.5, != 1.16.4, != 1.16.3, != 1.16.2, != 1.16.1, != 1.16.0.rc1, != 1.16.0)
+    rails_event_store (2.16.0)
+      activejob (>= 6.0)
+      activemodel (>= 6.0)
+      activesupport (>= 6.0)
+      aggregate_root (= 2.16.0)
+      arkency-command_bus (>= 0.4)
+      rails_event_store_active_record (= 2.16.0)
+      ruby_event_store (= 2.16.0)
+      ruby_event_store-browser (= 2.16.0)
+    rails_event_store_active_record (2.16.0)
+      ruby_event_store-active_record (= 2.16.0)
     railties (8.0.2)
       actionpack (= 8.0.2)
       activesupport (= 8.0.2)
@@ -434,11 +449,17 @@ GEM
       faraday (>= 1)
       faraday-multipart (>= 1)
     ruby-progressbar (1.13.0)
+    ruby_event_store (2.16.0)
+      concurrent-ruby (~> 1.0, >= 1.1.6)
+    ruby_event_store-active_record (2.16.0)
+      activerecord (>= 6.0)
+      ruby_event_store (= 2.16.0)
+    ruby_event_store-browser (2.16.0)
+      rack
+      ruby_event_store (= 2.16.0)
     rubyntlm (0.6.5)
       base64
     securerandom (0.4.1)
-    sequel (5.91.0)
-      bigdecimal
     shoulda-matchers (6.4.0)
       activesupport (>= 5.2.0)
     solid_cable (3.0.7)
@@ -556,10 +577,10 @@ DEPENDENCIES
   pry-rails
   puma (>= 5.0)
   rails (~> 8.0.2)
+  rails_event_store (~> 2.16)
   rspec-rails
   rubocop-rails-omakase
   ruby-openai (~> 8.1)
-  sequel (~> 5.91)
   shoulda-matchers (~> 6.0)
   solid_cable
   solid_cache

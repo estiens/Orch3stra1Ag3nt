@@ -3,7 +3,7 @@ FactoryBot.define do
     association :agent_activity
     provider { "openrouter" }
     model { "deepseek/deepseek-chat-v3-0324" }
-    prompt { "This is a test prompt" }
+    prompt_id { nil }
     response { "This is a test response" }
     tokens_used { 100 }
     prompt_tokens { 50 }

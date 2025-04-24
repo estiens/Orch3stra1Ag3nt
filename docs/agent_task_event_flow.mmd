@@ -1,0 +1,8 @@
+flowchart LR
+  Project --> Task
+  Task --> AgentActivity
+  AgentActivity -->|publish_event| EventService
+  EventService -->|publish| RailsEventStore
+  RailsEventStore -->|dispatch to| EventSubscriber
+  AgentActivity -->|calls| LlmCall
+  AgentActivity -->|requests| HumanInputRequest

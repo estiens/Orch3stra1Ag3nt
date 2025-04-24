@@ -18,14 +18,13 @@ default: &default
   # For details on connection pooling, see Rails configuration guide
   # https://guides.rubyonrails.org/configuring.html#database-pooling
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-  host: localhost
-  username: postgres
-  password: postgres
+
 
 development:
   primary: &primary_development
     <<: *default
     database: double_agent_development
+    host: localhost
   queue:
     <<: *primary_development
     database: double_agent_development_queue
@@ -64,8 +63,7 @@ development:
 test:
   <<: *default
   database: double_agent_test
-  username: postgres
-  url: <%= ENV["DATABASE_URL"] %>
+  host: localhost
 
 # As with config/credentials.yml, you never want to store sensitive information,
 # like your database password, in your source code. If your source code is

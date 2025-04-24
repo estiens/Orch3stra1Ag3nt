@@ -1,0 +1,63 @@
+# Rails 8 Multi-Agent System: Core Rules & Architecture
+
+## 1. Rails 8 as Foundation
+- Use Rails 8 for its robust job system (Solid Queue/Sidekiq), real-time UI (Turbo Streams), and strong developer ergonomics.
+- All agent logic lives in `app/services/agents/`, with orchestration, monitoring, and data handled by Rails.
+
+## 2. Agents as Jobs
+- Each agent is a job (in `app/jobs/agents/`), stateless or stateful, short-lived, and event-triggered.
+- Agent operations (state changes, LLM calls, child agent spawning) must go through DB models and callbacks.
+
+## 3. Core Models
+- **Task**: Top-level unit, state machine (pending, active, waiting_on_human, completed, failed).
+- **AgentActivity**: Each agent spawn/subtask, with parent/child relationships.
+- **LlmCall**: Every LLM/tool interaction, with full request/response, duration, cost.
+- **Event**: All meaningful events (errors, retries, human requests, completions, etc.).
+- **ClarificationRequest**: For HITL (Human-in-the-Loop) events.
+
+## 4. Observability & Dashboard
+- Use Rails Admin/ActiveAdmin or custom dashboards for all models.
+- Turbo Streams/ActionCable for live event/HITL notification.
+- Real-time visibility into agent activity, job queues, LLM calls, errors, and HITL requests.
+
+## 5. State Machines & Guards
+- Use `aasm` or `state_machines-activerecord` for Task and AgentActivity state.
+- On transitions (e.g., to errored), define guards/hooks for side effect control and event emission.
+
+## 6. Queue Management & Safeguards
+- Assign each agent type to a unique queue (e.g., :orchestration, :web_scraping).
+- Enforce max parallelism/spawn depth per Task and queue.
+- OrchestratorAgent can cancel or reprioritize queues dynamically.
+- Implement circuit-breakers and ResourceMonitorAgent to prevent runaway spawns (e.g., 50 agents spawning 50,000).
+
+## 7. Event Bus & HITL
+- Use Regent for pub/sub event bus, integrated with Rails for persistence and UI updates.
+- HITL events (soft/harsh/system-wide) pause jobs or require human/admin action via dashboard.
+- All HITL events are persisted and surfaced in the UI.
+
+## 8. LLM Logging & Validation
+- Every LLM call is logged as an LlmCall model.
+- Validation failures trigger FixResponseAgent or escalate via HITL.
+
+## 9. LangChain.rb & JSON Schema Validation
+- The system uses the [langchainrb Ruby gem](https://github.com/andrewmcodes/langchainrb) (not the Python framework).
+- langchainrb provides built-in JSON Schema validation for tool and agent interactions.
+- If validation or tool integration isn't working as expected, review the [langchainrb documentation](https://github.com/andrewmcodes/langchainrb) for guidance and updates.
+
+## 10. Bootstrapping & Dogfooding
+- System is built iteratively by agents (coding, review) and orchestrator, with tight HITL oversight.
+- Early phases focus on core models, agent/job structure, dashboard, and spawn control.
+- Iterative updates to spec and rules as system evolves.
+
+## 11. Recommended Gems
+- State machines: aasm, state_machines-activerecord
+- Jobs: solid_queue (Rails 8), sidekiq (optional)
+- Vector search: pgvector
+- Realtime UI: turbo-rails, ActionCable
+- LLM/AI: open_router, langchainrb
+- Testing: rspec-rails, factory_bot_rails
+
+## 12. Critical Safeguards
+- Always monitor job queues for runaway behavior.
+- Use dashboard and queue UIs for real-time oversight.
+- All agent logic should be portable, testable, and isolated in services.

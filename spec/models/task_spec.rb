@@ -12,6 +12,11 @@ RSpec.describe Task, type: :model do
   describe "state machine" do
     let(:task) { build(:task) }
 
+    before do
+      # Stub the enqueue_for_processing method to avoid spawning agents in tests
+      allow_any_instance_of(Task).to receive(:enqueue_for_processing).and_return(true)
+    end
+
     it "has initial state pending" do
       expect(task.aasm.current_state).to eq(:pending)
     end

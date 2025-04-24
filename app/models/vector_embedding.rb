@@ -1,4 +1,6 @@
 class VectorEmbedding < ApplicationRecord
+  include Contextable
+
   belongs_to :task, optional: true
   belongs_to :project, optional: true
 

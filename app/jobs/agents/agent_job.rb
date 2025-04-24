@@ -80,9 +80,10 @@ class Agents::AgentJob < ApplicationJob
         agent_activity.update!(status: "completed", completed_at: Time.current)
 
         # Emit event for completed agent activity
-        agent_activity.events.create!(
-          event_type: "agent_completed",
-          data: { result: result.to_s.truncate(1000) }
+        EventService.publish(
+          "agent_completed",
+          { result: result.to_s.truncate(1000) },
+          { agent_activity_id: agent_activity.id, task_id: task.id }
         )
 
         # Always mark the task as completed when the agent finishes successfully
@@ -111,26 +112,27 @@ class Agents::AgentJob < ApplicationJob
       )
 
       # Create error event with more detailed information
-      agent_activity.events.create!(
-        event_type: "agent_failed",
-        data: {
+      EventService.publish(
+        "agent_failed",
+        {
           error: e.message,
           error_class: e.class.name,
           recoverable: ErrorHandler::TRANSIENT_ERRORS.any? { |err| e.is_a?(err) }
-        }
+        },
+        { agent_activity_id: agent_activity.id, task_id: task.id }
       )
 
       # Emit a system-wide error event for possible automatic recovery
-      Event.publish(
-        "agent_error",
+      EventService.publish(
+        "agent.error",
         {
           agent_class: agent_klass.name,
           task_id: task.id,
           agent_activity_id: agent_activity.id,
           error: e.message,
           error_class: e.class.name
-        },
-        priority: Event::HIGH_PRIORITY
+        }
+        # Removed legacy priority option
       )
 
       # Mark task as failed unless it's already in another terminal state

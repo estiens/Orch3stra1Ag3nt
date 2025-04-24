@@ -41,9 +41,9 @@ class Project < ApplicationRecord
 
         # Create the initial orchestration task
         orchestration_task = tasks.create!(
-          title: "Project Orchestration: #{name}",
+          title: "Project Coordination: #{name}",
           description: "Initial task to plan and coordinate project: #{description}",
-          task_type: "orchestration",
+          task_type: "coordination",
           priority: "high",
           metadata: {
             project_kickoff: true,
@@ -52,7 +52,46 @@ class Project < ApplicationRecord
           }
         )
 
-        # Publish event to trigger OrchestratorAgent with system_event flag
+        # Directly spawn a CoordinatorAgent instead of going through the OrchestratorAgent
+        coordinator_options = {
+          task_id: orchestration_task.id,
+          purpose: "Coordinate execution of project: #{name}",
+          priority: "high",
+          metadata: {
+            project_id: id,
+            project_name: name,
+            task_type: "root_task"
+          }
+        }
+
+        # Create instructions for the coordinator
+        instructions = <<~INSTRUCTIONS
+          # PROJECT COORDINATION TASK
+
+          ## Project: #{name} (ID: #{id})
+
+          #{description}
+
+          ## Instructions
+          1. Analyze the project requirements
+          2. Decompose into atomic subtasks
+          3. Assign appropriate agent types for each subtask
+          4. Monitor and coordinate subtask execution
+          5. Ensure all critical paths are addressed
+
+          ## Important
+          - Focus on creating highly atomic, focused subtasks
+          - Use nested coordinators for complex work
+          - Ensure all critical paths are being addressed
+        INSTRUCTIONS
+
+        # Enqueue the coordinator directly
+        CoordinatorAgent.enqueue(instructions, coordinator_options)
+
+        # Activate the task to start processing
+        orchestration_task.activate!
+
+        # Still publish the project_created event for other listeners
         begin
           # Find or create a dummy agent activity for the event
           dummy_activity = orchestration_task.agent_activities.first_or_create!(
@@ -67,16 +106,12 @@ class Project < ApplicationRecord
               project_id: id,
               task_id: orchestration_task.id,
               priority: priority
-            },
-            { priority: Event::HIGH_PRIORITY }
+            }
           )
         rescue => e
           # Log but continue if event publishing fails
           Rails.logger.error("Failed to publish project_created event: #{e.message}")
         end
-
-        # Activate the task to start processing
-        orchestration_task.activate!
 
         # Return the orchestration task
         orchestration_task
@@ -179,15 +214,19 @@ class Project < ApplicationRecord
           )
         else
           # Create a system event if no agent activities exist
-          Event.publish(
+          EventService.publish(
             "project_paused",
-            {
-              project_id: id,
+            { # Data payload
+              # project_id moved to metadata
               project_name: name,
               paused_at: Time.current
             },
-            { priority: Event::HIGH_PRIORITY }
-          ) if defined?(Event)
+            { # Metadata
+              project_id: id
+            }
+            # Legacy priority option removed
+            # 'if defined?(Event)' removed
+          )
         end
       rescue => e
         # Log but don't fail if event publishing fails
@@ -248,15 +287,19 @@ class Project < ApplicationRecord
           )
         else
           # Create a system event if no agent activities exist
-          Event.publish(
+          EventService.publish(
             "project_resumed",
-            {
-              project_id: id,
+            { # Data payload
+              # project_id moved to metadata
               project_name: name,
               resumed_at: Time.current
             },
-            { priority: Event::HIGH_PRIORITY }
-          ) if defined?(Event)
+            { # Metadata
+              project_id: id
+            }
+            # Legacy priority option removed
+            # 'if defined?(Event)' removed
+          )
         end
       rescue => e
         # Log but don't fail if event publishing fails
@@ -264,14 +307,17 @@ class Project < ApplicationRecord
       end
 
       # Trigger project re-coordination
-      Event.publish(
+      EventService.publish(
         "project_recoordination_requested",
-        {
-          project_id: id,
+        { # Data payload
+          # project_id moved to metadata
           project_name: name,
           reason: "Project resumed after being paused"
         },
-        { priority: Event::HIGH_PRIORITY }
+        { # Metadata
+          project_id: id
+        }
+        # Legacy priority option removed
       )
 
       true

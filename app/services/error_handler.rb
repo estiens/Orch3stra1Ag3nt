@@ -141,10 +141,10 @@ class ErrorHandler
     }
 
     # Create an event for this error
-    Event.publish(
-      "agent_error_occurred",
-      event_data,
-      priority: Event::HIGH_PRIORITY
+    EventService.publish(
+      "agent.error_occurred",
+      event_data
+      # Removed legacy priority option
     )
   end
 

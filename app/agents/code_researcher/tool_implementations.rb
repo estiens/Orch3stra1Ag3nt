@@ -172,10 +172,19 @@ module CodeResearcher
 
       # Publish event if this is a subtask
       if task.parent_id
-        Event.publish(
+        EventService.publish(
           "research_subtask_completed",
-          { subtask_id: task.id, parent_id: task.parent_id, result: compiled_result },
-          { agent_activity_id: agent_activity&.id }
+          { # Data payload
+            # subtask_id moved to metadata
+            # parent_id moved to metadata
+            result: compiled_result
+          },
+          { # Metadata
+            subtask_id: task.id,
+            parent_id: task.parent_id,
+            task_id: task.id, # Include task_id for consistency
+            agent_activity_id: agent_activity&.id
+          }
         )
       end
 
