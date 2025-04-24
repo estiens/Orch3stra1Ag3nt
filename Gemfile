@@ -88,7 +88,7 @@ gem "dry-validation"
 # web scraping
 
 gem "httparty", "~> 0.21"
-gem "nokogiri", "~> 1.15"
+gem "nokogiri", "~> 1.18"
 gem "mechanize", "~> 2.9"
 gem "typhoeus"
 
