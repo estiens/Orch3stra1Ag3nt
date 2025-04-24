@@ -60,7 +60,6 @@ module Coordinator
     # Handle human input required
     def handle_human_input_required(event)
       task_id = event.data["task_id"]
-      return if task_id.blank?
 
       # Find the task directly
       task = Task.find_by(id: task_id)

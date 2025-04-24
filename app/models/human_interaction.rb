@@ -5,8 +5,7 @@ class HumanInteraction < ApplicationRecord
   include DashboardBroadcaster # Needed for input request events
   include Contextable
 
-  belongs_to :agent_activity, optional: true # AgentActivity might not always be present for manual creations
-  belongs_to :task, optional: true # Task might not always be present initially
+  belongs_to :project
 
   # Interaction Types
   INTERACTION_TYPES = %w[intervention input_request].freeze

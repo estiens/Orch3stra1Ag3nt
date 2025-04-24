@@ -15,15 +15,6 @@ class DashboardEventHandler
     Rails.logger.info "DashboardEventHandler processed event: #{event_type}"
   end
 
-  # Legacy handler method called by EventBus (for backward compatibility)
-  def handle_event(event)
-    # Process different event types
-    process_event_type(event.event_type.to_s)
-
-    # Log the event for debugging
-    Rails.logger.info "DashboardEventHandler processed event: #{event.event_type}"
-  end
-
   private
 
   def process_event_type(event_type)

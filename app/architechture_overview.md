@@ -69,7 +69,7 @@ This document provides an overview of the Rails models in the `models` directory
 *   **Associations**:
     *   `belongs_to :task`: Each agent activity belongs to a task.
     *   `has_many :llm_calls`:  An agent activity can make many LLM calls. Deleting an activity also deletes its calls.
-    *   `has_many :events`: An agent activity generates multiple events. Deleting an activity also deletes its events.
+
     *   `has_ancestry`: Used for representing a tree structure of agent activies.
 
 *   **Functionality**:
@@ -147,23 +147,6 @@ This document provides an overview of the Rails models in the `models` directory
     *   Stores and searches for similar embeddings using vector similarity search.
     *   Provides a method for generating embeddings from text.
 
-### 9. `Event` (`event.rb`)
-
-*   **Purpose**: Represents an event that occurred within the system. Events are used for auditing, debugging, and triggering actions.
-*   **Attributes**:
-    *   `event_type`: The type of event (string).
-    *   `data`: A hash containing event-specific data (JSON).
-    *   `processed_at`: Timestamp when the event was processed (datetime).
-    *   `priority`:  An integer representing the priority of the event.
-*   **Associations**:
-    *   `belongs_to :agent_activity`: An event can belong to an agent activity (optional for system events).
-*   **Functionality**:
-    *   Records events with associated data.
-    *   Publishes events to an event bus for processing.
-    *   Provides scopes for querying events.
-    *   Supports system events (not tied to a specific agent activity).
-    *   Validates events against a schema.
-
 ## Concerns
 
 Concerns are modules that provide shared functionality to multiple models.
@@ -176,10 +159,6 @@ Concerns are modules that provide shared functionality to multiple models.
     *   Provides a `context` method to return a hash of context attributes.
     *   Automatically propagates context from associations.
     *   Provides a `with_context` method to set context from another object or a hash.
-
-### 2. `DashboardBroadcaster` (`concerns/dashboard_broadcaster.rb`)
-
-*   **Purpose**:  **DEPRECATED** Intended to provide a way to broadcast updates to a dashboard. However, this functionality is now handled by the `EventBus` system, making this concern essentially a no-op.  It exists for backwards compatibility.
 
 ### 3. `SolidQueueManagement` (`concerns/solid_queue_management.rb`)
 
@@ -214,3 +193,28 @@ Concerns are modules that provide shared functionality to multiple models.
 ## Model Relationships Summary
 
 The models are interconnected to represent a complex system of projects, tasks, agents, human interaction, knowledge management, and event tracking. The `Contextable` concern plays a crucial role in ensuring that all models have access to the relevant context, while the `EventPublisher` concern enables the system to react to changes and provide real-time updates. `SolidQueueManagement` handles asynchronous processing of tasks and activities.
+## Pub/Sub Event System
+
+The application now utilizes a pub/sub event system to decouple event emission from handling:
+
+* **EventPublisher** (concern)
+  * Included in models and agent activities.
+  * Use `publish_event(event_type, data, options)` to emit events via `EventService`.
+  * Automatically merges context (`project_id`, `task_id`, `agent_activity_id`) and enforces required fields via `EventSchemaRegistry`.
+
+* **EventSubscriber** (concern)
+  * Included in agents and other event-aware components.
+  * Use `subscribe_to \"event.name\", :handler_method` or a block to register callbacks.
+  * Integrates with Rails Event Store for delivery (`Rails.configuration.event_store`).
+  * Provides `event_subscriptions` helper for test inspection.
+
+* **EventService**
+  * Core service receiving published events.
+  * Dispatches events to subscribers via Rails Event Store.
+
+* **Rails Event Store**
+  * Underlying event dispatcher in non-test environments.
+  * Handlers must implement `call(event)` (or use `handle_event` legacy method).
+
+This structure ensures consistent event flow, clear separation of concerns, and improved testability.
+

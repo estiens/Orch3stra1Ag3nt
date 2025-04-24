@@ -77,9 +77,4 @@ module EventSubscriber
       instance_exec(event, &callback)
     end
   end
-
-  # Legacy method for backward compatibility
-  def handle_event(event)
-    call(event)
-  end
 end

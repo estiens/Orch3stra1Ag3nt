@@ -70,22 +70,13 @@ We will not pass both `Task` and `AgentActivity` around; all logic starts from `
 
 ---
 
-## 4. Open Questions
-
-- What is the best way to consolidate HITL models for both routine and critical interventions?
-- How should we optimize event handling for high-volume scenarios?
-- Should we implement event versioning for better forward compatibility?
 
 ---
 
 ## 5. Next Steps
 
 - Proceed with keeping `AgentActivity` as a strictly task-scoped model.
-- Begin consolidation of HITL models.
-- Complete the event system transition by updating tests and enabling the pure RailsEventStore mode in production.
-- Consider event versioning for future-proofing the system.
-- Implement performance monitoring and optimizations for high-volume event scenarios.
 
 ---
 
-*This document will be updated as architectural decisions evolve. See also: `.clinerules/rails_multi_agent_system.clinerule` and `app/architechture_overview.md` for further context.*
+*This document will be updated as architectural decisions evolve. See also: `.clinerules/rails_multi_agent_system.clinerule` and `app/architecture_overview.md` for further context.*

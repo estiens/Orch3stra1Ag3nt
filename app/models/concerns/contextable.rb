@@ -7,14 +7,18 @@ module Contextable
 
   included do
     # Define associations if they don't exist
-    belongs_to :task, optional: true unless method_defined?(:task)
-    belongs_to :agent_activity, optional: true unless method_defined?(:agent_activity)
+    if respond_to?(:belongs_to)
+      belongs_to :task, optional: true unless method_defined?(:task)
+      belongs_to :agent_activity, optional: true unless method_defined?(:agent_activity)
 
-    # Define project association if it doesn't exist and task association exists
-    belongs_to :project, optional: true unless method_defined?(:project)
+      # Define project association if it doesn't exist and task association exists
+      belongs_to :project, optional: true unless method_defined?(:project)
+    end
 
-    # Define helper methods to access context
-    before_validation :propagate_context, if: :new_record?
+    # Define helper methods to access context in ActiveRecord models
+    if ancestors.include?(ActiveRecord::Base)
+      before_validation :propagate_context, if: :new_record?
+    end
   end
 
   # Get the current context as a hash
