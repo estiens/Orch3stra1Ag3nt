@@ -33,6 +33,9 @@ module Orch3stra1Ag3nt
     # This is safer than modifying autoload_paths
     config.paths.add "app/agents", eager_load: true
 
+    Rails.autoloaders.main.ignore(Rails.root.join("app/*/deprecated"))
+    Rails.autoloaders.main.ignore(Rails.root.join("app/**/deprecated"))
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files
