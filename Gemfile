@@ -2,7 +2,7 @@ gem "ancestry"
 
 source "https://rubygems.org"
 group :test do
-  gem "shoulda-matchers", "~> 6.0"
+  gem "shoulda-matchers", "~> 6.5"
 end
 
 gem "aasm"
